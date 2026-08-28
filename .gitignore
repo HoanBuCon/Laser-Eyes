@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.docx_qa/
+.qa/
+data/evidence/
+data/sessions/
+data/settings.json
+*.log
+reports/
+
+dataset*/

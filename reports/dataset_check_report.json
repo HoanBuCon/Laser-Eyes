@@ -3,25 +3,25 @@
   "splits": {
     "train": {
       "split": "train",
-      "image_count": 1479,
-      "label_count": 1479,
+      "image_count": 493,
+      "label_count": 493,
       "missing_labels_count": 0,
       "orphaned_labels_count": 0,
       "empty_labels_count": 0,
-      "total_annotations": 40440,
+      "total_annotations": 13480,
       "class_counts": {
-        "back peeking": 462,
-        "front peeking": 14382,
-        "no cheating": 16989,
-        "phone using": 1272,
-        "side peeking": 7335
+        "back peeking": 154,
+        "front peeking": 4794,
+        "no cheating": 5663,
+        "phone using": 424,
+        "side peeking": 2445
       },
       "raw_class_counts": {
-        "2": 16989,
-        "4": 7335,
-        "3": 1272,
-        "0": 462,
-        "1": 14382
+        "2": 5663,
+        "4": 2445,
+        "3": 424,
+        "0": 154,
+        "1": 4794
       },
       "corrupt_lines": 0,
       "degenerate_boxes": 0,
@@ -81,15 +81,15 @@
     }
   },
   "summary": {
-    "total_images": 1693,
-    "total_labels": 1693,
-    "total_annotations": 46313,
+    "total_images": 707,
+    "total_labels": 707,
+    "total_annotations": 19353,
     "class_distribution": {
-      "back peeking": 546,
-      "front peeking": 16406,
-      "no cheating": 19515,
-      "phone using": 1477,
-      "side peeking": 8369
+      "back peeking": 238,
+      "front peeking": 6818,
+      "no cheating": 8189,
+      "phone using": 629,
+      "side peeking": 3479
     }
   }
 }

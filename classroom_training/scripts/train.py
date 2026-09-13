@@ -29,20 +29,28 @@ logger = logging.getLogger("ClassroomTrainer")
 
 def run_training(
     data_yaml: Path,
-    model_size: str = "yolov8n.pt",
+    model_size: str = "yolo12s.pt",
     epochs: int = 100,
-    batch_size: int = 16,
+    batch_size: int = 8,
     img_size: int = 640,
     device: str = "",
-    patience: int = 15,
-    optimizer: str = "AdamW",
-    lr0: float = 0.001,
+    patience: int = 25,
+    optimizer: str = "auto",
+    lr0: float = 0.01,
     lrf: float = 0.01,
     project_dir: Path = Path("D:/VIGIL_AI_Results/training") if Path("D:/").exists() else Path("results/training"),
     run_name: str | None = None,
     deploy_model_path: Path = Path("models/classroom_best.pt"),
 ) -> str | None:
     """Execute YOLO fine-tuning pipeline on custom classroom dataset."""
+    os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+    try:
+        import torch
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    except Exception:
+        pass
+
     if run_name is None:
         run_name = f"{Path(model_size).stem}_classroom"
     try:
@@ -72,19 +80,30 @@ def run_training(
         "optimizer": optimizer,
         "lr0": lr0,
         "lrf": lrf,
+        "cos_lr": True,
         "weight_decay": 0.0005,
         "warmup_epochs": 3,
-        # Classroom context augmentations
+        "workers": 2,
+        # Loss weighting (weighted classification for minority classes)
+        "cls": 1.2,
+        "box": 7.5,
+        "dfl": 1.5,
+        # Natural classroom online augmentations for clean raw images
         "hsv_h": 0.015,
-        "hsv_s": 0.3,
-        "hsv_v": 0.3,
-        "degrees": 4.0,
+        "hsv_s": 0.4,
+        "hsv_v": 0.4,
+        "degrees": 0.0,      # Maintain natural upright sitting orientation
         "translate": 0.1,
-        "scale": 0.25,
-        "flipud": 0.0,  # Never flip vertical for classroom proctoring
-        "fliplr": 0.5,
-        "mosaic": 0.8,
-        "mixup": 0.1,
+        "scale": 0.25,       # Multi-scale distance invariance (near/far desks)
+        "shear": 0.0,
+        "perspective": 0.0,
+        "flipud": 0.0,       # Never flip vertically in classroom
+        "fliplr": 0.5,       # Left/right symmetry
+        "mosaic": 0.7,       # Multi-context learning
+        "mixup": 0.0,
+        "copy_paste": 0.0,
+        "erasing": 0.0,      # Do not erase small phones
+        "close_mosaic": 15,  # Turn off mosaic in last 15 epochs for pristine convergence
         "project": str(project_dir),
         "name": run_name,
         "exist_ok": True,
@@ -93,11 +112,14 @@ def run_training(
         "plots": True,
         "val": True,
         "verbose": True,
-        "cache": True,
+        "cache": False,
+        "amp": True,
     }
 
     if device:
         training_kwargs["device"] = device
+    elif torch.cuda.is_available():
+        training_kwargs["device"] = "0"
 
     try:
         results = model.train(**training_kwargs)
@@ -134,13 +156,13 @@ def main() -> None:
         "--model",
         type=str,
         default="yolo12s.pt",
-        help="Pretrained YOLO base model (yolo12s.pt, yolov8s.pt, yolo11s.pt)",
+        help="Pretrained YOLO base model (yolo12s.pt, yolo11s.pt, yolov8s.pt)",
     )
     parser.add_argument("--epochs", type=int, default=100, help="Max training epochs")
-    parser.add_argument("--batch", type=int, default=16, help="Batch size")
+    parser.add_argument("--batch", type=int, default=8, help="Batch size (default: 8 for VRAM stability)")
     parser.add_argument("--imgsz", type=int, default=640, help="Input image resolution")
     parser.add_argument("--device", type=str, default="", help="Device: '0', 'cpu', 'mps'")
-    parser.add_argument("--patience", type=int, default=15, help="Early stopping patience")
+    parser.add_argument("--patience", type=int, default=25, help="Early stopping patience (default: 25)")
     parser.add_argument(
         "--project",
         type=Path,

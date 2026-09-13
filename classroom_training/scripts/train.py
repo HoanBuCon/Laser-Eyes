@@ -38,11 +38,13 @@ def run_training(
     optimizer: str = "AdamW",
     lr0: float = 0.001,
     lrf: float = 0.01,
-    project_dir: Path = Path("results/training"),
-    run_name: str = "yolov8n_classroom",
+    project_dir: Path = Path("D:/VIGIL_AI_Results/training") if Path("D:/").exists() else Path("results/training"),
+    run_name: str | None = None,
     deploy_model_path: Path = Path("models/classroom_best.pt"),
 ) -> str | None:
     """Execute YOLO fine-tuning pipeline on custom classroom dataset."""
+    if run_name is None:
+        run_name = f"{Path(model_size).stem}_classroom"
     try:
         from ultralytics import YOLO
     except ImportError:
@@ -87,10 +89,11 @@ def run_training(
         "name": run_name,
         "exist_ok": True,
         "save": True,
-        "save_period": 10,
+        "save_period": -1,
         "plots": True,
         "val": True,
         "verbose": True,
+        "cache": True,
     }
 
     if device:
@@ -119,6 +122,7 @@ def run_training(
 
 
 def main() -> None:
+    default_proj = Path("D:/VIGIL_AI_Results/training") if Path("D:/").exists() else Path("results/training")
     parser = argparse.ArgumentParser(description="Train YOLO for Classroom Cheating Detection")
     parser.add_argument(
         "--data",
@@ -129,14 +133,20 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default="yolov8n.pt",
-        help="Pretrained YOLO base model (yolov8n.pt, yolov8s.pt, yolo11n.pt)",
+        default="yolo12s.pt",
+        help="Pretrained YOLO base model (yolo12s.pt, yolov8s.pt, yolo11s.pt)",
     )
     parser.add_argument("--epochs", type=int, default=100, help="Max training epochs")
     parser.add_argument("--batch", type=int, default=16, help="Batch size")
     parser.add_argument("--imgsz", type=int, default=640, help="Input image resolution")
     parser.add_argument("--device", type=str, default="", help="Device: '0', 'cpu', 'mps'")
     parser.add_argument("--patience", type=int, default=15, help="Early stopping patience")
+    parser.add_argument(
+        "--project",
+        type=Path,
+        default=default_proj,
+        help="Directory to save training artifacts and logs",
+    )
     parser.add_argument(
         "--deploy-path",
         type=Path,
@@ -153,6 +163,7 @@ def main() -> None:
         img_size=args.imgsz,
         device=args.device,
         patience=args.patience,
+        project_dir=args.project,
         deploy_model_path=args.deploy_path,
     )
 

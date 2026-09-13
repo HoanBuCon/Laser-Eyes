@@ -1,36 +1,78 @@
-# ==============================================================================
-# VIGIL AI — Complete Requirements Specification
-# Module 1: Eyes Gaze Personal Proctoring (MediaPipe & Acoustic VAD)
-# Module 2: Classroom Cheating Surveillance Enterprise (YOLOv8 & FastAPI Backend)
-# ==============================================================================
-
-# ---- Computer Vision & Deep Learning ----
-opencv-python>=4.8.0
-mediapipe>=0.10.14
-ultralytics>=8.2.0
-torch>=2.0.0
-torchvision>=0.15.0
-
-# ---- Numerics, Image & Signal Processing ----
-numpy>=1.24.0
-Pillow>=10.0.0
-matplotlib>=3.7.0
-PyYAML>=6.0
-tqdm>=4.65.0
-sounddevice>=0.4.6
-webrtcvad-wheels>=2.0.10
-
-# ---- API Backend & Web Infrastructure ----
-fastapi>=0.110.0
-uvicorn[standard]>=0.29.0
-pydantic>=2.7.0
-python-multipart>=0.0.9
-requests>=2.31.0
-aiofiles>=23.2.0
-jinja2>=3.1.0
-
-# ---- Database & Storage Layer ----
-SQLAlchemy>=2.0.0
-
-# ---- Testing & Code Quality ----
-pytest>=8.0.0
+absl-py==2.5.0
+aiofiles==25.1.0
+annotated-doc==0.0.5
+annotated-types==0.8.0
+anyio==4.15.1
+attrs==26.1.0
+bcrypt==5.0.0
+certifi==2026.7.22
+cffi==2.1.1
+charset-normalizer==3.5.1
+click==8.5.0
+colorama==0.4.6
+contourpy==1.3.3
+cycler==0.12.1
+fastapi==0.141.1
+filelock==3.32.6
+flatbuffers==25.12.19
+fonttools==4.65.0
+fsspec==2026.7.0
+greenlet==3.5.5
+h11==0.16.0
+httpcore==1.0.9
+httptools==0.8.0
+httpx==0.28.1
+idna==3.19
+iniconfig==2.3.0
+jax==0.7.1
+jaxlib==0.7.1
+Jinja2==3.1.6
+kiwisolver==1.5.1
+MarkupSafe==3.0.3
+matplotlib==3.11.2
+mediapipe==0.10.14
+ml_dtypes==0.5.4
+mpmath==1.3.0
+networkx==3.6.1
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+opencv-python==4.10.0.84
+opt_einsum==3.4.0
+packaging==26.3
+pillow==12.3.0
+pluggy==1.6.0
+polars==1.44.2
+polars-runtime-32==1.44.2
+protobuf==4.25.9
+psutil==7.2.2
+psycopg2-binary==2.9.13
+pycparser==3.0
+pydantic==2.13.5
+pydantic_core==2.46.5
+Pygments==2.21.0
+PyMySQL==1.2.0
+pyparsing==3.3.2
+pytest==9.1.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.3
+python-multipart==0.0.32
+PyYAML==6.0.3
+requests==2.34.2
+scipy==1.17.1
+six==1.17.0
+sounddevice==0.5.6
+SQLAlchemy==2.0.52
+starlette==1.6.0
+sympy==1.14.0
+torch==2.14.0
+torchvision==0.29.0
+tqdm==4.70.1
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+ultralytics==8.3.253
+ultralytics-thop==2.1.6
+urllib3==2.7.0
+uvicorn==0.52.4
+watchfiles==1.2.0
+webrtcvad-wheels==2.0.14
+websockets==17.1

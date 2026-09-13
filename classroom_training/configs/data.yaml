@@ -1,7 +1,7 @@
 # VIGIL AI - Classroom Cheating Detection Dataset Configuration
 # 5 Classes (Class 'gesture using' was pruned due to lack of samples)
 
-path: ../../dataset  # Dataset root directory relative to this config file
+path: H:/Code/MingKingLaser/laser_eyes/dataset
 train: train/images
 val: valid/images
 test: test/images

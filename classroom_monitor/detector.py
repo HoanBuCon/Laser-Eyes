@@ -1,19 +1,21 @@
-"""YOLO Object Detection Inference Wrapper for Classroom Surveillance.
+"""YOLO Object Detection Inference Wrapper with High-Res Tiling Support (SAHI).
 
-Handles model loading, fallback mechanisms, frame inference, and parsing
-bounding boxes into clean Detection data structures.
+Handles model loading, fallback mechanisms, single-frame inference,
+and dynamic high-resolution image slicing (SAHI-style tiling) to preserve
+small object detail (e.g., phones at the back of large lecture halls).
 """
 
 from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
 from classroom_monitor.models import Detection
+from classroom_monitor.spatial_matcher import compute_bbox_iou
 
 logger = logging.getLogger("ClassroomDetector")
 
@@ -71,7 +73,7 @@ class ClassroomDetector:
         self._is_mock = True
 
     def detect(self, frame: np.ndarray, frame_index: int = 0) -> List[Detection]:
-        """Run object detection on a single video frame."""
+        """Run object detection on a single video frame with optional SAHI high-res tiling."""
         if frame is None or frame.size == 0:
             return []
 
@@ -80,6 +82,17 @@ class ClassroomDetector:
         if self._is_mock or self.model is None:
             return self._mock_detect(frame, frame_index, w, h)
 
+        # High-Resolution Slicing (SAHI) for large frames if enabled
+        if self.config.enable_sahi_tiling and (w >= self.config.sahi_min_resolution or h >= self.config.sahi_min_resolution):
+            return self._detect_sliced(frame, frame_index, w, h)
+
+        # Standard full-frame inference
+        return self._detect_standard(frame, frame_index, w, h)
+
+    def _detect_standard(
+        self, frame: np.ndarray, frame_index: int, w: int, h: int
+    ) -> List[Detection]:
+        """Standard full-frame YOLO inference."""
         try:
             results = self.model(
                 frame,
@@ -127,6 +140,84 @@ class ClassroomDetector:
 
         return detections
 
+    def _detect_sliced(
+        self, frame: np.ndarray, frame_index: int, w: int, h: int
+    ) -> List[Detection]:
+        """Dynamic High-Resolution Image Tiling (SAHI-style) for large lecture halls."""
+        slice_size = self.config.sahi_slice_size
+        overlap = self.config.sahi_overlap_ratio
+        step_x = int(slice_size * (1.0 - overlap))
+        step_y = int(slice_size * (1.0 - overlap))
+
+        all_candidates: List[Detection] = []
+
+        # 1. First run global low-res frame to catch macro scale context
+        global_dets = self._detect_standard(frame, frame_index, w, h)
+        all_candidates.extend(global_dets)
+
+        # 2. Iterate high-resolution grid tiles
+        y_starts = list(range(0, max(1, h - slice_size + 1), step_y))
+        if y_starts[-1] + slice_size < h:
+            y_starts.append(h - slice_size)
+
+        x_starts = list(range(0, max(1, w - slice_size + 1), step_x))
+        if x_starts[-1] + slice_size < w:
+            x_starts.append(w - slice_size)
+
+        for y1_tile in y_starts:
+            y2_tile = min(h, y1_tile + slice_size)
+            for x1_tile in x_starts:
+                x2_tile = min(w, x1_tile + slice_size)
+                tile = frame[y1_tile:y2_tile, x1_tile:x2_tile]
+
+                tile_dets = self._detect_standard(
+                    tile, frame_index, tile.shape[1], tile.shape[0]
+                )
+
+                # Offset tile local coordinates to global image frame
+                for td in tile_dets:
+                    gx1 = td.bbox[0] + x1_tile
+                    gy1 = td.bbox[1] + y1_tile
+                    gx2 = td.bbox[2] + x1_tile
+                    gy2 = td.bbox[3] + y1_tile
+                    all_candidates.append(
+                        Detection(
+                            class_id=td.class_id,
+                            class_name=td.class_name,
+                            confidence=td.confidence,
+                            bbox=(gx1, gy1, gx2, gy2),
+                            frame_index=frame_index,
+                        )
+                    )
+
+        # 3. Global Non-Maximum Suppression (NMS) to merge overlapping tiles
+        return self._apply_nms(all_candidates, self.config.nms_iou_threshold)
+
+    def _apply_nms(
+        self, detections: List[Detection], iou_thresh: float
+    ) -> List[Detection]:
+        """Merge duplicated detections across tile boundaries using NMS."""
+        if not detections:
+            return []
+
+        # Sort by confidence descending
+        sorted_dets = sorted(detections, key=lambda d: d.confidence, reverse=True)
+        keep: List[Detection] = []
+
+        for det in sorted_dets:
+            overlap = False
+            for kept in keep:
+                # Same class IoU suppression
+                if det.class_name == kept.class_name:
+                    iou = compute_bbox_iou(det.bbox, kept.bbox)
+                    if iou > iou_thresh:
+                        overlap = True
+                        break
+            if not overlap:
+                keep.append(det)
+
+        return keep
+
     def detect_cheating_only(self, frame: np.ndarray, frame_index: int = 0) -> List[Detection]:
         """Filter out 'no cheating' detections, returning only suspicious activities."""
         return [
@@ -140,7 +231,7 @@ class ClassroomDetector:
     ) -> List[Detection]:
         """Generates realistic synthetic detections for demonstration and testing without GPU."""
         detections = []
-        # Grid of 4 simulated students
+        # Grid of 3 simulated students
         grid = [
             (int(width * 0.15), int(height * 0.2), int(width * 0.35), int(height * 0.7)),
             (int(width * 0.40), int(height * 0.2), int(width * 0.60), int(height * 0.7)),

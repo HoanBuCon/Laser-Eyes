@@ -2,25 +2,39 @@
 
 Tests:
 1. IoU Spatial Matching & Multi-Object Tracking.
-2. Anti-Flickering Score Accumulator dynamics.
-3. 4-State Behavior Machine Transitions.
+2. Anti-Flickering Score Accumulator dynamics (Time-Aware Sliding Window).
+3. 4-State Behavior Machine Transitions with Silent Tracking & Recidivism Escalation.
 4. Macro Room Crowd Context (Collective Suppression & Proximity Clusters).
-5. Event Lifecycle & Peak-Confidence Evidence Frame Tracking.
+5. Live Event Peak-Confidence Evidence Frame Tracking.
+6. 2D Kinematic Kalman Filter Box Tracking.
+7. Spatial Coasting during temporary occlusions (Anti-ID Switch).
+8. Time-based Millisecond Accumulator under variable frame rates.
+9. 10-Second Evidence Video Ring Buffer and MP4 Generation.
+10. High-Resolution SAHI Slicing and NMS Suppression.
 """
 
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 import numpy as np
 import pytest
 
 from classroom_monitor.behavior_tracker import PersonBehaviorTracker, StudentState
 from classroom_monitor.config import ClassroomConfig
+from classroom_monitor.detector import ClassroomDetector
 from classroom_monitor.event_engine import EventEngine
 from classroom_monitor.live_event import LiveEvent
-from classroom_monitor.models import Detection, TrackedDetection
+from classroom_monitor.models import Detection, EventStatus, TrackState, TrackedDetection
 from classroom_monitor.room_context import RoomContextAnalyzer
 from classroom_monitor.score_accumulator import ScoreAccumulator
-from classroom_monitor.spatial_matcher import SpatialMatcher, compute_bbox_iou
+from classroom_monitor.spatial_matcher import (
+    KalmanBoxTracker,
+    SpatialMatcher,
+    compute_bbox_iou,
+    compute_centroid_distance,
+)
+from classroom_monitor.video_buffer import EvidenceVideoBuffer
 
 
 # ==============================================================================
@@ -96,10 +110,10 @@ def test_score_accumulator_flicker_tolerance():
     sequence = [
         ("side peeking", 0.9),
         ("side peeking", 0.85),
-        ("no cheating", 0.95), # Flicker
+        ("no cheating", 0.95),  # Flicker
         ("side peeking", 0.88),
         ("side peeking", 0.92),
-        ("no cheating", 0.90), # Flicker
+        ("no cheating", 0.90),  # Flicker
         ("side peeking", 0.89),
         ("side peeking", 0.91),
     ]
@@ -114,7 +128,7 @@ def test_score_accumulator_flicker_tolerance():
 
 
 # ==============================================================================
-# 3. State Machine Transitions Tests
+# 3. State Machine Transitions & Cooldown Tests
 # ==============================================================================
 def test_behavior_tracker_lifecycle():
     """Test full cycle: NORMAL -> WATCHING -> SUSPICIOUS -> COOLDOWN."""
@@ -175,7 +189,9 @@ def test_room_context_collective_suppression():
 
 def test_room_context_spatial_cluster_boost():
     """Test boosting severity when 3 adjacent students peek simultaneously (in a 10-person room)."""
-    analyzer = RoomContextAnalyzer(ClassroomConfig(collective_suppress_ratio=0.4, cluster_distance_threshold=100.0, cluster_min_size=3))
+    analyzer = RoomContextAnalyzer(
+        ClassroomConfig(collective_suppress_ratio=0.4, cluster_distance_threshold=100.0, cluster_min_size=3)
+    )
 
     # 10 students: 3 adjacent students peeking (30% < 40% threshold, but form cluster)
     dets = [
@@ -223,3 +239,206 @@ def test_live_event_peak_evidence():
     event.update(frame_idx=20, confidence=0.80, bbox=(12, 12, 52, 52), frame_image=img_low)
     assert event.peak_confidence == 0.98
     assert event.peak_frame_idx == 15
+
+
+# ==============================================================================
+# 6. Kalman Filter 2D Kinematics Tests
+# ==============================================================================
+def test_kalman_filter_box_kinematics():
+    """Verify 2D Kalman Filter correctly predicts motion and updates box state."""
+    init_box = (100, 100, 200, 200)
+    kf = KalmanBoxTracker(init_box)
+
+    # Predict next state without measurement
+    pred_box = kf.predict()
+    assert abs(pred_box[0] - 100) <= 2
+    assert abs(pred_box[1] - 100) <= 2
+
+    # Feed moving measurements (moving right by 10px per frame)
+    for step in range(1, 6):
+        new_box = (100 + step * 10, 100, 200 + step * 10, 200)
+        kf.predict()
+        kf.update(new_box)
+
+    # Kalman filter should predict next position around 160
+    final_pred = kf.predict()
+    assert final_pred[0] >= 150  # Velocity has been successfully integrated
+
+
+# ==============================================================================
+# 7. Spatial Coasting during Temporary Occlusion (Anti-ID Switch)
+# ==============================================================================
+def test_spatial_coasting_during_occlusion():
+    """Verify that when a proctor walks past and occludes a student for 3 frames,
+
+    the student's track enters coasting mode and resumes with the SAME track ID.
+    """
+    matcher = SpatialMatcher(
+        iou_threshold=0.3,
+        max_missing_frames=10,
+        max_coasting_frames=8,
+        tracker_type="kalman_iou",
+    )
+
+    # Frame 0: Student 1 detected
+    det0 = [Detection(2, "no cheating", 0.92, (100, 100, 160, 180), 0)]
+    t0 = matcher.update(det0, 0)
+    assert len(t0) == 1
+    assert t0[0].track_id == 1
+
+    # Frames 1, 2, 3: Proctor walks past -> 0 detections
+    for f in range(1, 4):
+        t_miss = matcher.update([], f)
+        assert len(t_miss) == 0
+        assert 1 in matcher.tracks
+        assert matcher.tracks[1].state == TrackState.COASTING
+        assert matcher.tracks[1].missing_frames == f
+
+    # Frame 4: Student 1 reappears at essentially same desk location
+    det4 = [Detection(2, "no cheating", 0.90, (102, 101, 162, 181), 4)]
+    t4 = matcher.update(det4, 4)
+    assert len(t4) == 1
+    # Crucial assertion: ID Switch eliminated, Track ID remains 1!
+    assert t4[0].track_id == 1
+    assert matcher.tracks[1].state == TrackState.CONFIRMED
+
+
+# ==============================================================================
+# 8. Time-Aware Millisecond Sliding Window under Variable FPS
+# ==============================================================================
+def test_time_based_millisecond_accumulator():
+    """Verify ScoreAccumulator maintains exact time span even when FPS fluctuates."""
+    acc = ScoreAccumulator(
+        window_duration_ms=1000.0,
+        min_duration_ms=400.0,
+        score_threshold=3.0,
+        cheating_ratio_threshold=0.5,
+    )
+
+    # Feed 10 detections at 100ms intervals (1.0 second span)
+    for i in range(10):
+        ts = i * 100.0  # 0ms to 900ms
+        acc.add("side peeking", 0.85, timestamp_ms=ts, frame_idx=i)
+
+    assert acc.time_span_ms == 900.0
+    assert acc.is_suspicious() is True
+    assert acc.dominant_behavior == "side peeking"
+
+    # Add a normal frame at 1200ms -> oldest frames older than 200ms should be pruned
+    acc.add("no cheating", 0.90, timestamp_ms=1200.0, frame_idx=10)
+    # Oldest record in window should now be >= 200ms
+    assert acc.time_span_ms <= 1000.0
+
+
+# ==============================================================================
+# 9. Silent Background Tracking & Recidivism Escalation
+# ==============================================================================
+def test_silent_background_tracking_and_recidivism_escalation():
+    """Verify that cheating during cooldown triggers instant Recidivism Escalation to HIGH."""
+    config = ClassroomConfig(
+        score_threshold=2.0,
+        min_frames_in_window=3,
+        cooldown_seconds=10.0,
+        silent_cooldown_tracking=True,
+        recidivism_escalation=True,
+        recidivism_score_threshold=1.5,
+    )
+    tracker = PersonBehaviorTracker(track_id=7, fps=30.0, config=config)
+
+    # 1. Trigger first violation
+    det_phone = Detection(3, "phone using", 0.95, (50, 50, 100, 100), 0)
+    det_normal = Detection(2, "no cheating", 0.90, (50, 50, 100, 100), 0)
+
+    tracker.update(det_phone, frame_idx=0)
+    tracker.update(det_phone, frame_idx=1)
+    tracker.update(det_phone, frame_idx=2)
+    assert tracker.state == StudentState.SUSPICIOUS
+
+    # Clear to enter COOLDOWN
+    for f in range(3, 20):
+        tracker.update(det_normal, frame_idx=f)
+    assert tracker.state == StudentState.COOLDOWN
+
+    # 2. Student attempts to cheat AGAIN during Cooldown (Frame 25 < Cooldown 300 frames)
+    # Background silent tracking should capture it and trigger Recidivism Escalation
+    recidivist_event = None
+    for f in range(21, 26):
+        res = tracker.update(det_phone, frame_idx=f)
+        if res is not None:
+            recidivist_event = res
+
+    assert recidivist_event is not None
+    assert recidivist_event.is_recidivist is True
+    assert recidivist_event.severity == "HIGH"
+    assert tracker.state in (StudentState.FLAGGED_FOR_HUMAN_REVIEW, StudentState.SUSPICIOUS)
+
+
+# ==============================================================================
+# 10. Evidence Video Ring Buffer and MP4 Generation
+# ==============================================================================
+def test_evidence_video_ring_buffer():
+    """Verify that EvidenceVideoBuffer captures pre- and post-event frames and produces MP4."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        buf = EvidenceVideoBuffer(
+            pre_event_seconds=1.0,
+            post_event_seconds=1.0,
+            fps=10.0,
+            output_dir=tmpdir,
+        )
+
+        dummy_frame = np.zeros((240, 320, 3), dtype=np.uint8)
+
+        # Ingest 10 pre-event frames
+        for f in range(10):
+            buf.add_frame(dummy_frame, frame_idx=f, timestamp_ms=f * 100.0)
+
+        # Trigger event at frame 10
+        job = buf.trigger_clip(
+            event_id="EVT-TEST-001",
+            track_id=2,
+            behavior="phone using",
+            frame_idx=10,
+            timestamp_ms=1000.0,
+        )
+
+        # Ingest 10 post-event frames -> should trigger video file write
+        completed = []
+        for f in range(11, 22):
+            res = buf.add_frame(dummy_frame, frame_idx=f, timestamp_ms=f * 100.0)
+            if res:
+                completed.extend(res)
+
+        assert len(completed) >= 1
+        saved_path = Path(completed[0].saved_file_path)
+        assert saved_path.exists()
+        assert saved_path.stat().st_size > 0
+
+
+def test_sahi_high_res_slicing_and_nms():
+    """Verify SAHI dynamic slicing and NMS merging on simulated large image."""
+    config = ClassroomConfig(
+        enable_sahi_tiling=True,
+        sahi_slice_size=320,
+        sahi_overlap_ratio=0.20,
+        sahi_min_resolution=600,
+        nms_iou_threshold=0.45,
+    )
+    detector = ClassroomDetector(config=config)
+
+    # 1. Test NMS deduplication directly
+    overlapping_dets = [
+        Detection(3, "phone using", 0.92, (100, 100, 180, 180), 0),
+        Detection(3, "phone using", 0.81, (105, 102, 182, 184), 0),  # Overlap IoU > 0.8 -> suppressed
+        Detection(4, "side peeking", 0.88, (300, 300, 380, 380), 0), # Distinct box -> kept
+    ]
+    merged = detector._apply_nms(overlapping_dets, iou_thresh=0.45)
+    assert len(merged) == 2
+    assert merged[0].confidence == 0.92
+    assert merged[1].class_name == "side peeking"
+
+    # 2. Test mock detect with large frame
+    detector._is_mock = True
+    large_frame = np.zeros((800, 1200, 3), dtype=np.uint8)
+    dets = detector.detect(large_frame, frame_index=0)
+    assert len(dets) >= 1
+    assert all(d.confidence > 0 for d in dets)

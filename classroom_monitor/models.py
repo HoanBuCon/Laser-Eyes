@@ -20,10 +20,29 @@ class SeverityLevel(str, Enum):
 
 class EventStatus(str, Enum):
     SUSPICIOUS = "suspicious"
-    CONFIRMED = "confirmed"
+    FLAGGED_FOR_HUMAN_REVIEW = "flagged_for_human_review"
+    CONFIRMED = "confirmed"  # Backward-compatible alias
     SUPPRESSED = "suppressed"
     REVIEWED = "reviewed"
     DISMISSED = "dismissed"
+    RESOLVED = "resolved"
+
+
+class TrackState(str, Enum):
+    TENTATIVE = "tentative"
+    CONFIRMED = "confirmed"
+    COASTING = "coasting"
+    DELETED = "deleted"
+
+
+@dataclass
+class FrameObservation:
+    """Timestamp-aware observation tuple for sliding-window accumulation."""
+
+    behavior: str
+    confidence: float
+    timestamp_ms: float
+    frame_idx: int = 0
 
 
 @dataclass
@@ -73,6 +92,7 @@ class TrackedDetection:
 
     track_id: int
     detection: Detection
+    is_coasting: bool = False  # True if state was predicted by Kalman during occlusion
 
 
 @dataclass
@@ -102,9 +122,13 @@ class ClassroomEvent:
     peak_frame_idx: int = 0
     bbox: Optional[Tuple[int, int, int, int]] = None
     evidence_path: Optional[str] = None
+    evidence_video_path: Optional[str] = None
     evidence_frame: Optional[np.ndarray] = None
     room_context: Optional[str] = None
     reviewer_note: str = ""
+    is_recidivist: bool = False
+    requires_human_review: bool = True
+    timestamp_ms: Optional[float] = None
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self, include_frame: bool = False) -> Dict[str, Any]:
@@ -123,8 +147,12 @@ class ClassroomEvent:
             "peak_frame_idx": self.peak_frame_idx,
             "bbox": list(self.bbox) if self.bbox else None,
             "evidence_path": self.evidence_path,
+            "evidence_video_path": self.evidence_video_path,
             "room_context": self.room_context,
             "reviewer_note": self.reviewer_note,
+            "is_recidivist": self.is_recidivist,
+            "requires_human_review": self.requires_human_review,
+            "timestamp_ms": self.timestamp_ms,
             "created_at": self.created_at,
         }
         if include_frame and self.evidence_frame is not None:

@@ -1,7 +1,8 @@
 """End-to-End Video Processor for Classroom Cheating Surveillance.
 
-Reads camera streams or video files, executes YOLO inference, runs EventEngine,
-renders visually striking overlays, saves peak-confidence evidence frames, and dispatches callbacks.
+Reads camera streams or video files, executes YOLO inference (with optional SAHI),
+runs EventEngine, manages 10s video evidence buffer, renders rich HUD overlays,
+saves peak-confidence snapshots, and dispatches real-time callbacks.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import numpy as np
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
 from classroom_monitor.detector import ClassroomDetector
 from classroom_monitor.event_engine import EventEngine
-from classroom_monitor.models import ClassroomEvent, Detection
+from classroom_monitor.models import ClassroomEvent, Detection, EventStatus, SeverityLevel
 
 logger = logging.getLogger("VideoProcessor")
 
@@ -26,6 +27,8 @@ COLOR_NORMAL = (0, 200, 0)        # Green
 COLOR_SUSPICIOUS = (0, 165, 255)  # Orange
 COLOR_HIGH = (0, 0, 255)          # Red
 COLOR_PURPLE = (255, 0, 255)      # Magenta
+COLOR_CYAN = (255, 255, 0)        # Cyan
+COLOR_YELLOW = (0, 215, 255)      # Gold/Yellow
 
 
 class VideoProcessor:
@@ -66,6 +69,7 @@ class VideoProcessor:
         total_source_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
         self.event_engine.fps = fps
+        self.event_engine.video_buffer.fps = fps
 
         writer = None
         if output_path:
@@ -74,7 +78,14 @@ class VideoProcessor:
             fourcc = cv2.VideoWriter_fourcc(*"mp4v")
             writer = cv2.VideoWriter(str(out_p), fourcc, fps, (width, height))
 
-        logger.info("Processing video '%s' (%dx%d @ %.1f FPS)...", p.name, width, height, fps)
+        logger.info(
+            "Processing video '%s' (%dx%d @ %.1f FPS, %d total frames)...",
+            p.name,
+            width,
+            height,
+            fps,
+            total_source_frames,
+        )
 
         frame_idx = 0
         all_events: List[ClassroomEvent] = []
@@ -89,11 +100,16 @@ class VideoProcessor:
             if not ret or (max_frames is not None and frame_idx >= max_frames):
                 break
 
+            # Calculate precise millisecond timestamp
+            timestamp_ms = (frame_idx / fps) * 1000.0
+
             # 1. Perception
             detections = self.detector.detect(frame, frame_index=frame_idx)
 
             # 2. Decision & Event Generation
-            events = self.event_engine.process_frame(detections, frame_idx, frame)
+            events = self.event_engine.process_frame(
+                detections, frame_idx, frame, timestamp_ms=timestamp_ms
+            )
 
             for evt in events:
                 all_events.append(evt)
@@ -118,6 +134,11 @@ class VideoProcessor:
         cap.release()
         if writer:
             writer.release()
+
+        # Flush any in-flight 10s video evidence clips
+        if self.config.enable_video_evidence:
+            saved_clips = self.event_engine.video_buffer.flush_all()
+            logger.info("Flushed and saved %d video evidence clips.", len(saved_clips))
 
         elapsed = time.time() - start_time
         processed_fps = frame_idx / max(0.001, elapsed)
@@ -180,29 +201,37 @@ class VideoProcessor:
             )
 
         # Draw Top HUD Banner
-        hud_h = 42
+        hud_h = 44
         cv2.rectangle(vis, (0, 0), (w, hud_h), (20, 20, 20), -1)
         cv2.putText(
             vis,
-            f"VIGIL AI CLASSROOM SURVEILLANCE | Frame: {frame_idx} | Tracked: {len(detections)}",
-            (14, 26),
+            f"VIGIL AI ENTERPRISE PROCTORING | Frame: {frame_idx} | Tracks: {self.event_engine.get_active_tracks_count()}",
+            (14, 28),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.55,
-            (0, 255, 255),
+            COLOR_CYAN,
             1,
             cv2.LINE_AA,
         )
 
         # Highlight Active Cheating Events
         if active_events:
-            alert_text = f"ALERT: {len(active_events)} VIOLATION(S) DETECTED"
+            has_recidivist = any(getattr(e, "is_recidivist", False) for e in active_events)
+            if has_recidivist:
+                alert_text = f"CRITICAL ALERT: RECIDIVIST CHEATING ({len(active_events)} EVENTS)"
+                alert_color = (0, 0, 255)
+            else:
+                alert_text = f"ALERT: {len(active_events)} EVENT(S) FLAGGED FOR REVIEW"
+                alert_color = COLOR_YELLOW
+
+            (atw, _), _ = cv2.getTextSize(alert_text, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 2)
             cv2.putText(
                 vis,
                 alert_text,
-                (w - 380, 26),
+                (max(10, w - atw - 20), 28),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.55,
-                (0, 0, 255),
+                alert_color,
                 2,
                 cv2.LINE_AA,
             )

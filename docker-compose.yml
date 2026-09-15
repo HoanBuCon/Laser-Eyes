@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  vigil-db:
+    image: postgres:16-alpine
+    container_name: vigil-postgres-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vigil_user
+      POSTGRES_PASSWORD: vigil_secure_password_2026
+      POSTGRES_DB: vigil_proctoring
+    ports:
+      - "5432:5432"
+    volumes:
+      - vigil_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vigil_user -d vigil_proctoring"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vigil-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vigil-proctoring-server
+    restart: unless-stopped
+    depends_on:
+      vigil-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://vigil_user:vigil_secure_password_2026@vigil-db:5432/vigil_proctoring
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./reports:/app/reports
+
+volumes:
+  vigil_pg_data:
+    driver: local

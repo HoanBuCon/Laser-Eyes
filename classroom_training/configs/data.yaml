@@ -1,0 +1,24 @@
+# VIGIL AI - Classroom Cheating Detection Dataset Configuration
+# 5 Classes (Class 'gesture using' was pruned due to lack of samples)
+
+path: H:/Code/MingKingLaser/laser_eyes/dataset
+train: train/images
+val: valid/images
+test: test/images
+
+nc: 5
+names:
+  0: back peeking
+  1: front peeking
+  2: no cheating
+  3: phone using
+  4: side peeking
+
+# Class description metadata
+metadata:
+  classes:
+    0: "Quay/nhin ve phia sau"
+    1: "Nhin thang/nhin bai phia truoc"
+    2: "Binh thuong, tap trung lam bai"
+    3: "Su dung dien thoai"
+    4: "Liec nhin/quay sang hai ben"

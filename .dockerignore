@@ -1,0 +1,40 @@
+# ==============================================================================
+# VIGIL AI — Comprehensive .dockerignore
+# ==============================================================================
+
+.git/
+.gitignore
+.dockerignore
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+.docx_qa/
+.qa/
+tests/__pycache__/
+exam_monitor/__pycache__/
+classroom_monitor/__pycache__/
+storage/__pycache__/
+api/__pycache__/
+dataset/
+dataset*/
+*.zip
+*.tar.gz
+runs/
+results/
+wandb/
+.ipynb_checkpoints/
+.vscode/
+.idea/
+data/evidence/
+data/sessions/
+data/uploads/
+*.mp4
+*.avi
+*.log

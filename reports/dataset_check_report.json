@@ -1,0 +1,95 @@
+{
+  "dataset_path": "H:\\Code\\MingKingLaser\\laser_eyes\\dataset",
+  "splits": {
+    "train": {
+      "split": "train",
+      "image_count": 493,
+      "label_count": 493,
+      "missing_labels_count": 0,
+      "orphaned_labels_count": 0,
+      "empty_labels_count": 0,
+      "total_annotations": 13480,
+      "class_counts": {
+        "back peeking": 154,
+        "front peeking": 4794,
+        "no cheating": 5663,
+        "phone using": 424,
+        "side peeking": 2445
+      },
+      "raw_class_counts": {
+        "2": 5663,
+        "4": 2445,
+        "3": 424,
+        "0": 154,
+        "1": 4794
+      },
+      "corrupt_lines": 0,
+      "degenerate_boxes": 0,
+      "out_of_bounds_boxes": 0
+    },
+    "valid": {
+      "split": "valid",
+      "image_count": 130,
+      "label_count": 130,
+      "missing_labels_count": 0,
+      "orphaned_labels_count": 0,
+      "empty_labels_count": 0,
+      "total_annotations": 3593,
+      "class_counts": {
+        "back peeking": 56,
+        "front peeking": 1102,
+        "no cheating": 1699,
+        "phone using": 132,
+        "side peeking": 604
+      },
+      "raw_class_counts": {
+        "2": 1699,
+        "3": 132,
+        "0": 56,
+        "1": 1102,
+        "4": 604
+      },
+      "corrupt_lines": 0,
+      "degenerate_boxes": 0,
+      "out_of_bounds_boxes": 0
+    },
+    "test": {
+      "split": "test",
+      "image_count": 84,
+      "label_count": 84,
+      "missing_labels_count": 0,
+      "orphaned_labels_count": 0,
+      "empty_labels_count": 0,
+      "total_annotations": 2280,
+      "class_counts": {
+        "back peeking": 28,
+        "front peeking": 922,
+        "no cheating": 827,
+        "phone using": 73,
+        "side peeking": 430
+      },
+      "raw_class_counts": {
+        "2": 827,
+        "3": 73,
+        "4": 430,
+        "1": 922,
+        "0": 28
+      },
+      "corrupt_lines": 0,
+      "degenerate_boxes": 0,
+      "out_of_bounds_boxes": 0
+    }
+  },
+  "summary": {
+    "total_images": 707,
+    "total_labels": 707,
+    "total_annotations": 19353,
+    "class_distribution": {
+      "back peeking": 238,
+      "front peeking": 6818,
+      "no cheating": 8189,
+      "phone using": 629,
+      "side peeking": 3479
+    }
+  }
+}

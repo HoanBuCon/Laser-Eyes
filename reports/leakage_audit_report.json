@@ -1,0 +1,25 @@
+{
+  "dataset_path": "H:\\Code\\MingKingLaser\\laser_eyes\\dataset",
+  "total_unique_scenes": 707,
+  "split_scene_counts": {
+    "train": 493,
+    "valid": 130,
+    "test": 84
+  },
+  "overlaps": {
+    "train_vs_valid": {
+      "count": 0,
+      "scenes": []
+    },
+    "train_vs_test": {
+      "count": 0,
+      "scenes": []
+    },
+    "valid_vs_test": {
+      "count": 0,
+      "scenes": []
+    }
+  },
+  "has_leakage": false,
+  "leaked_scene_count": 0
+}

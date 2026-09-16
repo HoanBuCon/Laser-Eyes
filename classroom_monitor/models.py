@@ -54,6 +54,7 @@ class Detection:
     confidence: float
     bbox: Tuple[int, int, int, int]  # (x1, y1, x2, y2) in absolute pixel coordinates
     frame_index: int
+    keypoints: Optional[np.ndarray] = None
     timestamp: float = field(default_factory=time.time)
 
     @property

@@ -44,6 +44,9 @@ class SeatDefinition:
     seat_label: str = ""
     camera_id: Optional[str] = None
     enabled: bool = True
+    desk_polygon: Optional[np.ndarray] = None
+    desk_y: Optional[float] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SeatDefinition:
@@ -66,6 +69,24 @@ class SeatDefinition:
             ]
 
         poly_arr = np.array(poly_raw, dtype=np.float32)
+
+        desk_poly_raw = data.get("desk_polygon")
+        desk_poly_arr = None
+        if desk_poly_raw:
+            try:
+                if isinstance(desk_poly_raw, str):
+                    desk_poly_raw = json.loads(desk_poly_raw)
+                desk_poly_arr = np.array(desk_poly_raw, dtype=np.float32)
+            except Exception:
+                desk_poly_arr = None
+
+        desk_y_val = data.get("desk_y")
+        if desk_y_val is not None:
+            try:
+                desk_y_val = float(desk_y_val)
+            except Exception:
+                desk_y_val = None
+
         return cls(
             seat_id=str(data.get("id") or data.get("seat_id") or data.get("seat_code")),
             room_id=str(data.get("room_id", "")),
@@ -74,7 +95,23 @@ class SeatDefinition:
             seat_label=str(data.get("seat_label", data.get("seat_code", ""))),
             camera_id=data.get("camera_id"),
             enabled=bool(data.get("enabled", True)),
+            desk_polygon=desk_poly_arr,
+            desk_y=desk_y_val,
+            metadata=data.get("metadata", {}),
         )
+
+    def get_effective_desk_y(self) -> Optional[float]:
+        """Get the effective desk Y boundary with automatic fallback to polygon geometry."""
+        if self.desk_y is not None:
+            return self.desk_y
+        if self.desk_polygon is not None and len(self.desk_polygon) > 0:
+            return float(np.mean(self.desk_polygon[:, 1]))
+        if len(self.polygon) >= 3:
+            # Under-desk region begins in the lower third of the seat polygon
+            min_y = float(np.min(self.polygon[:, 1]))
+            max_y = float(np.max(self.polygon[:, 1]))
+            return min_y + (max_y - min_y) * 0.68
+        return None
 
     def contains_point(
         self,
@@ -93,6 +130,10 @@ class SeatDefinition:
             poly = poly * np.array([w, h], dtype=np.float32)
         res = cv2.pointPolygonTest(poly.astype(np.float32), (float(pt[0]), float(pt[1])), False)
         return res >= 0
+
+
+# Backward compatibility alias
+SeatROI = SeatDefinition
 
 
 @dataclass
@@ -148,6 +189,21 @@ class SeatManager:
             data = json.load(f)
         items = data if isinstance(data, list) else data.get("seats", [])
         self.load_seats(items)
+
+    def get_seat_for_detection(
+        self,
+        detection: Detection,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> Optional[str]:
+        """Find the matching seat_code for a single detection using bottom-center anchor point-in-polygon."""
+        x1, y1, x2, y2 = detection.bbox
+        ac_x = (x1 + x2) / 2.0
+        ac_y = y2 - (y2 - y1) * 0.15
+        for s_code, s_def in self.seats.items():
+            if s_def.contains_point((ac_x, ac_y), frame_w=frame_w, frame_h=frame_h):
+                return s_code
+        return None
 
     def map_detections_to_seats(
         self,

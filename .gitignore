@@ -71,6 +71,7 @@ data/*.sqlite3
 data/evidence/
 data/sessions/
 data/uploads/
+data/output_demo/
 data/settings.json
 *.log
 

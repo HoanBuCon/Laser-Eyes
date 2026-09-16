@@ -175,11 +175,11 @@ class VideoProcessor:
         # Draw Detections
         for det in detections:
             x1, y1, x2, y2 = det.bbox
-            is_cheating = det.class_name in self.config.cheating_classes
+            is_suspicious = det.class_name in getattr(self.config, "suspicious_classes", self.config.cheating_classes)
 
             if det.class_name == "phone using":
                 color = COLOR_PURPLE
-            elif is_cheating:
+            elif is_suspicious:
                 color = COLOR_HIGH
             else:
                 color = COLOR_NORMAL
@@ -214,11 +214,11 @@ class VideoProcessor:
             cv2.LINE_AA,
         )
 
-        # Highlight Active Cheating Events
+        # Highlight Active Events
         if active_events:
             has_recidivist = any(getattr(e, "is_recidivist", False) for e in active_events)
             if has_recidivist:
-                alert_text = f"CRITICAL ALERT: RECIDIVIST CHEATING ({len(active_events)} EVENTS)"
+                alert_text = f"CRITICAL ALERT: RECIDIVIST FLAGGED ({len(active_events)} EVENTS)"
                 alert_color = (0, 0, 255)
             else:
                 alert_text = f"ALERT: {len(active_events)} EVENT(S) FLAGGED FOR REVIEW"

@@ -25,8 +25,11 @@ logger = logging.getLogger("BehaviorSignals")
 class SignalType(str, Enum):
     PROLONGED_HEAD_TURN = "PROLONGED_HEAD_TURN"
     BODY_LEAN_SIDE = "BODY_LEAN_SIDE"
+    SUSPICIOUS_BELOW_DESK_ACTIVITY = "SUSPICIOUS_BELOW_DESK_ACTIVITY"
     LOOK_DOWN_LONG = "LOOK_DOWN_LONG"
     LOW_HAND_POSTURE = "LOW_HAND_POSTURE"
+    REPEATED_HAND_INTERACTION = "REPEATED_HAND_INTERACTION"
+    HEAD_HAND_CORRELATION = "HEAD_HAND_CORRELATION"
     SEAT_LEFT = "SEAT_LEFT"
     MULTIPLE_PERSON_NEAR_SEAT = "MULTIPLE_PERSON_NEAR_SEAT"
     NORMAL = "NORMAL"
@@ -65,15 +68,7 @@ def extract_head_yaw_pitch_safe(
     keypoints: np.ndarray,
     min_kp_conf: float = 0.30,
 ) -> Tuple[Optional[float], Optional[float], float]:
-    """Calculate Head Yaw and Pitch with unknown-safe quality estimation.
-
-    COCO Keypoint Mapping:
-    0: Nose, 1: L_Eye, 2: R_Eye, 3: L_Ear, 4: R_Ear, 5: L_Shoulder, 6: R_Shoulder
-
-    Returns:
-        (yaw, pitch, quality)
-        If keypoints are missing/occluded, returns (None, None, quality < 0.3)
-    """
+    """Calculate Head Yaw and Pitch with unknown-safe quality estimation."""
     if keypoints is None or len(keypoints) < 7:
         return None, None, 0.0
 
@@ -85,12 +80,10 @@ def extract_head_yaw_pitch_safe(
     ls = keypoints[5]
     rs = keypoints[6]
 
-    # Check keypoint confidences (keypoints[:, 2])
     head_confs = [nose[2], l_eye[2], r_eye[2], l_ear[2], r_ear[2], ls[2], rs[2]]
     quality = float(np.mean([c for c in head_confs if c > 0] or [0.0]))
 
     if nose[2] < min_kp_conf:
-        # Without nose detection, cannot reliably estimate head rotation
         return None, None, quality
 
     yaw: Optional[float] = None
@@ -108,7 +101,6 @@ def extract_head_yaw_pitch_safe(
         yaw_ratio = (nose[0] - eye_mid_x) / (eye_dist / 2.0)
         yaw = float(np.clip(yaw_ratio * 45.0, -90.0, 90.0))
     else:
-        # Only one ear/eye visible -> can indicate severe head turn, but insufficient for precise angle
         yaw = None
 
     # Pitch: Vertical head tilt
@@ -130,10 +122,7 @@ def extract_body_lean_angle(
     keypoints: np.ndarray,
     min_kp_conf: float = 0.30,
 ) -> Tuple[Optional[float], float]:
-    """Calculate Spine Body Lean Angle (degrees from vertical).
-
-    Keypoints: 5: L_Shoulder, 6: R_Shoulder, 11: L_Hip, 12: R_Hip
-    """
+    """Calculate Spine Body Lean Angle (degrees from vertical)."""
     if keypoints is None or len(keypoints) < 13:
         return None, 0.0
 
@@ -147,12 +136,10 @@ def extract_body_lean_angle(
         shoulder_mid = (ls[:2] + rs[:2]) / 2.0
         hip_mid = (lh[:2] + rh[:2]) / 2.0
         spine_vec = shoulder_mid - hip_mid
-        # Angle from vertical (0, -1)
         angle_rad = np.arctan2(abs(spine_vec[0]), abs(spine_vec[1]))
         angle_deg = float(np.degrees(angle_rad))
         return angle_deg, quality
 
-    # Fallback to shoulder tilt if hips are occluded by desk
     if ls[2] >= min_kp_conf and rs[2] >= min_kp_conf:
         dx = rs[0] - ls[0]
         dy = rs[1] - ls[1]
@@ -165,44 +152,73 @@ def extract_body_lean_angle(
 def extract_low_hands_cues(
     keypoints: np.ndarray,
     pitch: Optional[float],
-    min_kp_conf: float = 0.30,
-) -> Tuple[bool, float]:
-    """Detect low hand posture under desk with wrist proximity."""
+    min_kp_conf: float = 0.25,
+    desk_y: Optional[float] = None,
+) -> Tuple[bool, float, Optional[Tuple[np.ndarray, np.ndarray]]]:
+    """Detect low hand posture relative to desk geometry or lower torso."""
     if keypoints is None or len(keypoints) < 11:
-        return False, 0.0
+        return False, 0.0, None
 
     ls, rs = keypoints[5], keypoints[6]
     lw, rw = keypoints[9], keypoints[10]
 
     quality = float(np.mean([ls[2], rs[2], lw[2], rw[2]]))
 
-    if ls[2] < min_kp_conf or rs[2] < min_kp_conf or lw[2] < min_kp_conf or rw[2] < min_kp_conf:
-        return False, quality
+    # Unknown-safe: If both wrists are occluded / missing, cannot conclude low hands
+    if lw[2] < min_kp_conf and rw[2] < min_kp_conf:
+        return False, quality, None
+
+    # Evaluate against Desk Line if configured
+    if desk_y is not None:
+        is_below_desk = False
+        if lw[2] >= min_kp_conf and lw[1] > desk_y:
+            is_below_desk = True
+        if rw[2] >= min_kp_conf and rw[1] > desk_y:
+            is_below_desk = True
+        return is_below_desk, quality, (lw, rw)
+
+    # Fallback to body geometry
+    if ls[2] < min_kp_conf or rs[2] < min_kp_conf:
+        return False, quality, (lw, rw)
 
     hand_dist = float(np.linalg.norm(lw[:2] - rw[:2]))
-    shoulder_width = max(10.0, float(np.linalg.norm(ls[:2] - rs[:2])))
+    shoulder_width = max(15.0, float(np.linalg.norm(ls[:2] - rs[:2])))
     shoulder_y = (ls[1] + rs[1]) / 2.0
 
-    is_hands_close = (hand_dist / shoulder_width < 0.28) or (hand_dist < 45.0)
-    is_hands_low = (lw[1] > shoulder_y + 30.0) and (rw[1] > shoulder_y + 30.0)
-    is_head_down = (pitch is not None and pitch >= 18.0)
+    # Normal writing: wrists rest on desk (lw[1] ~ shoulder_y + 0.4..0.8 * shoulder_width)
+    # Under desk / lap: wrists drop significantly below desk level (lw[1] > shoulder_y + 1.05 * shoulder_width)
+    is_hands_deep_low = (lw[1] > shoulder_y + 1.05 * shoulder_width) or (rw[1] > shoulder_y + 1.05 * shoulder_width)
+    is_hands_close = (hand_dist / shoulder_width < 0.32) or (hand_dist < 40.0)
 
-    is_low_hand = is_hands_close and is_hands_low and is_head_down
-    return is_low_hand, quality
+    # Check hip landmarks if visible (11: L_Hip, 12: R_Hip)
+    if len(keypoints) >= 13 and keypoints[11][2] >= min_kp_conf and keypoints[12][2] >= min_kp_conf:
+        hip_y = (keypoints[11][1] + keypoints[12][1]) / 2.0
+        is_hands_deep_low = (lw[1] > hip_y - 15.0) or (rw[1] > hip_y - 15.0)
+
+    is_low_hand = is_hands_deep_low and (is_hands_close or lw[1] > shoulder_y + 1.25 * shoulder_width)
+    return is_low_hand, quality, (lw, rw)
 
 
 class BehaviorSignalExtractor:
-    """Orchestrates feature extraction and emits standardized BehaviorSignals per seat."""
+    """Orchestrates feature extraction and synthesizes composite below-desk behaviors."""
 
     def __init__(
-        self,
-        head_turn_yaw_threshold: float = 25.0,
-        body_lean_angle_threshold: float = 18.0,
-        look_down_pitch_threshold: float = 22.0,
+        self, 
+        config: Optional['ClassroomConfig'] = None,
+        head_turn_yaw_threshold: Optional[float] = None,
+        body_lean_angle_threshold: Optional[float] = None,
+        look_down_pitch_threshold: Optional[float] = None,
     ):
-        self.head_turn_yaw_threshold = head_turn_yaw_threshold
-        self.body_lean_angle_threshold = body_lean_angle_threshold
-        self.look_down_pitch_threshold = look_down_pitch_threshold
+        from classroom_monitor.config import DEFAULT_CONFIG
+        self.config = config or DEFAULT_CONFIG
+        self.head_turn_yaw_threshold = head_turn_yaw_threshold if head_turn_yaw_threshold is not None else self.config.head_turn_yaw_threshold
+        self.body_lean_angle_threshold = body_lean_angle_threshold if body_lean_angle_threshold is not None else self.config.body_lean_angle_threshold
+        self.look_down_pitch_threshold = look_down_pitch_threshold if look_down_pitch_threshold is not None else self.config.look_down_pitch_threshold
+        self.hand_motion_threshold = getattr(self.config, "hand_motion_threshold", 6.0)
+
+        # Lightweight wrist history per seat for motion & repeated interaction detection
+        from collections import defaultdict, deque
+        self.wrist_histories: Dict[str, deque] = defaultdict(lambda: deque(maxlen=15))
 
     def analyze_candidate_keypoints(
         self,
@@ -210,15 +226,30 @@ class BehaviorSignalExtractor:
         timestamp_ms: float,
         seat_id: Optional[str] = None,
         camera_id: Optional[str] = None,
+        desk_y: Optional[float] = None,
     ) -> List[BehaviorSignal]:
         """Analyze 17 keypoints of a seated candidate and return active behavior signals."""
         signals: List[BehaviorSignal] = []
 
         yaw, pitch, head_quality = extract_head_yaw_pitch_safe(keypoints)
         lean_angle, lean_quality = extract_body_lean_angle(keypoints)
-        is_low_hands, hand_quality = extract_low_hands_cues(keypoints, pitch)
+        is_low_hands, hand_quality, wrists = extract_low_hands_cues(keypoints, pitch, desk_y=desk_y)
 
-        # Signal 1: PROLONGED_HEAD_TURN
+        # Track wrist motion for REPEATED_HAND_INTERACTION
+        is_hand_moving = False
+        if seat_id and wrists:
+            lw, rw = wrists
+            curr_pos = np.array([lw[0], lw[1], rw[0], rw[1]])
+            hist = self.wrist_histories[seat_id]
+            hist.append(curr_pos)
+            if len(hist) >= 6:
+                arr = np.array(hist)
+                # Standard deviation of wrist motion across recent frames
+                pos_std = float(np.mean(np.std(arr, axis=0)))
+                if pos_std >= self.hand_motion_threshold:
+                    is_hand_moving = True
+
+        # Signal 1: PROLONGED_HEAD_TURN (Primary Suspicious P0)
         if yaw is not None and abs(yaw) >= self.head_turn_yaw_threshold:
             signals.append(
                 BehaviorSignal(
@@ -233,7 +264,7 @@ class BehaviorSignalExtractor:
                 )
             )
 
-        # Signal 2: BODY_LEAN_SIDE
+        # Signal 2: BODY_LEAN_SIDE (Primary Suspicious P0)
         if lean_angle is not None and lean_angle >= self.body_lean_angle_threshold:
             signals.append(
                 BehaviorSignal(
@@ -248,8 +279,9 @@ class BehaviorSignalExtractor:
                 )
             )
 
-        # Signal 3: LOOK_DOWN_LONG
-        if pitch is not None and pitch >= self.look_down_pitch_threshold:
+        # Signal 3: LOOK_DOWN_LONG (Context Observation)
+        is_head_down = (pitch is not None and pitch >= self.look_down_pitch_threshold)
+        if is_head_down:
             signals.append(
                 BehaviorSignal(
                     signal_type=SignalType.LOOK_DOWN_LONG.value,
@@ -259,11 +291,11 @@ class BehaviorSignalExtractor:
                     timestamp_ms=timestamp_ms,
                     seat_id=seat_id,
                     camera_id=camera_id,
-                    metadata={"pitch": round(pitch, 1)},
+                    metadata={"pitch": round(pitch, 1), "context_only": True},
                 )
             )
 
-        # Signal 4: LOW_HAND_POSTURE
+        # Signal 4: LOW_HAND_POSTURE (Context Observation)
         if is_low_hands:
             signals.append(
                 BehaviorSignal(
@@ -274,8 +306,38 @@ class BehaviorSignalExtractor:
                     timestamp_ms=timestamp_ms,
                     seat_id=seat_id,
                     camera_id=camera_id,
-                    metadata={"posture": "hands_concealed_low"},
+                    metadata={"posture": "hands_concealed_low", "context_only": True},
                 )
             )
+
+        # Signal 5: SUSPICIOUS_BELOW_DESK_ACTIVITY (P0 Composite Signal)
+        if is_low_hands:
+            evidence_components = ["LOW_HAND_POSTURE"]
+            if is_head_down:
+                evidence_components.append("LOOK_DOWN_LONG")
+            if is_hand_moving:
+                evidence_components.append("REPEATED_HAND_INTERACTION")
+            if lean_angle is not None and lean_angle >= self.body_lean_angle_threshold:
+                evidence_components.append("BODY_LEAN_SIDE")
+
+            # Composite triggers if hands are low AND at least one other confirming clue is active
+            if len(evidence_components) >= 2:
+                composite_score = min(1.0, 0.65 + 0.12 * len(evidence_components))
+                signals.append(
+                    BehaviorSignal(
+                        signal_type=SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value,
+                        raw_score=composite_score,
+                        confidence=hand_quality,
+                        quality=hand_quality,
+                        timestamp_ms=timestamp_ms,
+                        seat_id=seat_id,
+                        camera_id=camera_id,
+                        metadata={
+                            "evidence_components": evidence_components,
+                            "pitch": round(pitch, 1) if pitch else None,
+                            "motion_detected": is_hand_moving,
+                        },
+                    )
+                )
 
         return signals

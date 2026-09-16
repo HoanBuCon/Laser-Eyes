@@ -133,7 +133,7 @@
                         <button onclick="clearCurrentPolygon()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-amber-400 border border-gray-700 transition" title="Discard current polygon in progress">
                             Clear Current
                         </button>
-                        <button onclick="completeCurrentPolygon()" class="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition" title="Finish polygon (Requires >= 4 points)">
+                        <button onclick="completeCurrentPolygon()" class="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition" title="Finish polygon (Requires >= 3 points)">
                             Complete Polygon &rarr;
                         </button>
                     </div>
@@ -150,7 +150,7 @@
 
                 <!-- Canvas Footer Help Text -->
                 <div class="pt-2 flex items-center justify-between text-[11px] text-gray-500">
-                    <span>Instructions: <strong>Click 4+ points</strong> clockwise around the desk/seat ROI. Click "Complete Polygon" to name the seat.</span>
+                    <span>Instructions: <strong>Click 3+ points</strong> clockwise around the desk/seat ROI. Click "Complete Polygon" to name the seat.</span>
                     <span id="mouseCoordsLabel" class="font-mono text-cyan-400">X: 0 | Y: 0</span>
                 </div>
             </div>

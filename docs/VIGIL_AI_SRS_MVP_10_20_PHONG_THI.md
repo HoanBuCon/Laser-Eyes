@@ -2,9 +2,9 @@
 ## VIGIL AI — Hệ thống Trợ lý Giám sát Thi cử bằng AI
 ### Phiên bản Prototype cấp trường — 10–20 phòng thi đồng thời
 
-**Phiên bản tài liệu:** 1.0.0  
+**Phiên bản tài liệu:** 1.1.0  
 **Ngày lập:** 16/09/2026  
-**Trạng thái:** Baseline cho Prototype / MVP 10 ngày  
+**Trạng thái:** Behavior Detection Semantic Revision (v1.1)  
 **Hệ thống:** VIGIL AI / `laser_eyes`  
 **Mục tiêu triển khai:** Nguyên mẫu thử nghiệm trong phạm vi cấp trường, hỗ trợ 10–20 phòng thi đồng thời  
 **Định vị sản phẩm:** AI-assisted Exam Monitoring / Proctoring Risk Detection & Evidence System
@@ -16,6 +16,7 @@
 | Phiên bản | Ngày | Nội dung | Trạng thái |
 |---|---|---|---|
 | 1.0.0 | 16/09/2026 | Khởi tạo SRS cho prototype 10–20 phòng thi, đóng băng phạm vi theo kiến trúc khả thi trong 10 ngày | Baseline |
+| 1.1.0 | 16/09/2026 | **Behavior Detection Semantic Revision:** Thực nghiệm trên classroom video cho thấy `LOOK_DOWN_LONG` có activation rate rất cao vì tư thế cúi viết bài là behavior hợp lệ phổ biến. Do đó hạ `LOOK_DOWN_LONG` & `LOW_HAND_POSTURE` từ independent suspicious evidence xuống Context/Observation; bổ sung composite signal `SUSPICIOUS_BELOW_DESK_ACTIVITY` (P0) kết hợp đa manh mối (head pitch, hand below desk, motion, desk geometry); chuẩn hóa cơ chế chống double-counting risk | Revised |
 
 ---
 
@@ -586,122 +587,114 @@ MULTIPLE_PERSON
 
 ---
 
-# 9. SCOPE 05 — SUSPICIOUS BEHAVIOR SIGNALS
+# 9. SCOPE 05 — SUSPICIOUS BEHAVIOR SIGNALS (v1.1 REVISION)
 
-## 9.1. Mục tiêu
+## 9.1. Mục tiêu và Nguyên tắc phân tầng mới
 
-Chỉ phát hiện **tín hiệu đáng ngờ**, không phát hiện “gian lận” theo nghĩa pháp lý.
+Phân biệt rõ ràng giữa 3 tầng tín hiệu:
+1. **Observation / Context Signals:** Tín hiệu quan sát tư thế cơ thể (như cúi đầu đọc/viết bài, hạ tay). Bản thân các tín hiệu này KHÔNG đồng nghĩa với gian lận và chỉ đóng góp trọng số rủi ro rất thấp hoặc bằng 0 khi đứng độc lập.
+2. **Context Geometry Signals:** Vị trí tương đối của cổ tay/đầu so với mặt bàn (Desk Line / Writing Zone / Under-Desk Zone) của từng Seat.
+3. **Primary & Suspicious Composite Signals:** Các hành vi đáng ngờ thực sự (Quay đầu kéo dài, Nghiêng người sang bàn bên, Rời chỗ, hoặc Chuỗi hoạt động bất thường dưới gầm bàn kết hợp đa manh mối).
 
-## 9.2. Behavior Signals P0
+Chỉ phát hiện **tín hiệu đáng ngờ và mức độ rủi ro**, không tự động kết luận “gian lận” theo nghĩa pháp lý.
 
-### BEH-01 — PROLONGED_HEAD_TURN
+## 9.2. Phân loại Tín hiệu Hành vi (Behavior Taxonomy)
 
-Điều kiện khái niệm:
+### A. Primary Suspicious Signals (P0)
 
-- đầu lệch khỏi baseline;
-- duy trì vượt thời gian tối thiểu;
-- đủ observation quality.
+#### BEH-01 — PROLONGED_HEAD_TURN
+- **Điều kiện:** Đầu quay lệch khỏi baseline (Yaw $\ge 35^\circ$); duy trì vượt thời gian tối thiểu; đủ observation quality ($>0.20$).
+- **Mục đích:** Phát hiện hành vi liếc nhìn bài của thí sinh bên cạnh.
 
-Output:
+#### BEH-02 — BODY_LEAN_SIDE
+- **Điều kiện:** Torso/cột sống nghiêng rõ rệt sang trái/phải ($\ge 18^\circ$) kéo dài.
+- **Mục đích:** Phát hiện rướn người/nghiêng sang bàn bên để nhìn trộm hoặc trao đổi.
 
-```text
-signal_type = PROLONGED_HEAD_TURN
-severity = LOW/MEDIUM
-confidence = 0..1
-```
+#### BEH-05 — SEAT_LEFT
+- **Điều kiện:** Thí sinh rời khỏi Seat ROI vượt quá timeout cấu hình (mặc định 5.0s).
 
-### BEH-02 — BODY_LEAN_SIDE
+#### BEH-06 — MULTIPLE_PERSON_NEAR_SEAT
+- **Điều kiện:** Xuất hiện $\ge 2$ người trong hoặc giáp ranh Seat ROI bất thường.
 
-Mục đích:
+#### BEH-07 — SUSPICIOUS_BELOW_DESK_ACTIVITY (New P0 Composite Signal)
+- **Mục đích:** Phát hiện chuỗi hành vi biểu thị tương tác bất thường với khu vực dưới mặt bàn/gầm bàn (ví dụ: dùng phao thi, thiết bị di động giấu kín).
+- **Nguyên tắc tổng hợp (Multi-cue Synthesis):** Được tổng hợp từ sự kết hợp có tương quan thời gian giữa:
+  - `LOW_HAND_POSTURE` (Cổ tay nằm dưới mặt bàn hoặc vùng hộc bàn);
+  - `LOOK_DOWN_LONG` (Đầu cúi gập sâu về phía hộc bàn);
+  - `REPEATED_HAND_INTERACTION` (Chuyển động/dao động cổ tay lặp lại trong vùng dưới bàn);
+  - `BODY_LEAN_SIDE` (Nghiêng người che chắn hành động dưới bàn).
+- **Lưu ý:** Không gọi là `PHONE_USAGE` vì camera góc xa không thể khẳng định bản chất vật thể.
 
-Phát hiện torso nghiêng rõ rệt sang trái/phải và kéo dài.
+---
 
-### BEH-03 — LOOK_DOWN_LONG
+### B. Context & Observation Signals
 
-Mục đích:
+#### BEH-03 — LOOK_DOWN_LONG (Demoted to Context Observation)
+- **Định nghĩa v1.1:** Thí sinh duy trì tư thế nhìn/cúi đầu xuống dưới bàn trong một khoảng thời gian.
+- **Quy tắc rủi ro:** Trong phòng thi, cúi đầu viết bài và đọc đề là hành vi bình thường, phổ biến và hợp lệ. `LOOK_DOWN_LONG` **KHÔNG** được xem là bằng chứng đáng ngờ độc lập và có mức đóng góp rủi ro mặc định xấp xỉ 0 (hoặc rất thấp $\le 3.0$ pts/sec). Signal này chỉ đóng vai trò là **ngữ cảnh kích hoạt (Context Multiplier)** cho `SUSPICIOUS_BELOW_DESK_ACTIVITY`.
 
-Phát hiện posture cúi xuống kéo dài bất thường.
+#### BEH-04 — LOW_HAND_POSTURE (Context Observation)
+- **Định nghĩa v1.1:** Một hoặc hai cổ tay nằm ở vùng thấp hoặc dưới mặt bàn/hộc bàn khi keypoint đủ độ tin cậy.
+- **Quy tắc rủi ro:** Là bằng chứng thành phần. Nhãn UI hiển thị là `Low-hand posture` / `UNMAPPED context`, không tự ý gọi là `PHONE_DETECTED`.
 
-Không được gọi là phone usage.
+---
 
-### BEH-04 — LOW_HAND_POSTURE
+### C. P1 / Advanced Context Signals
 
-Mục đích:
+- **BEH-08 — REPEATED_HAND_INTERACTION:** Chuyển động/vận tốc cổ tay dao động liên tục trong vùng dưới mặt bàn qua cửa sổ thời gian.
+- **BEH-09 — HEAD_HAND_CORRELATION:** Sự tương quan đồng thời giữa góc cúi đầu và chuyển động hạ tay xuống gầm bàn.
+- **BEH-10 — REPEATED_SIDE_INTERACTION:** Chuỗi hành động quay đầu liếc bài lặp đi lặp lại nhiều đợt ngắn.
+- **BEH-11 — GROUP_ANOMALY:** Hiện tượng dị thường nhóm hoặc triệt tiêu tập thể (Collective Suppression).
 
-Phát hiện tay ở vùng thấp/bên dưới mặt bàn trong thời gian dài khi keypoint đủ tin cậy.
+---
 
-Nhãn UI phải là:
+## 9.3. Functional Requirements
 
-> Suspicious low-hand posture
-
-Không phải:
-
-> Phone detected
-
-### BEH-05 — SEAT_LEFT
-
-Phát hiện thí sinh rời Seat ROI vượt timeout cấu hình.
-
-### BEH-06 — MULTIPLE_PERSON_NEAR_SEAT
-
-Phát hiện nhiều người xuất hiện trong/giáp Seat ROI bất thường.
-
-## 9.3. Behavior Signals P1
-
-- Repeated side interaction.
-- Neighbor-oriented lean.
-- Repeated suspicious posture.
-- Group anomaly signal.
-
-## 9.4. Functional Requirements
-
-### FR-BEH-001 — Signal contract
-
-Mọi signal phải có:
-
+### FR-BEH-001 — Signal Contract
+Mọi signal phải tuân thủ schema chuẩn:
 ```json
 {
-  "room_id": "...",
-  "session_id": "...",
-  "camera_id": "...",
-  "seat_id": "...",
-  "signal_type": "...",
-  "raw_score": 0.0,
-  "confidence": 0.0,
-  "quality": 0.0,
-  "timestamp": "..."
+  "room_id": "ROOM_101",
+  "session_id": "SES_01",
+  "camera_id": "CAM_01",
+  "seat_id": "SEAT_101_01",
+  "signal_type": "SUSPICIOUS_BELOW_DESK_ACTIVITY",
+  "raw_score": 0.85,
+  "confidence": 0.90,
+  "quality": 0.88,
+  "timestamp_ms": 12500.0,
+  "metadata": {
+    "evidence_components": ["LOOK_DOWN_LONG", "LOW_HAND_POSTURE", "REPEATED_HAND_INTERACTION"]
+  }
 }
 ```
 
-### FR-BEH-002 — Unknown-safe behavior
+### FR-BEH-002 — Unknown-Safe Behavior
+- Nếu keypoint cổ tay/đầu có confidence $< \text{min\_kp\_conf}$ (bị che khuất hoặc không rõ ràng), hệ thống phải trả về `UNKNOWN / INSUFFICIENT_DATA`.
+- Tuyệt đối không suy diễn việc mất keypoint cổ tay sau mặt bàn là bằng chứng gian lận.
 
-Nếu input thiếu keypoint hoặc bị occlusion:
+### FR-BEH-003 — Per-Room / Per-Seat Thresholds
+Tất cả các ngưỡng góc đầu, góc nghiêng, khoảng cách tay và thời lượng kích hoạt phải được cấu hình hóa tập trung trong `ClassroomConfig`.
 
-- không tạo signal giả;
-- không coi missing data là normal tuyệt đối.
+### FR-BEH-004 — No Single-Frame Event
+Một frame đơn lẻ không được phép tạo sự kiện `FLAGGED_FOR_REVIEW`. Mọi quyết định cảnh báo phải trải qua tích lũy thời gian thực (`dt_sec`).
 
-### FR-BEH-003 — Per-room threshold
+### FR-BEH-005 — Composite Below-Desk Activity Synthesis
+Bộ trích xuất tín hiệu hoặc Risk Engine phải hỗ trợ cơ chế ghép nối đa manh mối:
+$$\text{Score}_{\text{composite}} = f(\text{LowHand}, \text{LookDown}, \text{HandMotion}, \text{Persistence})$$
 
-Cho phép threshold theo phòng/camera.
+### FR-BEH-006 — Component Risk Suppression (Anti-Double-Counting)
+Khi tín hiệu tổ hợp `SUSPICIOUS_BELOW_DESK_ACTIVITY` được kích hoạt cho một Seat, Risk Engine phải tự động triệt tiêu việc cộng điểm lặp lại của các tín hiệu thành phần (`LOOK_DOWN_LONG`, `LOW_HAND_POSTURE`) trong cùng cửa sổ thời gian để tránh hiện tượng thổi phồng điểm rủi ro.
 
-### FR-BEH-004 — No single-frame event
+### FR-BEH-007 — Seat Desk Geometry Awareness & Fallback
+- Mỗi `SeatDefinition` hỗ trợ lưu trữ siêu dữ liệu hình học bàn thi (Desk Line / Writing Zone / Under-Desk Zone).
+- Nếu dữ liệu Desk Geometry chưa được cấu hình (các Seat cũ trong DB), hệ thống phải tự động fallback sang ước lượng hình học cơ thể (tỉ lệ cổ tay so với vai/khuỷu tay) mà không làm gián đoạn pipeline.
 
-Một frame đơn lẻ không được tạo event P0, trừ các event rõ ràng như seat left khi đã vượt timeout.
+## 9.4. Acceptance Criteria
 
-### FR-BEH-005 — Explainability metadata
-
-Signal phải lưu nguyên nhân tối thiểu:
-
-- duration.
-- measured angle/ratio nếu có.
-- confidence.
-- active threshold.
-
-## 9.5. Acceptance Criteria
-
-- Các signal chỉ hoạt động khi có đủ dữ liệu.
-- Không có label “CHEATING” ở output của behavior module.
-- Behavior parameters thay đổi được bằng config.
+- `LOOK_DOWN_LONG` độc lập trong 10 giây làm bài bình thường KHÔNG làm Seat vượt ngưỡng `OBSERVE` ($< 30$ điểm Risk).
+- `SUSPICIOUS_BELOW_DESK_ACTIVITY` kích hoạt chính xác khi có sự kết hợp kéo dài giữa cúi đầu và giấu tay/chuyển động dưới bàn.
+- Không có nhãn `CHEATING` hay `PHONE_DETECTED` ở bất kỳ tầng nào của hệ thống.
 
 ---
 
@@ -767,22 +760,21 @@ Baseline đề xuất ban đầu:
 
 Các giá trị trên là cấu hình prototype và phải có khả năng tune.
 
-### FR-RISK-005 — Weighted signals
+### FR-RISK-005 — Contextual & Composite Weighting (v1.1)
 
-Mỗi behavior signal có trọng số riêng.
+Mỗi tầng tín hiệu có trọng số đóng góp theo giây riêng biệt:
 
-Ví dụ cấu hình ban đầu:
+- **Primary Suspicious Signals:**
+  - `PROLONGED_HEAD_TURN`: $+18.0\text{ pts/sec}$
+  - `BODY_LEAN_SIDE`: $+15.0\text{ pts/sec}$
+  - `MULTIPLE_PERSON_NEAR_SEAT`: $+20.0\text{ pts/sec}$
+  - `SUSPICIOUS_BELOW_DESK_ACTIVITY`: $+25.0\text{ pts/sec}$
+- **Context & Observation Signals:**
+  - `LOOK_DOWN_LONG` (độc lập): $+0.5\text{ đến }+3.0\text{ pts/sec}$ (rất thấp, không tự gây bão hòa khi viết bài).
+  - `LOW_HAND_POSTURE` (độc lập): $+4.0\text{ pts/sec}$ (bằng chứng thành phần).
+- **Anti-Double-Counting Rule:** Khi `SUSPICIOUS_BELOW_DESK_ACTIVITY` được kích hoạt, điểm của `LOOK_DOWN_LONG` và `LOW_HAND_POSTURE` bị triệt tiêu để tránh cộng dồn lặp lại.
 
-```text
-PROLONGED_HEAD_TURN        +20
-BODY_LEAN_SIDE             +15
-LOOK_DOWN_LONG             +10
-LOW_HAND_POSTURE           +15
-REPEATED_BEHAVIOR          +20
-MULTIPLE_PERSON_NEAR_SEAT  +20
-```
-
-Không coi các trọng số này là kết luận khoa học cố định.
+Tất cả trọng số đều được cấu hình trong `ClassroomConfig`.
 
 ### FR-RISK-006 — Normal decay
 
@@ -2241,7 +2233,7 @@ Tiêu chí thành công của phiên bản này không phải là một con số
 | P0-03 | YOLO-Pose person perception | P0 |
 | P0-04 | Seat ROI configuration | P0 |
 | P0-05 | Seat-based identity | P0 |
-| P0-06 | ≥3 suspicious behavior signals | P0 |
+| P0-06 | Primary & Composite Behavior Signals (BEH-01..07) + Context Demotion | P0 |
 | P0-07 | Temporal risk score | P0 |
 | P0-08 | State machine + cooldown | P0 |
 | P0-09 | Event engine | P0 |

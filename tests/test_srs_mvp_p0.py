@@ -28,9 +28,10 @@ from classroom_monitor.behavior_signals import (
     extract_head_yaw_pitch_safe,
     extract_low_hands_cues,
 )
+from classroom_monitor.config import ClassroomConfig
 from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.rtsp_reader import RTSPStreamReader, VideoFrame
-from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatState
+from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatROI, SeatState
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.worker_node import WorkerNodeRunner
 
@@ -160,32 +161,30 @@ def test_p0_07_08_temporal_risk_scoring_and_recidivism():
         seat_id="SEAT_A01",
     )
 
-    # Step 1: Ingest signals at t = 1000ms (+35 points -> OBSERVE)
-    evt1 = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=1000.0)
+    # Step 1: Ingest single turn signal at t = 1000ms (dt=0.1s -> ~1.8 pts)
+    evt1 = tracker.update_seat("SEAT_A01", [sig_turn], timestamp_ms=1000.0)
     assert evt1 is None
     profile = tracker.profiles["SEAT_A01"]
-    assert profile.risk_score >= 35
-    assert profile.current_state == RiskState.OBSERVE.value
+    assert profile.current_state == RiskState.NORMAL.value
 
-    # Step 2: Ingest signals at t = 1300ms (+35 points -> SUSPICIOUS, score ~70)
-    evt2 = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=1300.0)
+    # Step 2: Ingest turn signal at t = 2500ms (dt=1.5s -> +27.0 pts -> score ~28.8, NORMAL/OBSERVE)
+    evt2 = tracker.update_seat("SEAT_A01", [sig_turn], timestamp_ms=2500.0)
     assert evt2 is None
-    assert profile.risk_score >= 70
-    assert profile.current_state == RiskState.SUSPICIOUS.value
+    assert profile.risk_score >= 25.0
 
-    # Step 3: Ingest signals at t = 1600ms (+35 points -> Score >= 80 -> FLAGGED_FOR_REVIEW triggered!)
+    # Step 3: Ingest combined turn + lean at t = 4000ms (dt=1.5s -> +79.5 pts -> Score >= 80 -> FLAGGED_FOR_REVIEW)
     dummy_det = Detection(0, "person", 0.95, (100, 100, 200, 250), frame_index=50)
-    evt3 = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=1600.0, detection=dummy_det)
+    evt3 = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=4000.0, detection=dummy_det)
     assert evt3 is not None
     assert evt3.status == "PENDING"
     assert profile.current_state == RiskState.COOLDOWN.value  # Entered cooldown
 
-    # Step 4: During cooldown (t = 2000ms), no events emitted
-    evt_cool = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=2000.0)
+    # Step 4: During cooldown (t = 5000ms), no events emitted
+    evt_cool = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=5000.0)
     assert evt_cool is None
 
-    # Step 5: After cooldown expires (t = 4000ms), student immediately cheats again -> RECIDIVISM triggered!
-    for t_step in [4000.0, 4300.0, 4600.0]:
+    # Step 5: After cooldown expires (t = 8000ms), student immediately cheats again -> RECIDIVISM triggered!
+    for t_step in [8000.0, 9500.0, 11000.0]:
         evt_recid = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=t_step, detection=dummy_det)
         if evt_recid is not None:
             break
@@ -241,3 +240,210 @@ def test_p0_11_12_async_evidence_writer_and_sha256(tmp_path):
     assert len(res["video_sha256"]) == 64
 
     writer.shutdown(wait=True)
+
+
+# ==============================================================================
+# 6. Semantic Alignment Tests: Unmapped Role, Contextual Combinations & State SRS
+# ==============================================================================
+def test_unmapped_person_semantics_no_proctor_inference():
+    """Verify unmapped detections have seat_id=None and are never assumed to be PROCTOR."""
+    seat_mgr = SeatManager(room_id="ROOM_A101", camera_id="CAM_01")
+    seat_mgr.load_seats([
+        SeatROI(
+            seat_id="SEAT_01",
+            room_id="ROOM_A101",
+            seat_code="SEAT_01",
+            polygon=np.array([(100, 100), (200, 100), (200, 200), (100, 200)], dtype=np.float32),
+        ),
+    ])
+
+    # Person 1 inside seat ROI
+    det_seated = Detection(0, "person", 0.90, (120, 120, 180, 190), frame_index=1)
+    # Person 2 outside seat ROI (e.g. standing in corridor or unconfigured seat)
+    det_outside = Detection(0, "person", 0.85, (500, 500, 550, 600), frame_index=1)
+
+    mapped, unmapped = seat_mgr.map_detections_to_seats([det_seated, det_outside], timestamp_ms=100.0, frame_idx=1)
+    assert "SEAT_01" in mapped
+    assert mapped["SEAT_01"] is not None
+    assert len(unmapped) == 1
+    assert unmapped[0] == det_outside
+
+    # Verify that unmapped detection is NOT mapped to a seat ID
+    seat_id = seat_mgr.get_seat_for_detection(det_outside)
+    assert seat_id is None
+
+
+def test_look_down_long_contextual_contribution_and_combination_bonus():
+    """Verify LOOK_DOWN_LONG alone has mild contribution, while multi-cue combination triggers rapid escalation."""
+    config = ClassroomConfig(
+        risk_weights={"LOOK_DOWN_LONG": 3.0, "LOW_HAND_POSTURE": 12.0},
+        combination_weights={"LOOK_DOWN_LONG+LOW_HAND_POSTURE": 18.0},
+        decay_rate_per_sec=5.0,
+    )
+    tracker = SeatRiskTracker(room_id="ROOM_A101", config=config)
+
+    sig_look_down = BehaviorSignal(
+        signal_type=SignalType.LOOK_DOWN_LONG.value,
+        raw_score=1.0,
+        confidence=0.9,
+        quality=0.9,
+        timestamp_ms=1000.0,
+        seat_id="SEAT_01",
+    )
+
+    # 1. Candidate writing normally (LOOK_DOWN_LONG alone for 3 seconds)
+    # At t=1000ms (first frame, dt=0.1s -> 3.0 * 0.1 = 0.3)
+    tracker.update_seat("SEAT_01", [sig_look_down], timestamp_ms=1000.0)
+    # At t=4000ms (dt=3.0s -> 3.0 * 3.0 = 9.0 -> total ~9.3)
+    tracker.update_seat("SEAT_01", [sig_look_down], timestamp_ms=4000.0)
+
+    prof = tracker.profiles["SEAT_01"]
+    assert prof.current_state == RiskState.NORMAL.value  # Remains NORMAL (0-29 band)
+    assert prof.risk_score < 20.0  # Normal writing DOES NOT saturate risk!
+
+    # 2. Candidate looking down + concealing hands under desk (Multi-cue suspicious combo)
+    sig_low_hands = BehaviorSignal(
+        signal_type=SignalType.LOW_HAND_POSTURE.value,
+        raw_score=1.0,
+        confidence=0.9,
+        quality=0.9,
+        timestamp_ms=6000.0,
+        seat_id="SEAT_01",
+    )
+    # Ingest combination over 2 seconds (rate = 3.0 + 12.0 + 18.0 = 33.0 pts/sec -> +66.0 pts)
+    dummy_det = Detection(0, "person", 0.95, (100, 100, 200, 250), frame_index=180)
+    evt = tracker.update_seat("SEAT_01", [sig_look_down, sig_low_hands], timestamp_ms=6000.0, detection=dummy_det)
+
+    # Total score >= 80 -> triggers FLAGGED_FOR_REVIEW
+    assert prof.current_state in (RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value)
+    assert prof.risk_score >= 60.0
+
+
+def test_state_machine_srs_compliance_and_no_cheating_state():
+    """Verify State Machine adheres strictly to SRS and contains NO 'CHEATING' states."""
+    valid_states = {"NORMAL", "OBSERVE", "SUSPICIOUS", "FLAGGED_FOR_REVIEW", "COOLDOWN"}
+    actual_states = {s.value for s in RiskState}
+    assert actual_states == valid_states
+    assert "CHEATING" not in actual_states
+    assert "GUILTY" not in actual_states
+
+
+def test_risk_score_formatting_cleanliness():
+    """Verify risk scores format cleanly as integers or 1 decimal without floating-point artifacts."""
+    raw_scores = [95.86987923319205, 0.0, 30.12669588434663, 100.0]
+    formatted = [f"R:{s:.0f}" for s in raw_scores]
+    assert formatted == ["R:96", "R:0", "R:30", "R:100"]
+
+
+# ==============================================================================
+# 7. SRS v1.1 Composite Behavior & Anti-Double-Counting Scenarios
+# ==============================================================================
+def test_normal_writing_does_not_trigger_below_desk_composite():
+    """Scenario 1: Normal Writing (LOOK_DOWN=true, hands on desk) does NOT trigger composite."""
+    extractor = BehaviorSignalExtractor()
+
+    # Create dummy 17 keypoints: head tilted down, hands resting high on desk (near shoulder/elbow level)
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[0] = [100, 120, 0.9]  # Nose (down)
+    kps[1] = [90, 110, 0.9]   # L Eye
+    kps[2] = [110, 110, 0.9]  # R Eye
+    kps[5] = [70, 100, 0.9]   # L Shoulder
+    kps[6] = [130, 100, 0.9]  # R Shoulder
+    kps[9] = [80, 110, 0.9]   # L Wrist (resting on desk, close to shoulder level)
+    kps[10] = [120, 110, 0.9] # R Wrist (resting on desk)
+
+    signals = extractor.analyze_candidate_keypoints(kps, timestamp_ms=1000.0, seat_id="S01")
+    sig_types = {s.signal_type for s in signals}
+
+    # Should contain LOOK_DOWN_LONG as context observation, but NOT SUSPICIOUS_BELOW_DESK_ACTIVITY
+    assert SignalType.LOOK_DOWN_LONG.value in sig_types
+    assert SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value not in sig_types
+    assert SignalType.LOW_HAND_POSTURE.value not in sig_types
+
+
+def test_composite_suspicious_below_desk_activity_synthesis():
+    """Scenario 2 & 3: Low hands + head down + persistence triggers SUSPICIOUS_BELOW_DESK_ACTIVITY."""
+    extractor = BehaviorSignalExtractor()
+
+    # Create dummy keypoints: head down, hands low below desk/torso
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[0] = [100, 120, 0.9]  # Nose
+    kps[1] = [90, 110, 0.9]   # L Eye
+    kps[2] = [110, 110, 0.9]  # R Eye
+    kps[5] = [70, 100, 0.9]   # L Shoulder
+    kps[6] = [130, 100, 0.9]  # R Shoulder
+    kps[9] = [95, 175, 0.9]   # L Wrist (low & close together, below desk)
+    kps[10] = [105, 175, 0.9] # R Wrist (low & close together, below desk)
+
+    signals = extractor.analyze_candidate_keypoints(kps, timestamp_ms=1000.0, seat_id="S01")
+    sig_types = {s.signal_type for s in signals}
+
+    assert SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value in sig_types
+    composite_sig = [s for s in signals if s.signal_type == SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value][0]
+    assert "LOW_HAND_POSTURE" in composite_sig.metadata["evidence_components"]
+    assert "LOOK_DOWN_LONG" in composite_sig.metadata["evidence_components"]
+
+
+def test_missing_wrist_unknown_safe():
+    """Scenario 5: Missing / occluded wrist keypoints return UNKNOWN and do not trigger false alert."""
+    extractor = BehaviorSignalExtractor()
+
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[0] = [100, 120, 0.9]  # Nose
+    kps[5] = [70, 100, 0.9]   # L Shoulder
+    kps[6] = [130, 100, 0.9]  # R Shoulder
+    kps[9] = [95, 170, 0.05]  # L Wrist (occluded, low confidence)
+    kps[10] = [105, 170, 0.08] # R Wrist (occluded, low confidence)
+
+    signals = extractor.analyze_candidate_keypoints(kps, timestamp_ms=1000.0, seat_id="S01")
+    sig_types = {s.signal_type for s in signals}
+
+    assert SignalType.LOW_HAND_POSTURE.value not in sig_types
+    assert SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value not in sig_types
+
+
+def test_anti_double_counting_component_suppression():
+    """Verify RiskEngine suppresses component signals when SUSPICIOUS_BELOW_DESK_ACTIVITY is active."""
+    config = ClassroomConfig(
+        risk_weights={
+            "SUSPICIOUS_BELOW_DESK_ACTIVITY": 24.0,
+            "LOOK_DOWN_LONG": 1.0,
+            "LOW_HAND_POSTURE": 3.0,
+        },
+        composite_suppression=True,
+    )
+    tracker = SeatRiskTracker(room_id="ROOM_A101", config=config)
+
+    sig_comp = BehaviorSignal(
+        signal_type=SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value,
+        raw_score=1.0,
+        confidence=0.9,
+        quality=0.9,
+        timestamp_ms=1000.0,
+        seat_id="S01",
+    )
+    sig_look = BehaviorSignal(
+        signal_type=SignalType.LOOK_DOWN_LONG.value,
+        raw_score=1.0,
+        confidence=0.9,
+        quality=0.9,
+        timestamp_ms=1000.0,
+        seat_id="S01",
+    )
+    sig_low = BehaviorSignal(
+        signal_type=SignalType.LOW_HAND_POSTURE.value,
+        raw_score=1.0,
+        confidence=0.9,
+        quality=0.9,
+        timestamp_ms=1000.0,
+        seat_id="S01",
+    )
+
+    # Ingest all three together over dt = 1.0s (from t=1000 to t=2000)
+    tracker.update_seat("S01", [sig_comp, sig_look, sig_low], timestamp_ms=1000.0)
+    tracker.update_seat("S01", [sig_comp, sig_look, sig_low], timestamp_ms=2000.0)
+
+    prof = tracker.profiles["S01"]
+    # Expected added risk over 1.0s is ONLY 24.0 * 1.0 = 24.0 (components 1.0 and 3.0 are suppressed!)
+    # First step (0.1s) ~ 2.4, second step (1.0s) ~ 24.0 => total ~ 26.4
+    assert 25.0 <= prof.risk_score <= 28.0

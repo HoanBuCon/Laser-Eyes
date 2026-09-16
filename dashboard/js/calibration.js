@@ -239,7 +239,7 @@ function handleCanvasMouseDown(event) {
 }
 
 function handleCanvasDblClick(event) {
-    if (currentPolygon.length >= 4) {
+    if (currentPolygon.length >= 3) {
         completeCurrentPolygon();
     }
 }
@@ -250,7 +250,7 @@ function handleGlobalKeydown(event) {
         undoLastPoint();
     } else if (event.key === 'Escape') {
         clearCurrentPolygon();
-    } else if (event.key === 'Enter' && currentPolygon.length >= 4) {
+    } else if (event.key === 'Enter' && currentPolygon.length >= 3) {
         completeCurrentPolygon();
     }
 }
@@ -276,8 +276,17 @@ function clearCurrentPolygon() {
 }
 
 function completeCurrentPolygon() {
-    if (currentPolygon.length < 4) {
-        alert('A valid Seat ROI polygon requires at least 4 points (tối thiểu 4 điểm).');
+    if (currentPolygon.length === 0) {
+        if (seats.length > 0) {
+            alert(`Bạn đã tạo xong ${seats.length} chỗ ngồi trong danh sách.\n\n👉 Để lưu tất cả vào Hệ thống & Database, hãy nhấn nút màu xanh lá "Save All Seats to DB" ở góc trên bên phải màn hình!`);
+        } else {
+            alert('Vui lòng click chuột lên ảnh để vẽ các đỉnh đa giác cho bàn thi (tối thiểu 3 điểm).');
+        }
+        return;
+    }
+
+    if (currentPolygon.length < 3) {
+        alert(`Đa giác chỗ ngồi cần tối thiểu 3 điểm (hình tam giác hoặc tứ giác). Hiện tại bạn mới chọn ${currentPolygon.length} điểm.`);
         return;
     }
 

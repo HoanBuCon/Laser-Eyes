@@ -48,8 +48,8 @@ class SeatRiskProfile:
     camera_id: Optional[str] = None
 
     current_state: str = RiskState.NORMAL.value
-    risk_score: int = 0  # 0 to 100
-    peak_risk_score: int = 0
+    risk_score: float = 0.0  # 0 to 100
+    peak_risk_score: float = 0.0
 
     last_update_timestamp_ms: float = 0.0
     state_enter_timestamp_ms: float = 0.0
@@ -68,26 +68,25 @@ class SeatRiskTracker:
     """Manages risk accumulation across all seats in a classroom."""
 
     def __init__(
-        self,
-        room_id: str = "",
-        window_duration_ms: float = 1500.0,
-        cooldown_duration_ms: float = 5000.0,
-        recidivism_window_ms: float = 15000.0,
-        decay_rate_per_sec: float = 8.0,
+        self, 
+        room_id: str = "", 
+        config: Optional['ClassroomConfig'] = None,
+        window_duration_ms: Optional[float] = None,
+        cooldown_duration_ms: Optional[float] = None,
+        recidivism_window_ms: Optional[float] = None,
+        decay_rate_per_sec: Optional[float] = None,
+        combination_weights: Optional[Dict[str, float]] = None,
     ):
+        from classroom_monitor.config import DEFAULT_CONFIG
+        self.config = config or DEFAULT_CONFIG
         self.room_id = room_id
-        self.window_duration_ms = window_duration_ms
-        self.cooldown_duration_ms = cooldown_duration_ms
-        self.recidivism_window_ms = recidivism_window_ms
-        self.decay_rate_per_sec = decay_rate_per_sec
-
-        self.signal_weights = {
-            SignalType.PROLONGED_HEAD_TURN.value: 20,
-            SignalType.BODY_LEAN_SIDE.value: 15,
-            SignalType.LOOK_DOWN_LONG.value: 10,
-            SignalType.LOW_HAND_POSTURE.value: 15,
-            SignalType.MULTIPLE_PERSON_NEAR_SEAT.value: 20,
-        }
+        
+        self.window_duration_ms = window_duration_ms if window_duration_ms is not None else self.config.window_duration_ms
+        self.cooldown_duration_ms = cooldown_duration_ms if cooldown_duration_ms is not None else (self.config.cooldown_seconds * 1000.0)
+        self.recidivism_window_ms = recidivism_window_ms if recidivism_window_ms is not None else (self.config.recidivism_window_seconds * 1000.0)
+        self.decay_rate_per_sec = decay_rate_per_sec if decay_rate_per_sec is not None else self.config.decay_rate_per_sec
+        self.signal_weights = self.config.risk_weights
+        self.combination_weights = combination_weights if combination_weights is not None else getattr(self.config, "combination_weights", {})
 
         self.profiles: Dict[str, SeatRiskProfile] = {}
 
@@ -123,19 +122,35 @@ class SeatRiskTracker:
         if profile.current_state == RiskState.COOLDOWN.value and not in_cooldown:
             # Cooldown expired -> return to NORMAL (or OBSERVE if lingering signals)
             profile.current_state = RiskState.NORMAL.value
-            profile.risk_score = min(profile.risk_score, 25)
+            profile.risk_score = min(profile.risk_score, 25.0)
 
         # 2. Accumulate Score or Decay
-        added_risk = 0
+        added_risk = 0.0
         valid_signals = [s for s in active_signals if s.is_valid and s.quality >= 0.20]
+        active_sig_types = {s.signal_type for s in valid_signals}
 
+        # Check for composite below-desk activity
+        has_composite_below_desk = SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value in active_sig_types
+        suppress_components = has_composite_below_desk and getattr(self.config, "composite_suppression", True)
+
+        # (a) Base individual signal risk
         for sig in valid_signals:
-            w = self.signal_weights.get(sig.signal_type, 10)
-            added_risk += int(round(w * sig.raw_score))
+            if suppress_components and sig.signal_type in (SignalType.LOOK_DOWN_LONG.value, SignalType.LOW_HAND_POSTURE.value):
+                # Suppress component risk to avoid double-counting with composite (SRS FR-BEH-006)
+                continue
+            w = self.signal_weights.get(sig.signal_type, 5.0)
+            added_risk += float(w) * sig.raw_score * dt_sec
             profile.recent_signals.append(sig)
 
+        # (b) Contextual combinations bonus (multi-cue co-occurrence when composite is not already active)
+        if len(active_sig_types) >= 2 and not has_composite_below_desk:
+            for combo_key, bonus_w in self.combination_weights.items():
+                parts = combo_key.split("+")
+                if len(parts) == 2 and parts[0] in active_sig_types and parts[1] in active_sig_types:
+                    added_risk += float(bonus_w) * dt_sec
+
         if added_risk > 0:
-            profile.risk_score = min(100, profile.risk_score + added_risk)
+            profile.risk_score = min(100.0, profile.risk_score + added_risk)
             if detection is not None:
                 if profile.risk_score >= profile.peak_risk_score:
                     profile.peak_risk_score = profile.risk_score
@@ -144,10 +159,10 @@ class SeatRiskTracker:
                         profile.peak_frame_image = frame_image.copy()
         else:
             # Decay score over time
-            decay_pts = int(round(self.decay_rate_per_sec * dt_sec))
-            profile.risk_score = max(0, profile.risk_score - max(1, decay_pts))
-            if profile.risk_score == 0:
-                profile.peak_risk_score = 0
+            decay_pts = self.decay_rate_per_sec * dt_sec
+            profile.risk_score = max(0.0, profile.risk_score - decay_pts)
+            if profile.risk_score == 0.0:
+                profile.peak_risk_score = 0.0
                 profile.peak_detection = None
 
         # 3. State Transitions
@@ -182,7 +197,21 @@ class SeatRiskTracker:
             profile.current_state = RiskState.COOLDOWN.value
             profile.cooldown_enter_timestamp_ms = timestamp_ms
 
+            # Prioritize composite and primary suspicious signals over context observations
+            priority_order = [
+                SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value,
+                SignalType.PROLONGED_HEAD_TURN.value,
+                SignalType.BODY_LEAN_SIDE.value,
+                SignalType.SEAT_LEFT.value,
+                SignalType.MULTIPLE_PERSON_NEAR_SEAT.value,
+                SignalType.LOW_HAND_POSTURE.value,
+                SignalType.LOOK_DOWN_LONG.value,
+            ]
             primary_sig_name = valid_signals[0].signal_type if valid_signals else SignalType.PROLONGED_HEAD_TURN.value
+            for p_sig in priority_order:
+                if p_sig in active_sig_types:
+                    primary_sig_name = p_sig
+                    break
             severity = SeverityLevel.CRITICAL.value if is_recidivist else (SeverityLevel.HIGH.value if score >= 85 else SeverityLevel.MEDIUM.value)
 
             peak_bbox = profile.peak_detection.bbox if profile.peak_detection else (detection.bbox if detection else (0, 0, 0, 0))
@@ -206,7 +235,7 @@ class SeatRiskTracker:
             )
 
             logger.info(
-                "Triggered FLAGGED_FOR_REVIEW on Seat %s: Risk=%d/100, Signal=%s, Recidivist=%s",
+                "Triggered FLAGGED_FOR_REVIEW on Seat %s: Risk=%.0f/100, Signal=%s, Recidivist=%s",
                 seat_id,
                 score,
                 primary_sig_name,

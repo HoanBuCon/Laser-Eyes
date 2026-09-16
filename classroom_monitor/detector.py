@@ -434,11 +434,11 @@ class PoseClassroomDetector:
                 kp,
                 pitch,
                 wrist_ratio_threshold=self.config.phone_wrist_ratio_threshold,
-                pitch_threshold=self.config.phone_pitch_threshold,
+                pitch_threshold=self.config.look_down_pitch_threshold,
             )
 
             # Map to behavioral classes
-            if abs(yaw) >= self.config.side_peeking_yaw_threshold:
+            if abs(yaw) >= self.config.head_turn_yaw_threshold:
                 cls_name = "side peeking"
                 cls_id = 4
             elif is_phone:
@@ -455,6 +455,7 @@ class PoseClassroomDetector:
                     confidence=conf,
                     bbox=(x1, y1, x2, y2),
                     frame_index=frame_index,
+                    keypoints=kp,
                 )
             )
 

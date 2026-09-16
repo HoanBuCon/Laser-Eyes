@@ -29,8 +29,6 @@ class ClassroomConfig:
     input_resolution: int = 640
     pose_input_resolution: int = 1280
     pose_ai_fps_target: int = 10
-    side_peeking_yaw_threshold: float = 28.0
-    phone_pitch_threshold: float = 20.0
     phone_wrist_ratio_threshold: float = 0.28
 
     # ---- High-Resolution Slicing (SAHI / Dynamic Tiling) ----
@@ -62,8 +60,39 @@ class ClassroomConfig:
     escalation_duration_seconds: float = 5.0 # After 5s continuous, escalate MEDIUM -> HIGH
     silent_cooldown_tracking: bool = True    # Maintain score accumulation silently during cooldown
     recidivism_escalation: bool = True       # If cheating repeats during cooldown, escalate to HIGH instantly
+    recidivism_window_seconds: float = 15.0  # Window for recidivism escalation
     recidivism_score_threshold: float = 3.0  # Lower threshold for instant recidivism trigger
+    decay_rate_per_sec: float = 8.0          # Risk score decay rate per second when no signals
     require_human_review: bool = True        # Human-in-the-Loop decision support model
+
+    # ---- Behavior Signal Thresholds (v1.1) ----
+    head_turn_yaw_threshold: float = 35.0
+    body_lean_angle_threshold: float = 18.0
+    look_down_pitch_threshold: float = 40.0
+    hand_motion_threshold: float = 6.0
+    under_desk_min_duration_ms: float = 1000.0
+    composite_suppression: bool = True  # Suppress component signals when composite is active
+    
+    # ---- Risk Weights (Base rate per second - v1.1 Taxonomy) ----
+    risk_weights: Dict[str, float] = field(
+        default_factory=lambda: {
+            "PROLONGED_HEAD_TURN": 18.0,
+            "BODY_LEAN_SIDE": 15.0,
+            "SUSPICIOUS_BELOW_DESK_ACTIVITY": 24.0, # P0 Composite Suspicious Signal
+            "LOOK_DOWN_LONG": 1.0,                 # Context observation (very low)
+            "LOW_HAND_POSTURE": 3.0,               # Context observation
+            "MULTIPLE_PERSON_NEAR_SEAT": 20.0,
+        }
+    )
+
+    # ---- Contextual Signal Combinations (Bonus rate per second when signals co-occur) ----
+    combination_weights: Dict[str, float] = field(
+        default_factory=lambda: {
+            "PROLONGED_HEAD_TURN+BODY_LEAN_SIDE": 18.0,   # Active side peeking at peer's paper
+            "PROLONGED_HEAD_TURN+LOW_HAND_POSTURE": 15.0, # Multi-cue cheating posture
+            "BODY_LEAN_SIDE+LOW_HAND_POSTURE": 15.0,      # Leaning with concealed hands
+        }
+    )
 
     # ---- Crowd Room Context ----
     collective_suppress_ratio: float = 0.40 # >40% of room doing same act -> Suppress alert
@@ -80,7 +109,7 @@ class ClassroomConfig:
             "side peeking",
         ]
     )
-    cheating_classes: Set[str] = field(
+    suspicious_classes: Set[str] = field(
         default_factory=lambda: {
             "back peeking",
             "front peeking",
@@ -89,6 +118,11 @@ class ClassroomConfig:
         }
     )
     normal_classes: Set[str] = field(default_factory=lambda: {"no cheating"})
+
+    @property
+    def cheating_classes(self) -> Set[str]:
+        """Backward compatibility for legacy references."""
+        return self.suspicious_classes
 
     # ---- Severity Mapping ----
     severity_map: Dict[str, str] = field(

@@ -1,3 +1,7 @@
+# ==============================================================================
+# VIGIL AI — Comprehensive Project .gitignore
+# ==============================================================================
+
 # ---- 1. Python Environment & Bytecode ----
 .venv/
 venv/
@@ -23,7 +27,7 @@ wheels/
 .installed.cfg
 *.egg
 
-# ---- 2. Testing, Linting & QA Tools ----
+# ---- 2. Testing, Coverage & Linting Cache ----
 .pytest_cache/
 .coverage
 htmlcov/
@@ -35,36 +39,40 @@ htmlcov/
 .docx_qa/
 .qa/
 
-# ---- 3. Datasets & Large Archives ----
+# ---- 3. Datasets & Raw Media Archives ----
 dataset/
 dataset*/
+datasets/
+demo_video/
 *.zip
 *.tar.gz
 *.tgz
 *.rar
 *.7z
 
-# ---- 4. Model Weights, Checkpoints & Training Runs ----
+# ---- 4. Model Weights, Checkpoints & Training Artifacts ----
 *.pt
 *.pth
 *.onnx
 *.engine
 *.weights
+*.checkpoint
 yolov8*.pt
 yolo11*.pt
+yolo12*.pt
 models/*.pt
 models/*.onnx
 models/*.engine
+weights/
 runs/
 results/
 wandb/
-*.checkpoint
 
 # Keep essential lightweight base assets
 !exam_monitor/assets/face_landmarker.task
 !exam_monitor/assets/efficientdet_lite0.tflite
 
-# ---- 5. Runtime Storage, Database & Evidence Files ----
+# ---- 5. Runtime Storage, Databases & Temp Logs ----
 data/*.db
 data/*.sqlite
 data/*.sqlite3
@@ -74,13 +82,19 @@ data/uploads/
 data/output_demo/
 data/settings.json
 *.log
+*.sqlite-journal
+*.db-journal
 
-# ---- 6. Video Files & Rendered Outputs ----
+# ---- 6. Large Video Files & Rendered Stream Outputs ----
 *.mp4
 *.avi
 *.mov
 *.mkv
 *.webm
+*.flv
+*.ts
+*.h264
+*.hevc
 
 # ---- 7. Jupyter Notebook & Checkpoints ----
 .ipynb_checkpoints/
@@ -96,3 +110,8 @@ data/settings.json
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+*.bak
+
+# ---- 9. Scratch Scripts & Temp Workspace ----
+scratch/
+tmp/

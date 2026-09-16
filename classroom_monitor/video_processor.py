@@ -16,7 +16,7 @@ import cv2
 import numpy as np
 
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
-from classroom_monitor.detector import ClassroomDetector
+from classroom_monitor.detector import ClassroomDetector, PoseClassroomDetector, create_detector
 from classroom_monitor.event_engine import EventEngine
 from classroom_monitor.models import ClassroomEvent, Detection, EventStatus, SeverityLevel
 
@@ -42,7 +42,7 @@ class VideoProcessor:
         on_frame: Optional[Callable[[np.ndarray, List[Detection], List[ClassroomEvent]], None]] = None,
     ):
         self.config = config or DEFAULT_CONFIG
-        self.detector = ClassroomDetector(model_path=model_path, config=self.config)
+        self.detector = create_detector(config=self.config, model_path=model_path)
         self.event_engine = EventEngine(fps=self.config.default_fps, config=self.config)
         self.on_event = on_event
         self.on_frame = on_frame

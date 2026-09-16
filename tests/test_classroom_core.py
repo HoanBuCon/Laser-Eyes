@@ -22,7 +22,13 @@ import pytest
 
 from classroom_monitor.behavior_tracker import PersonBehaviorTracker, StudentState
 from classroom_monitor.config import ClassroomConfig
-from classroom_monitor.detector import ClassroomDetector
+from classroom_monitor.detector import (
+    ClassroomDetector,
+    PoseClassroomDetector,
+    calculate_head_pose_yaw_pitch,
+    check_phone_posture_multicue,
+    create_detector,
+)
 from classroom_monitor.event_engine import EventEngine
 from classroom_monitor.live_event import LiveEvent
 from classroom_monitor.models import Detection, EventStatus, TrackState, TrackedDetection
@@ -442,3 +448,70 @@ def test_sahi_high_res_slicing_and_nms():
     dets = detector.detect(large_frame, frame_index=0)
     assert len(dets) >= 1
     assert all(d.confidence > 0 for d in dets)
+
+
+# ==============================================================================
+# 11. Two-Stage Pose Estimation & Multi-Cue Behavior Tests
+# ==============================================================================
+def test_head_pose_yaw_pitch_computation():
+    """Verify trigonometric calculation of Head Yaw and Head Pitch from 2D keypoints."""
+    # Keypoints: 0: Nose, 1: L_Eye, 2: R_Eye, 3: L_Ear, 4: R_Ear, 5: L_Shoulder, 6: R_Shoulder
+    # Scenario 1: Straight neutral head facing camera
+    kps_neutral = np.zeros((17, 3), dtype=np.float32)
+    kps_neutral[0] = [100, 80, 0.9]   # Nose
+    kps_neutral[3] = [70, 75, 0.9]    # L Ear
+    kps_neutral[4] = [130, 75, 0.9]   # R Ear
+    kps_neutral[5] = [60, 150, 0.9]   # L Shoulder
+    kps_neutral[6] = [140, 150, 0.9]  # R Shoulder
+
+    yaw_neutral, pitch_neutral = calculate_head_pose_yaw_pitch(kps_neutral)
+    assert abs(yaw_neutral) < 5.0  # Straight ahead
+
+    # Scenario 2: Head turned right (Nose shifted towards right ear)
+    kps_turned = np.copy(kps_neutral)
+    kps_turned[0] = [125, 80, 0.9]  # Nose shifted significantly right
+    yaw_turned, _ = calculate_head_pose_yaw_pitch(kps_turned)
+    assert yaw_turned > 25.0  # Significant right yaw (side peeking)
+
+
+def test_phone_posture_multicue_classification():
+    """Verify multi-cue fusion distinguishes normal writing from phone cheating posture."""
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[5] = [80, 100, 0.9]   # L Shoulder
+    kps[6] = [160, 100, 0.9]  # R Shoulder (width = 80px)
+
+    # Scenario 1: Normal exam writing (hands on table, Y_wrist not deep low, pitch neutral)
+    kps[9] = [110, 120, 0.9]  # L Wrist
+    kps[10] = [130, 120, 0.9] # R Wrist (dist = 20px, but Y_wrist is high, pitch = 5 deg)
+    assert not check_phone_posture_multicue(kps, pitch=5.0, wrist_ratio_threshold=0.28, pitch_threshold=20.0)
+
+    # Scenario 2: Phone cheating (hands low in lap, close together, head pitched down 25 deg)
+    kps[9] = [115, 160, 0.9]  # L Wrist low
+    kps[10] = [125, 160, 0.9] # R Wrist low (dist = 10px / 80px = 0.125 < 0.28)
+    assert check_phone_posture_multicue(kps, pitch=25.0, wrist_ratio_threshold=0.28, pitch_threshold=20.0)
+
+
+def test_pose_classroom_detector_and_factory():
+    """Verify PoseClassroomDetector initialization, factory creation, and detection pipeline."""
+    config_1stage = ClassroomConfig(pipeline_mode="1stage_yolo")
+    config_2stage = ClassroomConfig(pipeline_mode="2stage_pose")
+
+    detector_1 = create_detector(config=config_1stage)
+    detector_2 = create_detector(config=config_2stage)
+
+    assert isinstance(detector_1, ClassroomDetector)
+    assert isinstance(detector_2, PoseClassroomDetector)
+
+    # Mock detection run
+    detector_2._is_mock = True
+    dummy_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
+    dets_f0 = detector_2.detect(dummy_frame, frame_index=0)
+    assert len(dets_f0) == 3
+    assert all(d.class_name == "no cheating" for d in dets_f0)
+
+    # Frame 45 triggers student 2 side peeking
+    dets_f45 = detector_2.detect(dummy_frame, frame_index=45)
+    assert any(d.class_name == "side peeking" for d in dets_f45)
+    assert len(detector_2.detect_cheating_only(dummy_frame, frame_index=45)) >= 1
+
+

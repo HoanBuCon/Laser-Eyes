@@ -18,12 +18,20 @@ class ClassroomConfig:
     """Enterprise Configuration parameters for Classroom Surveillance."""
 
     # ---- Model & Perception Settings ----
+    pipeline_mode: str = "1stage_yolo"  # "1stage_yolo" or "2stage_pose"
     model_path: str = "models/classroom_best.pt"
+    pose_model_path: str = "yolo11n-pose.pt"
     fallback_model: str = "yolov8n.pt"
     confidence_threshold: float = 0.45
+    pose_confidence_threshold: float = 0.20
     nms_iou_threshold: float = 0.45
     default_fps: float = 30.0
     input_resolution: int = 640
+    pose_input_resolution: int = 1280
+    pose_ai_fps_target: int = 10
+    side_peeking_yaw_threshold: float = 28.0
+    phone_pitch_threshold: float = 20.0
+    phone_wrist_ratio_threshold: float = 0.28
 
     # ---- High-Resolution Slicing (SAHI / Dynamic Tiling) ----
     enable_sahi_tiling: bool = False

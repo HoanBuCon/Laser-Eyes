@@ -1,17 +1,91 @@
 /**
- * VIGIL AI Enterprise Proctoring Dashboard Application
+ * VIGIL AI Enterprise Proctoring Dashboard Application (SRS v1.0)
+ *
+ * Implements:
+ * - 10-20 Concurrent Exam Rooms Multi-Card Grid
+ * - Real-time WebSocket event ingestion with HTTP polling fallback
+ * - Seat-anchored violation telemetry feed
+ * - Dual media evidence viewer (Peak JPEG snapshot + 10s MP4 video clip)
+ * - Cryptographic SHA-256 integrity hash verification
+ * - Human-in-the-Loop review actions (CONFIRM, REJECT, INCONCLUSIVE)
  */
 
 let behaviorChart = null;
-let currentSessionId = null;
+let currentEventId = null;
+let currentSha256 = '';
+let selectedRoomId = null;
+let currentRoomFilterType = 'ALL';
+let ws = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     initChart();
+    initWebSocket();
     loadDashboardData();
-    // Auto-refresh every 4 seconds
-    setInterval(loadDashboardData, 4000);
+    // Auto-refresh every 5 seconds as heartbeat fallback
+    setInterval(loadDashboardData, 5000);
 });
 
+// ==============================================================================
+// 1. WebSocket Real-time Ingestion & Heartbeat
+// ==============================================================================
+function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws/events`;
+
+    try {
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            setWsBadge(true, 'LIVE STREAM CONNECTED');
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                handleIncomingLiveEvent(data);
+            } catch (e) {
+                // Keep-alive or non-JSON message
+            }
+        };
+
+        ws.onclose = () => {
+            setWsBadge(false, 'RECONNECTING...');
+            setTimeout(initWebSocket, 4000);
+        };
+
+        ws.onerror = () => {
+            setWsBadge(false, 'STREAM OFFLINE');
+        };
+    } catch (err) {
+        setWsBadge(false, 'POLLING MODE');
+    }
+}
+
+function setWsBadge(isLive, text) {
+    const badge = document.getElementById('wsStatusBadge');
+    const label = document.getElementById('wsStatusText');
+    if (!badge || !label) return;
+
+    label.innerText = text;
+    if (isLive) {
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold';
+    } else {
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold';
+    }
+}
+
+function handleIncomingLiveEvent(eventData) {
+    // Refresh stats and events when a live event arrives
+    loadDashboardData();
+}
+
+function triggerManualRefresh() {
+    loadDashboardData();
+}
+
+// ==============================================================================
+// 2. Behavior Signal Chart
+// ==============================================================================
 function initChart() {
     const ctx = document.getElementById('behaviorDonutChart');
     if (!ctx) return;
@@ -19,15 +93,14 @@ function initChart() {
     behaviorChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['Phone Using', 'Back Peeking', 'Side Peeking', 'Front Peeking', 'No Cheating'],
+            labels: ['PROLONGED_HEAD_TURN', 'BODY_LEAN_SIDE', 'LOOK_DOWN_LONG', 'LOW_HAND_POSTURE'],
             datasets: [{
-                data: [0, 0, 0, 0, 1],
+                data: [0, 0, 0, 0],
                 backgroundColor: [
-                    '#ef4444', // Phone - Red
-                    '#f97316', // Back - Orange
-                    '#eab308', // Side - Yellow
-                    '#3b82f6', // Front - Blue
-                    '#10b981'  // Normal - Green
+                    '#f59e0b', // Head turn - Amber
+                    '#3b82f6', // Body lean - Blue
+                    '#8b5cf6', // Look down - Purple
+                    '#ef4444'  // Low hand - Red
                 ],
                 borderWidth: 0,
                 hoverOffset: 6
@@ -41,205 +114,377 @@ function initChart() {
                     position: 'bottom',
                     labels: {
                         color: '#9ca3af',
-                        font: { size: 12, family: 'Inter' },
-                        padding: 14
+                        font: { size: 11, family: 'Inter' },
+                        padding: 10
                     }
                 }
             },
-            cutout: '72%'
+            cutout: '70%'
         }
     });
 }
 
+function updateBehaviorChart(counts = {}) {
+    if (!behaviorChart) return;
+
+    const headTurn = counts['PROLONGED_HEAD_TURN'] || counts['side peeking'] || counts['back peeking'] || 0;
+    const bodyLean = counts['BODY_LEAN_SIDE'] || 0;
+    const lookDown = counts['LOOK_DOWN_LONG'] || counts['front peeking'] || 0;
+    const lowHand = counts['LOW_HAND_POSTURE'] || counts['phone using'] || 0;
+
+    const dataArr = [headTurn, bodyLean, lookDown, lowHand];
+    const total = dataArr.reduce((a, b) => a + b, 0);
+
+    if (total === 0) {
+        behaviorChart.data.datasets[0].data = [1, 1, 1, 1];
+    } else {
+        behaviorChart.data.datasets[0].data = dataArr;
+    }
+    behaviorChart.update();
+
+    // Update text labels
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    setEl('statHeadTurn', headTurn);
+    setEl('statBodyLean', bodyLean);
+    setEl('statLookDown', lookDown);
+    setEl('statLowHand', lowHand);
+}
+
+// ==============================================================================
+// 3. Main Data Fetching & Rendering
+// ==============================================================================
 async function loadDashboardData() {
     try {
-        // 1. Fetch Summary Stats
-        const statsRes = await fetch('/api/statistics/summary');
+        // Fetch Summary Stats
+        const statsRes = await fetch('/api/v1/statistics/summary');
         if (statsRes.ok) {
             const stats = await statsRes.json();
             updateSummaryCounters(stats);
             updateBehaviorChart(stats.events_by_behavior);
         }
 
-        // 2. Fetch Room Risk Rankings
-        const rankRes = await fetch('/api/statistics/rankings');
-        if (rankRes.ok) {
-            const rankings = await rankRes.json();
-            renderRoomRankings(rankings);
-        }
+        // Fetch Room Rankings / Grid
+        const roomsRes = await fetch('/api/v1/rooms');
+        const rankRes = await fetch('/api/v1/statistics/rankings');
+        let rooms = [];
+        let rankings = [];
 
-        // 3. Fetch Active Sessions
-        const sessRes = await fetch('/api/sessions/active');
-        if (sessRes.ok) {
-            const sessions = await sessRes.json();
-            renderActiveSessions(sessions);
-            if (sessions.length > 0) {
-                loadSessionEvents(sessions[0].id);
-            }
-        }
+        if (roomsRes.ok) rooms = await roomsRes.json();
+        if (rankRes.ok) rankings = await rankRes.json();
+
+        renderRoomGrid(rooms, rankings);
+
+        // Fetch Events List with active filters
+        loadEvents();
     } catch (err) {
-        console.warn('Telemetry update sync error:', err);
+        console.warn('Dashboard sync telemetry error:', err);
     }
 }
 
 function updateSummaryCounters(stats) {
-    document.getElementById('statTotalEvents').innerText = stats.total_events || 0;
-    document.getElementById('statActiveRooms').innerText = stats.active_rooms || 0;
-    document.getElementById('statCompletedSessions').innerText = stats.completed_sessions || 0;
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
+    setEl('statTotalEvents', stats.total_events || 0);
+    setEl('statActiveRooms', stats.active_rooms || 0);
 
     const highCount = (stats.events_by_severity && stats.events_by_severity.HIGH) || 0;
-    document.getElementById('statHighSeverity').innerText = highCount;
+    setEl('statHighSeverity', highCount);
+
+    // Human Review Rate calculation
+    const totalEvents = stats.total_events || 0;
+    const reviewedCount = (stats.total_events || 0) - ((stats.events_by_review_status && stats.events_by_review_status.PENDING) || 0);
+    const reviewRate = totalEvents > 0 ? Math.round((reviewedCount / totalEvents) * 100) : 100;
+    setEl('statReviewRate', `${reviewRate}%`);
 }
 
-function updateBehaviorChart(behaviorCounts = {}) {
-    if (!behaviorChart) return;
+function renderRoomGrid(rooms, rankings) {
+    const grid = document.getElementById('roomCardsGrid');
+    if (!grid) return;
 
-    const counts = [
-        behaviorCounts['phone using'] || 0,
-        behaviorCounts['back peeking'] || 0,
-        behaviorCounts['side peeking'] || 0,
-        behaviorCounts['front peeking'] || 0,
-        behaviorCounts['no cheating'] || 0,
-    ];
-
-    const total = counts.reduce((a, b) => a + b, 0);
-    if (total === 0) {
-        behaviorChart.data.datasets[0].data = [0, 0, 0, 0, 1];
-    } else {
-        behaviorChart.data.datasets[0].data = counts;
-    }
-    behaviorChart.update();
-}
-
-function renderRoomRankings(rankings) {
-    const tbody = document.getElementById('roomRankingsTable');
-    if (!tbody) return;
-
-    if (rankings.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-500">No rooms monitored yet</td></tr>`;
+    if (!rooms || rooms.length === 0) {
+        grid.innerHTML = `<div class="p-6 text-center text-gray-500 col-span-full">No rooms configured in system.</div>`;
         return;
     }
 
-    tbody.innerHTML = rankings.map((r, i) => {
-        let badgeColor = 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
-        if (r.risk_score >= 60) {
-            badgeColor = 'bg-rose-500/20 text-rose-400 border-rose-500/30 badge-pulse-red';
-        } else if (r.risk_score >= 25) {
-            badgeColor = 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+    const rankMap = {};
+    rankings.forEach(r => { rankMap[r.room_id] = r; });
+
+    let displayRooms = rooms;
+    if (currentRoomFilterType === 'HIGH_RISK') {
+        displayRooms = rooms.filter(r => (rankMap[r.id]?.risk_score || 0) >= 30);
+    }
+
+    grid.innerHTML = displayRooms.map(room => {
+        const rank = rankMap[room.id] || { risk_score: 0, total_events: 0 };
+        const isSelected = selectedRoomId === room.id;
+
+        let riskColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+        let barColor = 'bg-emerald-500';
+        if (rank.risk_score >= 60) {
+            riskColor = 'text-red-400 bg-red-500/20 border-red-500/40 badge-pulse-red';
+            barColor = 'bg-red-500';
+        } else if (rank.risk_score >= 25) {
+            riskColor = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+            barColor = 'bg-amber-500';
         }
 
+        const borderStyle = isSelected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-gray-800 hover:border-gray-700';
+
         return `
-        <tr class="border-b border-gray-800/50 hover:bg-gray-800/30 transition">
-            <td class="py-3 px-4 font-mono text-gray-400">#${i + 1}</td>
-            <td class="py-3 px-4 font-medium text-white">${r.room_name}</td>
-            <td class="py-3 px-4 text-gray-400 text-sm">${r.site_name}</td>
-            <td class="py-3 px-4 font-semibold text-center">${r.total_events}</td>
-            <td class="py-3 px-4 text-right">
-                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${badgeColor}">
-                    ${r.risk_score} / 100
-                </span>
-            </td>
-        </tr>`;
+        <div onclick="selectRoom('${room.id}', '${room.name}')" class="p-4 rounded-xl bg-gray-900/80 border ${borderStyle} cursor-pointer transition flex flex-col justify-between">
+            <div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-mono font-bold text-gray-400 uppercase">${room.room_code || 'ROOM'}</span>
+                    <span class="text-xs px-2 py-0.5 rounded-full border font-bold font-mono ${riskColor}">
+                        Score ${rank.risk_score}
+                    </span>
+                </div>
+                <h3 class="font-bold text-sm text-white mt-1">${room.name}</h3>
+                <p class="text-xs text-gray-400 font-mono mt-0.5">Capacity: ${room.capacity_seats || 24} seats</p>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-gray-800/80">
+                <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
+                    <span>Risk Level</span>
+                    <span class="font-mono text-gray-200">${rank.risk_score}/100</span>
+                </div>
+                <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
+                    <div class="${barColor} h-1.5 rounded-full transition-all duration-500" style="width: ${Math.min(100, rank.risk_score)}%"></div>
+                </div>
+                <div class="flex items-center justify-between text-[11px] text-gray-500 mt-2">
+                    <span>Events: <strong class="text-gray-300 font-mono">${rank.total_events}</strong></span>
+                    <span class="${isSelected ? 'text-cyan-400 font-semibold' : 'text-gray-400'}">${isSelected ? 'Filtering Feed' : 'Click to filter'}</span>
+                </div>
+            </div>
+        </div>
+        `;
     }).join('');
 }
 
-function renderActiveSessions(sessions) {
-    const container = document.getElementById('activeSessionsList');
-    if (!container) return;
-
-    if (sessions.length === 0) {
-        container.innerHTML = `<div class="p-4 text-sm text-gray-500 text-center">No active exam sessions</div>`;
-        return;
-    }
-
-    container.innerHTML = sessions.map(s => `
-        <div class="p-3 rounded-lg bg-gray-900/60 border border-gray-800 hover:border-cyan-500/40 transition flex items-center justify-between cursor-pointer" onclick="loadSessionEvents('${s.id}')">
-            <div>
-                <div class="font-medium text-sm text-white">${s.exam_name}</div>
-                <div class="text-xs text-cyan-400 flex items-center gap-2 mt-0.5">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                    Frames: ${s.total_frames.toLocaleString()} | Events: ${s.total_events}
-                </div>
-            </div>
-            <span class="text-xs px-2 py-1 rounded bg-red-500/20 text-red-300 border border-red-500/30 font-mono">
-                Risk: ${s.risk_score}
-            </span>
-        </div>
-    `).join('');
+function filterRooms(type) {
+    currentRoomFilterType = type;
+    loadDashboardData();
 }
 
-async function loadSessionEvents(sessionId) {
-    currentSessionId = sessionId;
+function selectRoom(roomId, roomName) {
+    if (selectedRoomId === roomId) {
+        selectedRoomId = null;
+        const badge = document.getElementById('selectedRoomFilterBadge');
+        if (badge) badge.classList.add('hidden');
+    } else {
+        selectedRoomId = roomId;
+        const badge = document.getElementById('selectedRoomFilterBadge');
+        if (badge) {
+            badge.innerText = `Room: ${roomName}`;
+            badge.classList.remove('hidden');
+        }
+    }
+    loadDashboardData();
+}
+
+// ==============================================================================
+// 4. Events Feed & Filtering
+// ==============================================================================
+async function loadEvents() {
+    const sevFilter = document.getElementById('severityFilter')?.value || '';
+    const revFilter = document.getElementById('reviewFilter')?.value || '';
+
+    let url = '/api/v1/events?limit=50';
+    if (selectedRoomId) url += `&room_id=${encodeURIComponent(selectedRoomId)}`;
+    if (sevFilter) url += `&severity=${encodeURIComponent(sevFilter)}`;
+    if (revFilter) url += `&review_status=${encodeURIComponent(revFilter)}`;
+
     try {
-        const res = await fetch(`/api/events/session/${sessionId}`);
+        const res = await fetch(url);
         if (!res.ok) return;
         const events = await res.json();
         renderEventFeed(events);
     } catch (e) {
-        console.warn('Error fetching events:', e);
+        console.warn('Failed to load events:', e);
     }
+}
+
+function applyEventFilters() {
+    loadEvents();
 }
 
 function renderEventFeed(events) {
     const feed = document.getElementById('eventsFeed');
     if (!feed) return;
 
-    if (events.length === 0) {
-        feed.innerHTML = `<div class="p-8 text-center text-gray-500">No violations detected in this session.</div>`;
+    if (!events || events.length === 0) {
+        feed.innerHTML = `<div class="p-8 text-center text-gray-500">No detection events match the current filter.</div>`;
         return;
     }
 
     feed.innerHTML = events.map(ev => {
-        let badgeCls = ev.severity === 'HIGH' ? 'text-red-400 bg-red-500/10 border-red-500/30' : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-        let evidenceBtn = ev.evidence_url ? `
-            <button onclick="openEvidenceModal('${ev.evidence_url}', '${ev.event_id}', '${ev.behavior}')" class="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/30 rounded text-xs transition flex items-center gap-1">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                Evidence
-            </button>
-        ` : '';
+        let badgeCls = 'text-gray-400 bg-gray-500/10 border-gray-500/30';
+        if (ev.severity === 'HIGH') {
+            badgeCls = 'text-red-400 bg-red-500/20 border-red-500/40';
+        } else if (ev.severity === 'MEDIUM') {
+            badgeCls = 'text-amber-400 bg-amber-500/20 border-amber-500/40';
+        }
+
+        let reviewBadgeCls = 'text-gray-400 bg-gray-800';
+        if (ev.review_status === 'CONFIRMED') {
+            reviewBadgeCls = 'text-red-400 bg-red-500/10 border border-red-500/30';
+        } else if (ev.review_status === 'REJECTED') {
+            reviewBadgeCls = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
+        } else if (ev.review_status === 'INCONCLUSIVE') {
+            reviewBadgeCls = 'text-amber-400 bg-amber-500/10 border border-amber-500/30';
+        }
+
+        const seatLabel = ev.seat_id || `TRACK-#${ev.track_id}`;
+        const shaShort = ev.evidence_hash ? `${ev.evidence_hash.substring(0, 10)}...` : 'N/A';
 
         return `
-        <div class="p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex items-center justify-between gap-4">
+        <div class="p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 rounded-lg bg-gray-800 flex items-center justify-center font-mono text-xs text-gray-300">
-                    #${ev.track_id}
+                <div class="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center font-mono text-xs text-cyan-300 font-bold border border-gray-700">
+                    <span class="text-[9px] text-gray-400">SEAT</span>
+                    <span>${seatLabel.replace('SEAT-', '')}</span>
                 </div>
                 <div>
                     <div class="flex items-center gap-2">
-                        <span class="font-semibold text-sm text-white uppercase tracking-wider">${ev.behavior}</span>
-                        <span class="text-xs px-2 py-0.5 rounded border ${badgeCls} font-bold">${ev.severity}</span>
+                        <span class="font-bold text-sm text-white font-mono">${ev.behavior}</span>
+                        <span class="text-[11px] px-2 py-0.5 rounded border font-bold ${badgeCls}">${ev.severity}</span>
+                        <span class="text-[10px] px-2 py-0.5 rounded font-mono ${reviewBadgeCls}">${ev.review_status}</span>
                     </div>
-                    <div class="text-xs text-gray-400 mt-0.5">
-                        Peak Conf: <span class="text-gray-200 font-mono">${(ev.confidence_peak * 100).toFixed(1)}%</span> | 
-                        Duration: <span class="text-gray-200 font-mono">${ev.duration_seconds}s</span>
-                        ${ev.room_context ? `<span class="text-amber-400/80 ml-1">(${ev.room_context})</span>` : ''}
+                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-3">
+                        <span>Confidence: <strong class="text-gray-200 font-mono">${(ev.confidence_peak * 100).toFixed(0)}%</strong></span>
+                        <span>Duration: <strong class="text-gray-200 font-mono">${ev.duration_seconds}s</strong></span>
+                        <span class="font-mono text-[11px] text-gray-500">SHA: ${shaShort}</span>
                     </div>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
-                ${evidenceBtn}
+
+            <div class="flex items-center gap-2 self-end sm:self-center">
+                <button onclick="openEvidenceModal('${ev.id}', '${seatLabel}', '${ev.behavior}', '${ev.confidence_peak}', '${ev.duration_seconds}', '${ev.evidence_hash || ''}', '${ev.review_status}')" class="px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                    Review Evidence
+                </button>
             </div>
-        </div>`;
+        </div>
+        `;
     }).join('');
 }
 
-function openEvidenceModal(url, eventId, behavior) {
+// ==============================================================================
+// 5. Dual Evidence Modal (Snapshot + MP4 Video + SHA-256)
+// ==============================================================================
+function openEvidenceModal(eventId, seatLabel, behavior, confPeak, duration, sha256, reviewStatus) {
+    currentEventId = eventId;
+    currentSha256 = sha256;
+
     const modal = document.getElementById('evidenceModal');
-    const img = document.getElementById('modalEvidenceImg');
     const title = document.getElementById('modalEventTitle');
+    const seatBadge = document.getElementById('modalSeatBadge');
+    const subtitle = document.getElementById('modalEventSubtitle');
+    const shaLabel = document.getElementById('modalSha256');
+    const curRevBadge = document.getElementById('modalCurrentReviewStatus');
+    const img = document.getElementById('modalEvidenceImg');
+    const videoSource = document.getElementById('modalVideoSource');
+    const videoPlayer = document.getElementById('modalEvidenceVideo');
 
-    if (!modal || !img) return;
+    if (!modal) return;
 
-    img.src = url;
-    title.innerText = `Evidence: ${eventId} — ${behavior.toUpperCase()}`;
+    seatBadge.innerText = seatLabel;
+    subtitle.innerText = `Behavior: ${behavior} | Peak Confidence: ${(Number(confPeak) * 100).toFixed(0)}% | Duration: ${duration}s`;
+    shaLabel.innerText = sha256 || 'SHA-256 NOT GENERATED';
+    curRevBadge.innerText = reviewStatus || 'PENDING';
+
+    // Set media URLs
+    const snapUrl = `/api/v1/events/${eventId}/evidence`;
+    const videoUrl = `/api/v1/events/${eventId}/video`;
+
+    if (img) img.src = snapUrl;
+    if (videoSource && videoPlayer) {
+        videoSource.src = videoUrl;
+        videoPlayer.load();
+    }
+
+    switchEvidenceTab('snapshot');
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
 
 function closeEvidenceModal() {
     const modal = document.getElementById('evidenceModal');
+    const videoPlayer = document.getElementById('modalEvidenceVideo');
+    if (videoPlayer) videoPlayer.pause();
+
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+    }
+}
+
+function switchEvidenceTab(tab) {
+    const snapViewer = document.getElementById('snapshotViewer');
+    const vidViewer = document.getElementById('videoViewer');
+    const btnSnap = document.getElementById('btnTabSnapshot');
+    const btnVid = document.getElementById('btnTabVideo');
+    const videoPlayer = document.getElementById('modalEvidenceVideo');
+
+    if (tab === 'snapshot') {
+        if (snapViewer) snapViewer.classList.remove('hidden');
+        if (vidViewer) vidViewer.classList.add('hidden');
+        if (btnSnap) btnSnap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow';
+        if (btnVid) btnVid.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white';
+        if (videoPlayer) videoPlayer.pause();
+    } else {
+        if (snapViewer) snapViewer.classList.add('hidden');
+        if (vidViewer) vidViewer.classList.remove('hidden');
+        if (btnSnap) btnSnap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white';
+        if (btnVid) btnVid.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow';
+        if (videoPlayer) videoPlayer.play().catch(() => {});
+    }
+}
+
+function copySha256() {
+    if (!currentSha256) return;
+    navigator.clipboard.writeText(currentSha256).then(() => {
+        alert('SHA-256 Hash copied to clipboard:\n' + currentSha256);
+    }).catch(() => {
+        prompt('Copy SHA-256 Hash:', currentSha256);
+    });
+}
+
+// ==============================================================================
+// 6. Human-in-the-Loop Review Submission
+// ==============================================================================
+async function submitReviewDecision(decision) {
+    if (!currentEventId) return;
+
+    const reasonCode = document.getElementById('reviewReasonCode')?.value || 'CLEAR_CHEATING';
+    const note = document.getElementById('reviewNoteInput')?.value || '';
+
+    try {
+        const payload = {
+            reviewer_id: 'proctor_admin',
+            decision: decision,
+            reason_code: reasonCode,
+            note: note
+        };
+
+        const res = await fetch(`/api/v1/events/${currentEventId}/review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            const curRevBadge = document.getElementById('modalCurrentReviewStatus');
+            if (curRevBadge) curRevBadge.innerText = decision;
+
+            // Refresh events and stats
+            loadDashboardData();
+            setTimeout(closeEvidenceModal, 600);
+        } else {
+            alert('Failed to submit review decision.');
+        }
+    } catch (err) {
+        console.error('Review submission error:', err);
+        alert('Error submitting review decision.');
     }
 }

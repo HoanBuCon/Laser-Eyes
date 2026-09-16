@@ -1,4 +1,16 @@
-"""SQLAlchemy Relational Database Models for VIGIL AI Enterprise Proctoring."""
+"""SQLAlchemy Relational Database Models for VIGIL AI Enterprise Proctoring.
+
+Comprehensive 9-table relational schema matching SRS v1.0 specifications:
+1. exam_sites / rooms
+2. cameras
+3. seats (Seat ROI Polygons)
+4. exam_sessions
+5. detection_events (AI Events)
+6. evidence_files (Snapshots, MP4 Video, SHA-256 Hash)
+7. event_reviews (Human-in-the-Loop Review Decisions)
+8. worker_nodes (Inference Worker Heartbeats & Registrations)
+9. audit_logs (Immutable Audit Trail)
+"""
 
 from __future__ import annotations
 
@@ -48,17 +60,24 @@ class ExamRoom(Base):
     __tablename__ = "exam_rooms"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    site_id = Column(String(36), ForeignKey("exam_sites.id"), nullable=False)
+    site_id = Column(String(36), ForeignKey("exam_sites.id"), nullable=True)
+    room_code = Column(String(50), nullable=True, index=True)
     name = Column(String(255), nullable=False)
+    building = Column(String(100), nullable=True)
+    floor = Column(String(50), nullable=True)
     capacity = Column(Integer, default=30)
     description = Column(Text, nullable=True)
+    status = Column(String(20), default="active")  # "active", "maintenance", "inactive"
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
 
     # Relationships
     site = relationship("ExamSite", back_populates="rooms")
     cameras = relationship("Camera", back_populates="room", cascade="all, delete-orphan")
     sessions = relationship("ExamSession", back_populates="room", cascade="all, delete-orphan")
+    seats = relationship("SeatROI", back_populates="room", cascade="all, delete-orphan")
+    events = relationship("DetectionEvent", back_populates="room", cascade="all, delete-orphan")
 
 
 class Camera(Base):
@@ -70,12 +89,42 @@ class Camera(Base):
     room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=False)
     name = Column(String(255), nullable=False)
     source_uri = Column(String(500), default="0")  # RTSP URL or Device Index
+    rtsp_url_protected = Column(String(500), nullable=True)
     position = Column(String(50), default="front_center")
-    status = Column(String(20), default="online")  # "online", "offline", "error"
+    resolution = Column(String(50), default="1280x720")
+    capture_fps = Column(Float, default=30.0)
+    inference_fps = Column(Float, default=5.0)
+    worker_id = Column(String(36), ForeignKey("worker_nodes.id"), nullable=True)
+    enabled = Column(Boolean, default=True)
+    status = Column(String(20), default="online")  # "online", "degraded", "offline", "error"
     last_seen_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
     room = relationship("ExamRoom", back_populates="cameras")
+    worker = relationship("WorkerNode", back_populates="assigned_cameras")
+    seats = relationship("SeatROI", back_populates="camera", cascade="all, delete-orphan")
+    events = relationship("DetectionEvent", back_populates="camera", cascade="all, delete-orphan")
+
+
+class SeatROI(Base):
+    """Seat Region-of-Interest Polygon mapping a physical seat in a room camera view."""
+
+    __tablename__ = "seats"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=False)
+    camera_id = Column(String(36), ForeignKey("cameras.id"), nullable=True)
+    seat_code = Column(String(50), nullable=False, index=True)  # e.g., "A101_S01"
+    seat_label = Column(String(100), nullable=True)             # e.g., "Row 1 Desk 1"
+    polygon_json = Column(Text, nullable=False)                 # JSON array of points [[x, y], ...]
+    enabled = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Relationships
+    room = relationship("ExamRoom", back_populates="seats")
+    camera = relationship("Camera", back_populates="seats")
+    events = relationship("DetectionEvent", back_populates="seat", cascade="all, delete-orphan")
 
 
 class ExamSession(Base):
@@ -87,13 +136,16 @@ class ExamSession(Base):
     room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=False)
     camera_id = Column(String(36), ForeignKey("cameras.id"), nullable=True)
     exam_name = Column(String(255), nullable=False)
+    subject_code = Column(String(50), nullable=True)
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
     started_at = Column(DateTime, default=datetime.datetime.utcnow)
     ended_at = Column(DateTime, nullable=True)
     total_frames = Column(Integer, default=0)
     avg_fps = Column(Float, default=0.0)
     total_events = Column(Integer, default=0)
     risk_score = Column(Integer, default=0)  # 0 to 100
-    status = Column(String(20), default="running")  # "running", "completed", "cancelled"
+    status = Column(String(20), default="RUNNING")  # "DRAFT", "READY", "RUNNING", "STOPPING", "COMPLETED", "FAILED"
 
     # Relationships
     room = relationship("ExamRoom", back_populates="sessions")
@@ -103,45 +155,119 @@ class ExamSession(Base):
 
 
 class DetectionEvent(Base):
-    """A detected violation episode (e.g. phone using, peeking)."""
+    """A detected suspicious behavioral event associated with a Seat and Session."""
 
     __tablename__ = "detection_events"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=False)
-    event_id = Column(String(36), nullable=False, index=True)  # Human-readable EVT-XXXX
+    room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=True)
+    camera_id = Column(String(36), ForeignKey("cameras.id"), nullable=True)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=True)
+    event_id = Column(String(36), nullable=False, index=True)  # UUID or human-readable EVT-XXXX
     track_id = Column(Integer, default=0)
-    behavior = Column(String(50), nullable=False)
-    severity = Column(String(10), default="MEDIUM")  # "LOW", "MEDIUM", "HIGH"
+    event_type = Column(String(50), default="SUSPICIOUS_BEHAVIOR")
+    primary_signal = Column(String(50), default="PROLONGED_HEAD_TURN")
+    behavior = Column(String(50), nullable=False)  # Legacy alias matching primary_signal
+    severity = Column(String(10), default="MEDIUM")  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    risk_score = Column(Integer, default=50)  # 0 to 100 normalized score
     confidence_avg = Column(Float, default=0.0)
     confidence_peak = Column(Float, default=0.0)
     start_frame = Column(Integer, default=0)
     end_frame = Column(Integer, default=0)
+    start_timestamp = Column(DateTime, nullable=True)
+    peak_timestamp = Column(DateTime, nullable=True)
+    end_timestamp = Column(DateTime, nullable=True)
     duration_seconds = Column(Float, default=0.0)
     bbox_json = Column(Text, nullable=True)
-    status = Column(String(20), default="suspicious")  # "suspicious", "confirmed", "dismissed"
+    status = Column(String(30), default="PENDING")  # "PENDING", "CONFIRMED", "REJECTED", "INCONCLUSIVE", "FLAGGED_FOR_HUMAN_REVIEW"
+    review_status = Column(String(20), default="PENDING")  # "PENDING", "CONFIRMED", "REJECTED", "INCONCLUSIVE"
+    model_version = Column(String(50), default="yolo11n-pose")
+    config_version = Column(String(50), default="school-prototype-v1")
     room_context = Column(Text, nullable=True)
     reviewer_note = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
     session = relationship("ExamSession", back_populates="events")
+    room = relationship("ExamRoom", back_populates="events")
+    camera = relationship("Camera", back_populates="events")
+    seat = relationship("SeatROI", back_populates="events")
     evidence = relationship(
         "EvidenceFile", back_populates="event", uselist=False, cascade="all, delete-orphan"
+    )
+    review = relationship(
+        "EventReview", back_populates="event", uselist=False, cascade="all, delete-orphan"
     )
 
 
 class EvidenceFile(Base):
-    """Archived evidence image (JPEG) corresponding to an event."""
+    """Archived evidence package (JPEG Snapshot + 10s MP4 Video + SHA-256 Hash)."""
 
     __tablename__ = "evidence_files"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     event_id = Column(String(36), ForeignKey("detection_events.id"), nullable=False)
-    file_path = Column(String(500), nullable=False)
-    file_type = Column(String(50), default="image/jpeg")
+    file_path = Column(String(500), nullable=False)  # Primary file (or snapshot)
+    snapshot_path = Column(String(500), nullable=True)
+    video_path = Column(String(500), nullable=True)
+    video_sha256 = Column(String(64), nullable=True)  # SHA-256 integrity digest
+    file_type = Column(String(50), default="video/mp4")
     file_size_bytes = Column(Integer, default=0)
+    status = Column(String(20), default="READY")  # "PENDING", "READY", "FAILED"
+    error_message = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
     event = relationship("DetectionEvent", back_populates="evidence")
+
+
+class EventReview(Base):
+    """Human-in-the-Loop Proctor Review Record for an AI Event."""
+
+    __tablename__ = "event_reviews"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    event_id = Column(String(36), ForeignKey("detection_events.id"), nullable=False, unique=True)
+    reviewer_id = Column(String(100), nullable=False)  # User ID or Username
+    decision = Column(String(20), nullable=False)      # "CONFIRMED", "REJECTED", "INCONCLUSIVE"
+    reason_code = Column(String(50), nullable=True)    # "TRUE_SUSPICIOUS", "NORMAL_BEHAVIOR", "PROCTOR_OCCLUSION", "LOW_IMAGE_QUALITY", "SEAT_MAPPING_ERROR", "OTHER"
+    note = Column(Text, default="")
+    reviewed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    event = relationship("DetectionEvent", back_populates="review")
+
+
+class WorkerNode(Base):
+    """Distributed Inference Worker Node handling RTSP decoding and AI perception."""
+
+    __tablename__ = "worker_nodes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    hostname = Column(String(255), nullable=False)
+    gpu_name = Column(String(255), nullable=True)
+    gpu_memory_mb = Column(Integer, default=0)
+    status = Column(String(20), default="ONLINE")  # "ONLINE", "DEGRADED", "OFFLINE"
+    last_heartbeat = Column(DateTime, default=datetime.datetime.utcnow)
+    active_camera_count = Column(Integer, default=0)
+    max_active_streams = Column(Integer, default=10)
+    version = Column(String(50), default="1.0.0")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    assigned_cameras = relationship("Camera", back_populates="worker")
+
+
+class AuditLog(Base):
+    """Immutable Audit Log Trail for Critical Actions in the System."""
+
+    __tablename__ = "audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    actor_id = Column(String(100), nullable=False)
+    action = Column(String(100), nullable=False)  # "LOGIN", "START_SESSION", "STOP_SESSION", "REVIEW_EVENT", "UPDATE_SEAT_ROI"
+    resource_type = Column(String(50), nullable=False) # "SESSION", "EVENT", "SEAT", "CAMERA", "ROOM"
+    resource_id = Column(String(100), nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)

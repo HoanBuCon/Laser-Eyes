@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIGIL AI — Enterprise Exam Cheating Surveillance</title>
+    <title>VIGIL AI — Enterprise Exam Cheating Surveillance & Proctoring</title>
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -12,48 +12,69 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: { 500: '#06b6d4', 600: '#0891b2' }
+                        brand: { 500: '#06b6d4', 600: '#0891b2' },
+                        dark: { 900: '#0b0f19', 800: '#111827', 700: '#1f2937' }
                     }
                 }
             }
         }
     </script>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
-<body class="bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white">
+<body class="bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans">
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-gray-800/80 bg-gray-950/70 backdrop-blur sticky top-0 z-40">
+    <header class="border-b border-gray-800/80 bg-gray-950/80 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                 </div>
                 <div>
-                    <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-200 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
-                    <p class="text-xs text-gray-400 font-mono">Classroom Proctoring Enterprise Server v2.0</p>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
+                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">MVP v1.0</span>
+                    </div>
+                    <p class="text-xs text-gray-400 font-mono">10–20 Room Multi-Camera AI Proctoring Dashboard</p>
                 </div>
             </div>
+
             <div class="flex items-center gap-4">
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                <div id="wsStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    SYSTEM ONLINE
+                    <span id="wsStatusText">LIVE STREAM CONNECTED</span>
                 </div>
-                <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs (Swagger) &rarr;</a>
+                <button onclick="triggerManualRefresh()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition" title="Refresh Dashboard">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                </button>
+                <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
             </div>
         </div>
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Stat Counter Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="glass-panel p-5">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Monitored Rooms</span>
+                    <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
+                    </span>
+                </div>
+                <div class="mt-3 flex items-baseline gap-2">
+                    <span id="statActiveRooms" class="text-3xl font-bold font-mono text-emerald-400">0</span>
+                    <span class="text-xs text-gray-500">active rooms</span>
+                </div>
+            </div>
+
             <div class="glass-panel p-5">
                 <div class="flex items-center justify-between">
                     <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Total Violations</span>
@@ -61,7 +82,7 @@
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     </span>
                 </div>
-                <div class="mt-4 flex items-baseline gap-2">
+                <div class="mt-3 flex items-baseline gap-2">
                     <span id="statTotalEvents" class="text-3xl font-bold font-mono text-white">0</span>
                     <span class="text-xs text-gray-500">recorded episodes</span>
                 </div>
@@ -69,125 +90,187 @@
 
             <div class="glass-panel p-5">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">High Severity (Alert)</span>
+                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">High Severity Alerts</span>
                     <span class="p-2 rounded-lg bg-red-500/10 text-red-400">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414"/></svg>
                     </span>
                 </div>
-                <div class="mt-4 flex items-baseline gap-2">
+                <div class="mt-3 flex items-baseline gap-2">
                     <span id="statHighSeverity" class="text-3xl font-bold font-mono text-red-400">0</span>
-                    <span class="text-xs text-red-500/80">Phone / group cheating</span>
+                    <span class="text-xs text-red-500/80">requires review</span>
                 </div>
             </div>
 
             <div class="glass-panel p-5">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Active Classrooms</span>
-                    <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </span>
-                </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span id="statActiveRooms" class="text-3xl font-bold font-mono text-emerald-400">0</span>
-                    <span class="text-xs text-gray-500">live streams</span>
-                </div>
-            </div>
-
-            <div class="glass-panel p-5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Completed Sessions</span>
+                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Human Review Rate</span>
                     <span class="p-2 rounded-lg bg-blue-500/10 text-blue-400">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </span>
                 </div>
-                <div class="mt-4 flex items-baseline gap-2">
-                    <span id="statCompletedSessions" class="text-3xl font-bold font-mono text-white">0</span>
-                    <span class="text-xs text-gray-500">exams archived</span>
+                <div class="mt-3 flex items-baseline gap-2">
+                    <span id="statReviewRate" class="text-3xl font-bold font-mono text-white">0%</span>
+                    <span class="text-xs text-gray-500">audited by proctors</span>
                 </div>
             </div>
         </div>
 
-        <!-- Middle Grid: Behavior Distribution & Room Risk Rankings -->
+        <!-- 10-20 Exam Rooms Multi-Card Grid -->
+        <div class="glass-panel p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-base font-bold text-white flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                        Multi-Room Surveillance Grid (10–20 Rooms)
+                    </h2>
+                    <p class="text-xs text-gray-400">Real-time room risk scores, active cameras, and seat occupancy</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="filterRooms('ALL')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition">All Rooms</button>
+                    <button onclick="filterRooms('HIGH_RISK')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-red-400 border border-gray-700 transition">High Risk Only</button>
+                </div>
+            </div>
+            <div id="roomCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div class="p-8 text-center text-gray-500 col-span-full">Loading room telemetry...</div>
+            </div>
+        </div>
+
+        <!-- Middle Grid: Behavior Distribution Chart & Live Event Feed -->
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Chart -->
+            <!-- Left Chart: Behavior Distribution -->
             <div class="glass-panel p-6">
-                <h2 class="text-base font-semibold text-white mb-1">Behavior Distribution</h2>
-                <p class="text-xs text-gray-400 mb-6">Proctoring violations by class classification</p>
+                <h2 class="text-base font-semibold text-white mb-1">Behavior Signal Distribution</h2>
+                <p class="text-xs text-gray-400 mb-6">Normalized SRS Behavior Signals</p>
                 <div class="h-64 relative">
                     <canvas id="behaviorDonutChart"></canvas>
                 </div>
+                <div class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
+                    <div class="flex justify-between"><span>PROLONGED_HEAD_TURN:</span><span id="statHeadTurn" class="font-mono text-gray-200">0</span></div>
+                    <div class="flex justify-between"><span>BODY_LEAN_SIDE:</span><span id="statBodyLean" class="font-mono text-gray-200">0</span></div>
+                    <div class="flex justify-between"><span>LOOK_DOWN_LONG:</span><span id="statLookDown" class="font-mono text-gray-200">0</span></div>
+                    <div class="flex justify-between"><span>LOW_HAND_POSTURE:</span><span id="statLowHand" class="font-mono text-gray-200">0</span></div>
+                </div>
             </div>
 
-            <!-- Right Room Ranking Table -->
+            <!-- Right: Live Event Telemetry Feed with Human-in-the-Loop Review Buttons -->
             <div class="glass-panel p-6 lg:col-span-2">
                 <div class="flex items-center justify-between mb-4">
                     <div>
-                        <h2 class="text-base font-semibold text-white">Classroom Risk Rankings</h2>
-                        <p class="text-xs text-gray-400">Rooms prioritized by cumulative AI risk scores</p>
+                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
+                            <span>Real-Time Violation Telemetry & Human Review</span>
+                            <span id="selectedRoomFilterBadge" class="hidden text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono"></span>
+                        </h2>
+                        <p class="text-xs text-gray-400">Seat-anchored events requiring proctor verification</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <select id="severityFilter" onchange="applyEventFilters()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-2.5 py-1 text-gray-300 focus:outline-none focus:border-cyan-500">
+                            <option value="">All Severities</option>
+                            <option value="HIGH">HIGH Only</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="LOW">LOW</option>
+                        </select>
+                        <select id="reviewFilter" onchange="applyEventFilters()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-2.5 py-1 text-gray-300 focus:outline-none focus:border-cyan-500">
+                            <option value="">All Review States</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="CONFIRMED">CONFIRMED</option>
+                            <option value="REJECTED">REJECTED</option>
+                            <option value="INCONCLUSIVE">INCONCLUSIVE</option>
+                        </select>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm">
-                        <thead>
-                            <tr class="border-b border-gray-800 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                                <th class="py-3 px-4">#</th>
-                                <th class="py-3 px-4">Room Name</th>
-                                <th class="py-3 px-4">Exam Site</th>
-                                <th class="py-3 px-4 text-center">Events</th>
-                                <th class="py-3 px-4 text-right">Risk Score</th>
-                            </tr>
-                        </thead>
-                        <tbody id="roomRankingsTable">
-                            <tr><td colspan="5" class="py-8 text-center text-gray-500">Loading telemetry...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- Bottom Grid: Live Exam Feed & Active Sessions -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Active Sessions List -->
-            <div class="glass-panel p-6">
-                <h2 class="text-base font-semibold text-white mb-1">Active Sessions</h2>
-                <p class="text-xs text-gray-400 mb-4">Currently running camera proctoring sessions</p>
-                <div id="activeSessionsList" class="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-                    <div class="p-4 text-sm text-gray-500 text-center">No active sessions</div>
-                </div>
-            </div>
-
-            <!-- Violation Events Live Feed -->
-            <div class="glass-panel p-6 lg:col-span-2">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-base font-semibold text-white">Violation Telemetry Feed</h2>
-                        <p class="text-xs text-gray-400">Real-time temporal events with peak-confidence evidence</p>
-                    </div>
-                </div>
-                <div id="eventsFeed" class="space-y-3 max-h-96 overflow-y-auto pr-1">
-                    <div class="p-8 text-center text-gray-500">Select an active session to view event timeline.</div>
+                <div id="eventsFeed" class="space-y-3 max-h-[480px] overflow-y-auto pr-1">
+                    <div class="p-8 text-center text-gray-500">No events found. Waiting for camera stream detections...</div>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- Evidence Modal -->
+    <!-- Comprehensive Evidence & Human-in-the-Loop Review Modal -->
     <div id="evidenceModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-3xl w-full p-6 shadow-2xl space-y-4">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+            <!-- Modal Header -->
             <div class="flex items-center justify-between border-b border-gray-800 pb-3">
-                <h3 id="modalEventTitle" class="font-bold text-lg text-white font-mono">Evidence Preview</h3>
-                <button onclick="closeEvidenceModal()" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
+                <div>
+                    <h3 id="modalEventTitle" class="font-bold text-lg text-white font-mono flex items-center gap-2">
+                        <span>Evidence Package</span>
+                        <span id="modalSeatBadge" class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"></span>
+                    </h3>
+                    <p id="modalEventSubtitle" class="text-xs text-gray-400 mt-0.5"></p>
+                </div>
+                <button onclick="closeEvidenceModal()" class="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="rounded-xl overflow-hidden bg-black flex items-center justify-center max-h-[65vh]">
-                <img id="modalEvidenceImg" src="" alt="Evidence Frame" class="object-contain max-h-[60vh] w-full">
+
+            <!-- Media Preview Tabs (Snapshot / Video) -->
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex gap-2">
+                        <button id="btnTabSnapshot" onclick="switchEvidenceTab('snapshot')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow">Peak Snapshot (JPEG)</button>
+                        <button id="btnTabVideo" onclick="switchEvidenceTab('video')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white">10s Video Clip (MP4)</button>
+                    </div>
+                    <!-- Integrity Hash Badge -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] text-gray-400 font-mono">SHA-256:</span>
+                        <code id="modalSha256" class="text-[11px] text-cyan-300 bg-gray-950 px-2 py-1 rounded border border-gray-800 font-mono truncate max-w-[200px]" title="Cryptographic Evidence Hash">N/A</code>
+                        <button onclick="copySha256()" class="text-xs text-gray-400 hover:text-cyan-400" title="Copy full SHA-256 hash">📋</button>
+                    </div>
+                </div>
+
+                <!-- Snapshot Image Display -->
+                <div id="snapshotViewer" class="rounded-xl overflow-hidden bg-black flex items-center justify-center min-h-[300px] max-h-[460px] border border-gray-800">
+                    <img id="modalEvidenceImg" src="" alt="Evidence Frame" class="object-contain max-h-[440px] w-full">
+                </div>
+
+                <!-- MP4 Video Player Display -->
+                <div id="videoViewer" class="hidden rounded-xl overflow-hidden bg-black flex items-center justify-center min-h-[300px] max-h-[460px] border border-gray-800">
+                    <video id="modalEvidenceVideo" controls class="max-h-[440px] w-full">
+                        <source id="modalVideoSource" src="" type="video/mp4">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
             </div>
-            <div class="flex justify-end gap-3 pt-2">
-                <button onclick="closeEvidenceModal()" class="px-5 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-sm font-semibold text-gray-200 transition">
-                    Close Preview
-                </button>
+
+            <!-- Human-in-the-Loop Proctor Review Panel -->
+            <div class="pt-3 border-t border-gray-800 bg-gray-950/60 p-4 rounded-xl space-y-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-sm font-semibold text-white">Proctor Decision & Verification (Human-in-the-Loop)</h4>
+                    <span id="modalCurrentReviewStatus" class="text-xs px-2.5 py-0.5 rounded font-bold font-mono">PENDING</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Reason Code (Mã lý do)</label>
+                        <select id="reviewReasonCode" class="w-full bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-cyan-500">
+                            <option value="CLEAR_CHEATING">CLEAR_CHEATING — Gian lận rõ ràng (dùng tài liệu/nhìn bài)</option>
+                            <option value="LEGITIMATE_BEHAVIOR">LEGITIMATE_BEHAVIOR — Hành vi hợp lệ (mỏi cổ / nhìn bảng / làm bài)</option>
+                            <option value="OCCLUSION_ERROR">OCCLUSION_ERROR — Che khuất / Giám thị đi ngang qua</option>
+                            <option value="TEACHER_INTERACTION">TEACHER_INTERACTION — Tương tác với giám thị</option>
+                            <option value="CAMERA_GLITCH">CAMERA_GLITCH — Nhiễu khung hình camera</option>
+                            <option value="OTHER">OTHER — Khác</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-400 mb-1">Reviewer Note (Ghi chú giám thị)</label>
+                        <input id="reviewNoteInput" type="text" placeholder="Optional audit explanation..." class="w-full bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-cyan-500">
+                    </div>
+                </div>
+                <div class="flex items-center justify-between pt-2">
+                    <div class="text-[11px] text-gray-500">
+                        * In accordance with SRS Section 7: AI never makes final disciplinary decisions.
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="submitReviewDecision('REJECTED')" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition">
+                            REJECT (Bác bỏ)
+                        </button>
+                        <button onclick="submitReviewDecision('INCONCLUSIVE')" class="px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/40 text-xs font-bold transition">
+                            INCONCLUSIVE (Chưa rõ)
+                        </button>
+                        <button onclick="submitReviewDecision('CONFIRMED')" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition">
+                            CONFIRM (Xác nhận vi phạm)
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

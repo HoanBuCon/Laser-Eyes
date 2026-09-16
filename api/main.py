@@ -145,3 +145,11 @@ if dashboard_dir.exists():
         if index_file.exists():
             return FileResponse(str(index_file))
         return {"message": "Dashboard index.html not found, please visit /docs"}
+
+    @app.get("/calibration", tags=["Dashboard"])
+    def serve_calibration_tool():
+        """Serve the Interactive Seat ROI Calibration Tool UI."""
+        calib_file = dashboard_dir / "calibration.html"
+        if calib_file.exists():
+            return FileResponse(str(calib_file))
+        return {"message": "Calibration tool calibration.html not found, please visit /docs"}

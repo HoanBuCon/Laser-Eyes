@@ -250,6 +250,30 @@ class SeatRepository:
         self.db.commit()
         return results
 
+    def update(
+        self,
+        seat_id: str,
+        seat_code: Optional[str] = None,
+        seat_label: Optional[str] = None,
+        polygon_json: Optional[str | List[List[float]]] = None,
+        enabled: Optional[bool] = None,
+    ) -> Optional[SeatROI]:
+        seat = self.get_by_id(seat_id)
+        if not seat:
+            return None
+        if seat_code is not None:
+            seat.seat_code = seat_code
+        if seat_label is not None:
+            seat.seat_label = seat_label
+        if polygon_json is not None:
+            seat.polygon_json = polygon_json if isinstance(polygon_json, str) else json.dumps(polygon_json)
+        if enabled is not None:
+            seat.enabled = enabled
+        seat.updated_at = datetime.datetime.utcnow()
+        self.db.commit()
+        self.db.refresh(seat)
+        return seat
+
     def delete(self, seat_id: str) -> bool:
         seat = self.get_by_id(seat_id)
         if seat:

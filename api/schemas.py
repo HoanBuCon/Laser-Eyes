@@ -124,6 +124,13 @@ class SeatCreate(BaseModel):
     enabled: bool = True
 
 
+class SeatUpdate(BaseModel):
+    seat_code: Optional[str] = None
+    seat_label: Optional[str] = None
+    polygon_json: Optional[List[List[float]] | str] = None
+    enabled: Optional[bool] = None
+
+
 class SeatBulkUpsertRequest(BaseModel):
     room_id: str
     camera_id: Optional[str] = None

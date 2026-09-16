@@ -17,14 +17,14 @@
 | Chỉ số Đánh giá (Metrics) | Kịch bản 10 Phòng thi | Kịch bản 20 Phòng thi |
 | :--- | :--- | :--- |
 | **Tổng số chỗ ngồi giám sát (Seats)** | **240 chỗ** | **480 chỗ** |
-| **Thời lượng bài kiểm tra** | 8.01 giây | 8.12 giây |
-| **FPS trung bình / phòng thi** | **4.06 FPS** | **2.7 FPS** |
-| **Tổng thông lượng FPS xử lý** | **40.6 FPS** | **54.05 FPS** |
-| **Tổng số khung hình nạp vào** | 325 frames | 439 frames |
-| **Tỷ lệ thả rơi khung hình cũ** | 86.1% | 90.75% |
-| **RAM tiêu thụ tối đa (Peak RSS)** | **2127.7 MB** | **1985.7 MB** |
-| **VRAM GPU tiêu thụ (Peak VRAM)** | **82.9 MB** | **91.0 MB** |
-| **CPU Usage trung bình** | 5.7% | 18.4% |
+| **Thời lượng bài kiểm tra** | 15.01 giây | 15.01 giây |
+| **FPS trung bình / phòng thi** | **4.62 FPS** | **3.45 FPS** |
+| **Tổng thông lượng FPS xử lý** | **46.24 FPS** | **69.02 FPS** |
+| **Tổng số khung hình nạp vào** | 694 frames | 1036 frames |
+| **Tỷ lệ thả rơi khung hình cũ** | 84.33% | 88.19% |
+| **RAM tiêu thụ tối đa (Peak RSS)** | **2697.6 MB** | **3513.6 MB** |
+| **VRAM GPU tiêu thụ (Peak VRAM)** | **90.7 MB** | **86.6 MB** |
+| **CPU Usage trung bình** | 11.8% | 18.6% |
 | **Sự kiện vi phạm ghi nhận** | 0 episodes | 0 episodes |
 | **Độ ổn định (Crash / Memory Leak)** | **0 Lỗi / Ổn định 100%** | **0 Lỗi / Ổn định 100%** |
 

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Interactive Seat ROI Calibration Tool</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#06b6d4', 600: '#0891b2' },
+                        dark: { 900: '#0b0f19', 800: '#111827', 700: '#1f2937' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <style>
+        #calibrationCanvas {
+            cursor: crosshair;
+            user-select: none;
+            touch-action: none;
+        }
+        .seat-item:hover {
+            border-color: #06b6d4;
+        }
+        .seat-item.active {
+            border-color: #06b6d4;
+            background-color: rgba(6, 182, 212, 0.1);
+        }
+    </style>
+</head>
+<body class="bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <a href="/" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 hover:opacity-90 transition">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </a>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
+                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">Seat Calibration Tool</span>
+                    </div>
+                    <p class="text-xs text-gray-400 font-mono">Interactive Polygon ROI Editor for Physical Exam Desks</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <a href="/" class="px-3.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 transition flex items-center gap-1.5 border border-gray-700">
+                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    Proctor Dashboard
+                </a>
+                <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col space-y-4">
+
+        <!-- Top Control Bar: Room, Camera & Reference Source Selector -->
+        <div class="glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <div>
+                    <label class="block text-[11px] text-gray-400 uppercase font-semibold mb-1">Select Room</label>
+                    <select id="selectRoom" onchange="onRoomChanged()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-1.5 text-gray-200 focus:outline-none focus:border-cyan-500 min-w-[160px]">
+                        <option value="">Loading rooms...</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-[11px] text-gray-400 uppercase font-semibold mb-1">Select Camera Feed</label>
+                    <select id="selectCamera" onchange="onCameraChanged()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-1.5 text-gray-200 focus:outline-none focus:border-cyan-500 min-w-[180px]">
+                        <option value="">Select a room first</option>
+                    </select>
+                </div>
+
+                <div class="flex items-end gap-2 pt-4 sm:pt-0">
+                    <button onclick="fetchCameraReferenceFrame()" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-semibold text-white transition flex items-center gap-1.5 shadow">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        Grab Live Frame
+                    </button>
+
+                    <label class="px-3.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-semibold text-gray-300 hover:text-white transition flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        Upload Image/Video
+                        <input id="fileUpload" type="file" accept="image/*,video/*" onchange="handleFileUpload(event)" class="hidden">
+                    </label>
+                </div>
+            </div>
+
+            <!-- Global Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="reloadSeatsFromDB()" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 border border-gray-700 text-xs font-semibold text-gray-300 hover:text-white transition" title="Reload seats from DB">
+                    Reload DB
+                </button>
+                <button onclick="saveAllSeatsToDB()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                    Save All Seats to DB
+                </button>
+            </div>
+        </div>
+
+        <!-- Middle Editor: Canvas on Left (75%), Seat List & Form on Right (25%) -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
+
+            <!-- Canvas Viewport -->
+            <div class="glass-panel p-4 lg:col-span-3 flex flex-col justify-between">
+                <!-- Canvas Top Bar -->
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-white">Drawing Canvas</span>
+                        <span id="canvasResLabel" class="text-[11px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">1280 × 720</span>
+                        <span id="drawingStatusBadge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">READY</span>
+                    </div>
+
+                    <!-- Polygon Tool Buttons -->
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="undoLastPoint()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 hover:text-white border border-gray-700 transition" title="Undo Last Point (Ctrl+Z)">
+                            Undo Point
+                        </button>
+                        <button onclick="clearCurrentPolygon()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-amber-400 border border-gray-700 transition" title="Discard current polygon in progress">
+                            Clear Current
+                        </button>
+                        <button onclick="completeCurrentPolygon()" class="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition" title="Finish polygon (Requires >= 4 points)">
+                            Complete Polygon &rarr;
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Display Container -->
+                <div id="canvasWrapper" class="relative flex-1 min-h-[460px] bg-black rounded-xl overflow-hidden flex items-center justify-center border border-gray-800/80">
+                    <canvas id="calibrationCanvas" width="1280" height="720" class="max-w-full max-h-[72vh] object-contain"></canvas>
+                    <div id="canvasEmptyPlaceholder" class="absolute text-center text-gray-500 space-y-2 pointer-events-none">
+                        <svg class="w-12 h-12 mx-auto text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <p class="text-sm">Click "Grab Live Frame" or "Upload Image/Video" to begin calibration</p>
+                    </div>
+                </div>
+
+                <!-- Canvas Footer Help Text -->
+                <div class="pt-2 flex items-center justify-between text-[11px] text-gray-500">
+                    <span>Instructions: <strong>Click 4+ points</strong> clockwise around the desk/seat ROI. Click "Complete Polygon" to name the seat.</span>
+                    <span id="mouseCoordsLabel" class="font-mono text-cyan-400">X: 0 | Y: 0</span>
+                </div>
+            </div>
+
+            <!-- Right Sidebar: Configured Seat List & Inspector -->
+            <div class="glass-panel p-4 flex flex-col justify-between space-y-4">
+                <div>
+                    <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-3">
+                        <div>
+                            <h2 class="text-sm font-bold text-white">Configured Seats</h2>
+                            <p class="text-[11px] text-gray-400">Persisted in CSDL</p>
+                        </div>
+                        <span id="seatCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-mono font-bold border border-cyan-500/40">0 Seats</span>
+                    </div>
+
+                    <!-- Seat List Container -->
+                    <div id="seatItemsList" class="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                        <div class="p-6 text-center text-xs text-gray-500">No seats drawn yet.</div>
+                    </div>
+                </div>
+
+                <!-- Bulk Management & Export -->
+                <div class="pt-3 border-t border-gray-800 space-y-2">
+                    <button onclick="copySeatsJSON()" class="w-full py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 hover:text-white border border-gray-700 transition flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                        Copy Configuration JSON
+                    </button>
+                    <button onclick="clearAllSeats()" class="w-full py-1.5 rounded-lg bg-red-950/40 hover:bg-red-900/60 text-xs font-semibold text-red-300 border border-red-800/40 transition">
+                        Clear All Seats
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal Form: Assign Seat Code & Label when completing polygon -->
+    <div id="seatModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+                <h3 class="font-bold text-base text-white flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
+                    <span>Assign Seat Details</span>
+                </h3>
+                <button onclick="closeSeatModal(false)" class="text-gray-400 hover:text-white p-1 rounded-lg hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">Seat Code (Mã chỗ ngồi / Định danh duy nhất) *</label>
+                    <input id="inputSeatCode" type="text" placeholder="e.g. S01, SEAT-101-01" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500 font-mono">
+                    <p class="text-[11px] text-gray-500 mt-1">Used by AI SeatManager as persistent tracking anchor.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-gray-300 mb-1">Seat Label (Tên hiển thị / Mô tả vị trí)</label>
+                    <input id="inputSeatLabel" type="text" placeholder="e.g. Bàn 1 Dãy A (Cạnh cửa sổ)" class="w-full bg-gray-950 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500">
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <input id="inputSeatEnabled" type="checkbox" checked class="w-4 h-4 rounded text-cyan-500 bg-gray-900 border-gray-700 focus:ring-cyan-500">
+                    <label for="inputSeatEnabled" class="text-xs text-gray-300 font-medium">Enable for AI Proctoring Surveillance</label>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-3 border-t border-gray-800">
+                <button onclick="closeSeatModal(false)" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-300 transition">
+                    Cancel
+                </button>
+                <button onclick="confirmSeatDetails()" class="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow-lg shadow-cyan-600/30 transition">
+                    Save Seat ROI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calibration JavaScript -->
+    <script src="/static/js/calibration.js"></script>
+</body>
+</html>

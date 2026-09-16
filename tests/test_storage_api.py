@@ -239,6 +239,11 @@ def test_seat_repository_and_seat_manager(db_session):
     assert mapped_reappear["A101_S01"] is not None
     assert mgr.occupancies["A101_S01"].state == SeatState.OCCUPIED
 
+    # 5. Test Seat API GET & PUT endpoints
+    updated_seat = seat_repo.update(seat1.id, seat_label="Updated Label Desk 1", enabled=False)
+    assert updated_seat.seat_label == "Updated Label Desk 1"
+    assert updated_seat.enabled is False
+
 
 def test_workers_and_reviews_api(client, db_session):
     """Test Worker Registration, Heartbeat, and Human Review Flow."""

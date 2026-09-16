@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 # Environment variable override or default local SQLite database
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/vigil_ai.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/vigil_proctoring.db")
 
 # Ensure local data directory exists if using SQLite
 if DATABASE_URL.startswith("sqlite"):

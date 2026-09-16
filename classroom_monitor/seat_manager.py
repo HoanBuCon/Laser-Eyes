@@ -47,9 +47,24 @@ class SeatDefinition:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SeatDefinition:
-        poly_raw = data.get("polygon") or data.get("polygon_json") or []
+        poly_raw = (
+            data.get("polygon")
+            or data.get("polygon_json")
+            or data.get("polygon_points")
+            or []
+        )
         if isinstance(poly_raw, str):
-            poly_raw = json.loads(poly_raw)
+            try:
+                poly_raw = json.loads(poly_raw)
+            except Exception:
+                poly_raw = []
+
+        if isinstance(poly_raw, list) and len(poly_raw) > 0 and isinstance(poly_raw[0], dict):
+            poly_raw = [
+                [float(pt.get("x", 0.0)), float(pt.get("y", 0.0))]
+                for pt in poly_raw
+            ]
+
         poly_arr = np.array(poly_raw, dtype=np.float32)
         return cls(
             seat_id=str(data.get("id") or data.get("seat_id") or data.get("seat_code")),
@@ -61,11 +76,22 @@ class SeatDefinition:
             enabled=bool(data.get("enabled", True)),
         )
 
-    def contains_point(self, pt: Tuple[float, float]) -> bool:
-        """Check if 2D point is inside this seat polygon."""
+    def contains_point(
+        self,
+        pt: Tuple[float, float],
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> bool:
+        """Check if 2D point is inside this seat polygon with automatic normalized scaling support."""
         if len(self.polygon) < 3:
             return False
-        res = cv2.pointPolygonTest(self.polygon, (float(pt[0]), float(pt[1])), False)
+        poly = self.polygon
+        # If polygon is normalized (0.0 to 1.0) and point is in pixel coordinate space (> 1.0)
+        if poly.size > 0 and np.max(poly) <= 1.05 and (pt[0] > 1.05 or pt[1] > 1.05):
+            w = frame_w if frame_w else 1280
+            h = frame_h if frame_h else 720
+            poly = poly * np.array([w, h], dtype=np.float32)
+        res = cv2.pointPolygonTest(poly.astype(np.float32), (float(pt[0]), float(pt[1])), False)
         return res >= 0
 
 

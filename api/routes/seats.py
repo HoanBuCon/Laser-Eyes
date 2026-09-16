@@ -1,14 +1,23 @@
-"""Seat ROI Management Endpoints for VIGIL AI REST API."""
+"""Seat ROI Management Endpoints for VIGIL AI REST API (SRS v1.0).
+
+Canonical Endpoints:
+- GET    /api/v1/rooms/{room_id}/seats  (List seats for room)
+- POST   /api/v1/rooms/{room_id}/seats  (Create seat for room)
+- POST   /api/v1/rooms/{room_id}/seats/bulk (Bulk sync/upsert seats)
+- GET    /api/v1/seats/{seat_id}        (Get single seat by ID)
+- PUT    /api/v1/seats/{seat_id}        (Update seat polygon/status)
+- DELETE /api/v1/seats/{seat_id}        (Delete seat)
+"""
 
 from __future__ import annotations
 
 import json
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from api.schemas import SeatBulkUpsertRequest, SeatCreate, SeatResponse
+from api.schemas import SeatBulkUpsertRequest, SeatCreate, SeatResponse, SeatUpdate
 from storage.database import get_db
 from storage.repositories import SeatRepository
 
@@ -52,6 +61,32 @@ def bulk_upsert_seats(room_id: str, request: SeatBulkUpsertRequest, db: Session 
         camera_id=request.camera_id or "",
         seats_data=seats_dicts,
     )
+
+
+@router.get("/seats/{seat_id}", response_model=SeatResponse)
+def get_seat(seat_id: str, db: Session = Depends(get_db)):
+    """Get single seat ROI definition by ID."""
+    repo = SeatRepository(db)
+    seat = repo.get_by_id(seat_id)
+    if not seat:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seat not found")
+    return seat
+
+
+@router.put("/seats/{seat_id}", response_model=SeatResponse)
+def update_seat(seat_id: str, payload: SeatUpdate, db: Session = Depends(get_db)):
+    """Update seat polygon coordinates, code, label, or enabled state."""
+    repo = SeatRepository(db)
+    updated = repo.update(
+        seat_id=seat_id,
+        seat_code=payload.seat_code,
+        seat_label=payload.seat_label,
+        polygon_json=payload.polygon_json,
+        enabled=payload.enabled,
+    )
+    if not updated:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Seat not found")
+    return updated
 
 
 @router.delete("/seats/{seat_id}", status_code=status.HTTP_204_NO_CONTENT)

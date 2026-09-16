@@ -1,0 +1,95 @@
+[
+  {
+    "event_id": "7fc5e0fa-61cc-48a2-8844-8c8951623d1e",
+    "track_id": 10103,
+    "seat_id": "SEAT-101-03",
+    "room_id": "ROOM-101",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "MEDIUM",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      996,
+      381,
+      1145,
+      657
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 59000.0,
+    "metadata": {
+      "risk_score": 80.9,
+      "peak_risk_score": 80.9,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.827,
+      "component_episode_ids": [
+        "71601552-9724-42a5-a113-a7e757304fcb",
+        "6108ab98-b1fb-4f99-92b7-a7a08a6d4696"
+      ]
+    },
+    "created_at": 1789583109.0045736
+  },
+  {
+    "event_id": "d12a8104-8398-4a6c-9299-35bce113a297",
+    "track_id": 10103,
+    "seat_id": "SEAT-101-03",
+    "room_id": "ROOM-101",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      996,
+      381,
+      1145,
+      657
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 70600.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 80.9,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 3 in 25s window"
+      ],
+      "observation_quality": 0.836,
+      "component_episode_ids": [
+        "71601552-9724-42a5-a113-a7e757304fcb",
+        "6108ab98-b1fb-4f99-92b7-a7a08a6d4696",
+        "e640e130-ed8d-4127-b1c9-5d3f83b5d38a"
+      ]
+    },
+    "created_at": 1789583111.4112563
+  }
+]

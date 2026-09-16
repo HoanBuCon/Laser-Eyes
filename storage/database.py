@@ -46,6 +46,20 @@ def get_db() -> Generator[Session, None, None]:
 
 
 def init_db(custom_engine=None) -> None:
-    """Create all database schema tables."""
+    """Create all database schema tables and ensure newly added columns exist."""
     target_engine = custom_engine or engine
     Base.metadata.create_all(bind=target_engine)
+
+    # Automatic lightweight column migration for SQLite development DB
+    try:
+        with target_engine.connect() as conn:
+            # Check seats table
+            res = conn.execute(
+                __import__("sqlalchemy").text("PRAGMA table_info(seats)")
+            ).fetchall()
+            existing_cols = {row[1] for row in res}
+            if "context_json" not in existing_cols and "seats" in [r[0] for r in conn.execute(__import__("sqlalchemy").text("SELECT name FROM sqlite_master WHERE type='table'")).fetchall()]:
+                conn.execute(__import__("sqlalchemy").text("ALTER TABLE seats ADD COLUMN context_json TEXT"))
+                conn.commit()
+    except Exception:
+        pass

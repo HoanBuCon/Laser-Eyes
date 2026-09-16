@@ -1,0 +1,102 @@
+{
+  "dataset_name": "india_classroom_regression_timeline",
+  "video_source": "demo_video/india_classroom.mp4",
+  "resolution": "1280x720",
+  "fps": 30.0,
+  "duration_seconds": 71.77,
+  "total_frames": 2153,
+  "timeline_intervals": [
+    {
+      "interval_id": "INT-01-BASELINE-WRITING",
+      "start_sec": 0.0,
+      "end_sec": 8.0,
+      "seat_id": "SEAT-101-01",
+      "observable_facts": [
+        "NORMAL_WRITING",
+        "HEAD_PITCH_DOWN",
+        "WRIST_IN_WRITING_ZONE",
+        "TORSO_NORMAL"
+      ],
+      "expected_episodes": [
+        "HEAD_PITCH_DOWN",
+        "WRIST_WRITING"
+      ],
+      "forbidden_patterns": [
+        "BELOW_DESK_INTERACTION",
+        "REPEATED_NEIGHBOR_GLANCE"
+      ],
+      "expected_risk_max": 25.0,
+      "notes": "Student writing exam paper normally. Writing Zone must suppress below-desk alarms."
+    },
+    {
+      "interval_id": "INT-02-SHORT-NATURAL-GLANCE",
+      "start_sec": 8.5,
+      "end_sec": 9.2,
+      "seat_id": "SEAT-101-02",
+      "observable_facts": [
+        "SHORT_HEAD_TURN_LEFT",
+        "RETURN_TO_BASELINE"
+      ],
+      "expected_episodes": [
+        "HEAD_TURN_LEFT"
+      ],
+      "forbidden_patterns": [
+        "REPEATED_NEIGHBOR_GLANCE"
+      ],
+      "expected_risk_max": 35.0,
+      "notes": "Single short 0.7s glance. Must NOT trigger repeated glance pattern."
+    },
+    {
+      "interval_id": "INT-03-REPEATED-GLANCE-SERIES",
+      "start_sec": 9.5,
+      "end_sec": 16.5,
+      "seat_id": "SEAT-101-04",
+      "observable_facts": [
+        "HEAD_TURN_RIGHT_1",
+        "RETURN_BASELINE",
+        "HEAD_TURN_RIGHT_2",
+        "RETURN_BASELINE",
+        "HEAD_TURN_RIGHT_3"
+      ],
+      "expected_episodes": [
+        "HEAD_TURN_RIGHT"
+      ],
+      "expected_patterns": [
+        "REPEATED_NEIGHBOR_GLANCE"
+      ],
+      "notes": "3 distinct head turn episodes toward Right Neighbor (SEAT-101-05) within rolling window."
+    },
+    {
+      "interval_id": "INT-04-PERSISTENT-BODY-LEAN",
+      "start_sec": 17.0,
+      "end_sec": 21.0,
+      "seat_id": "SEAT-101-01",
+      "observable_facts": [
+        "TORSO_LEAN_RIGHT_TOWARD_NEIGHBOR",
+        "HEAD_TURN_RIGHT"
+      ],
+      "expected_episodes": [
+        "TORSO_LEAN_RIGHT"
+      ],
+      "expected_patterns": [
+        "NEIGHBOR_ORIENTED_LEAN"
+      ],
+      "notes": "Persistent torso lean > 1.2s toward right neighbor with concurrent head turn support."
+    },
+    {
+      "interval_id": "INT-05-PROCTOR-OCCLUSION",
+      "start_sec": 38.0,
+      "end_sec": 42.0,
+      "seat_id": "SEAT-101-03",
+      "observable_facts": [
+        "FOREGROUND_PERSON_CROSSING",
+        "TEMPORARY_CANDIDATE_OCCLUSION"
+      ],
+      "expected_seat_state": "OCCLUDED",
+      "forbidden_patterns": [
+        "SEAT_LEFT"
+      ],
+      "notes": "Proctor passes in front of camera. Seat ID must remain stable without emitting SEAT_LEFT."
+    }
+  ]
+}

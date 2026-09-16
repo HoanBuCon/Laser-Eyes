@@ -1,0 +1,11 @@
+{
+  "event_id": "310f433a-a28b-4770-87db-6a3d528b6bcf",
+  "track_id": 0,
+  "behavior": "SUSPICIOUS_BELOW_DESK_ACTIVITY",
+  "trigger_frame_idx": 394,
+  "trigger_timestamp_ms": 13133.333333333332,
+  "video_file": "310f433a-a28b-4770-87db-6a3d528b6bcf_T0_SUSPICIOUS_BELOW_DESK_ACTIVITY.mp4",
+  "sha256_hash": "fcf0b776963bfafe357d23e0d3a191f0c442b2d2ae9ab3ebdaf66c1b50519b27",
+  "room_id": "ROOM-101",
+  "camera_id": "CAM-01"
+}

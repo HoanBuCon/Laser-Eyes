@@ -117,6 +117,7 @@ class SeatROI(Base):
     seat_code = Column(String(50), nullable=False, index=True)  # e.g., "A101_S01"
     seat_label = Column(String(100), nullable=True)             # e.g., "Row 1 Desk 1"
     polygon_json = Column(Text, nullable=False)                 # JSON array of points [[x, y], ...]
+    context_json = Column(Text, nullable=True)                  # Scene/Seat context & neighbor graph
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -125,6 +126,53 @@ class SeatROI(Base):
     room = relationship("ExamRoom", back_populates="seats")
     camera = relationship("Camera", back_populates="seats")
     events = relationship("DetectionEvent", back_populates="seat", cascade="all, delete-orphan")
+    episodes = relationship("BehaviorEpisodeDB", back_populates="seat", cascade="all, delete-orphan")
+    patterns = relationship("BehaviorPatternDB", back_populates="seat", cascade="all, delete-orphan")
+
+
+class BehaviorEpisodeDB(Base):
+    """Time-bounded atomic behavior episode recorded per seat."""
+
+    __tablename__ = "behavior_episodes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=True)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=False)
+    episode_type = Column(String(50), nullable=False)  # e.g., "HEAD_TURN_LEFT", "TORSO_LEAN_RIGHT"
+    start_timestamp_ms = Column(Float, nullable=False)
+    peak_timestamp_ms = Column(Float, nullable=False)
+    end_timestamp_ms = Column(Float, nullable=True)
+    duration_ms = Column(Float, default=0.0)
+    confidence = Column(Float, default=1.0)
+    quality = Column(Float, default=1.0)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    seat = relationship("SeatROI", back_populates="episodes")
+
+
+class BehaviorPatternDB(Base):
+    """Synthesized review-worthy behavioral pattern recorded per seat."""
+
+    __tablename__ = "behavior_patterns"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=True)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=False)
+    pattern_type = Column(String(50), nullable=False)  # e.g., "REPEATED_NEIGHBOR_GLANCE"
+    start_timestamp_ms = Column(Float, nullable=False)
+    end_timestamp_ms = Column(Float, nullable=False)
+    confidence = Column(Float, default=1.0)
+    quality = Column(Float, default=1.0)
+    primary_direction = Column(String(20), nullable=True)
+    target_neighbor_id = Column(String(50), nullable=True)
+    component_episode_ids_json = Column(Text, nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    seat = relationship("SeatROI", back_populates="patterns")
 
 
 class ExamSession(Base):
@@ -169,6 +217,9 @@ class DetectionEvent(Base):
     event_type = Column(String(50), default="SUSPICIOUS_BEHAVIOR")
     primary_signal = Column(String(50), default="PROLONGED_HEAD_TURN")
     behavior = Column(String(50), nullable=False)  # Legacy alias matching primary_signal
+    primary_pattern = Column(String(50), nullable=True)  # SRS v2: e.g. "REPEATED_NEIGHBOR_GLANCE"
+    supporting_patterns_json = Column(Text, nullable=True)  # SRS v2: list of supporting pattern cues
+    observation_quality = Column(Float, default=1.0)        # SRS v2: quality metric
     severity = Column(String(10), default="MEDIUM")  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
     risk_score = Column(Integer, default=50)  # 0 to 100 normalized score
     confidence_avg = Column(Float, default=0.0)

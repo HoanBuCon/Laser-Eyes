@@ -1,15 +1,16 @@
-"""End-to-End Real Video Demonstration & Verification Script for VIGIL AI.
+"""End-to-End Real Video Demonstration & Verification Script for VIGIL AI SRS v2.0.
 
-Validates the full production pipeline on demo_video/india_classroom.mp4:
-1. Video Ingestion & Frame Timestamping
-2. Single-Pass 1280px YOLO-Pose Inference
-3. Seat ROI Polygon Mapping & Seat Identity Persistence
-4. Standardized Unknown-Safe Behavior Signal Extraction
-5. Time-Aware Temporal 0-100 Risk Scoring
-6. 4-Tier State Machine Transitions & Silent Cooldown Tracking
-7. Event Engine Triggering & Disciplinary Flagging
-8. Async Evidence Video Buffering, Snapshot Extraction & SHA-256 Digest
-9. Rich Visual Overlays & Annotated Result MP4 Generation
+Implements the complete 7-Layer Actor-Centric Temporal Architecture:
+1. Video Ingestion & Timestamping (ms timestamps, frame-rate independent).
+2. Single-Pass 1280px YOLO-Pose Perception.
+3. Seat ROI Polygon Mapping & Seat Identity Persistence.
+4. SceneContext, SeatGraph & Capability Gating.
+5. Raw Observation Extraction (Head Yaw/Pitch Relative, Torso Lean, Writing Zone Suppression, Unknown-Safe).
+6. Temporal Episode Engine (Stateful Hysteresis, Durations in ms).
+7. Contextual & Relational Pattern Engine (P0 Patterns: REPEATED_NEIGHBOR_GLANCE, NEIGHBOR_ORIENTED_LEAN, SEAT_LEFT, MULTI_PERSON_DWELL_NEAR_SEAT; P1 BELOW_DESK_INTERACTION).
+8. Risk Prioritization & Canonical State Machine (Exponential Decay, Correlation Bonus, Diminishing Returns, Canonical States, NO 'CHEATING').
+9. Async Evidence Buffering, Snapshot Extraction, EOF Flush & SHA-256 Digest.
+10. Compact, Non-Polluting HUD Overlay & Full Multi-Metric Export (data/output_demo_v2/).
 """
 
 from __future__ import annotations
@@ -30,12 +31,15 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from classroom_monitor.async_evidence_writer import AsyncEvidenceWriter, compute_file_sha256
-from classroom_monitor.behavior_signals import BehaviorSignal, BehaviorSignalExtractor, SignalType
+from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine, PatternType
 from classroom_monitor.config import ClassroomConfig, DEFAULT_CONFIG
 from classroom_monitor.detector import PoseClassroomDetector
 from classroom_monitor.models import ClassroomEvent, Detection
+from classroom_monitor.observation_extractor import ObservationExtractor, RawObservation
+from classroom_monitor.scene_context import CapabilityStatus, DeskGeometry, SeatContext, SeatGraph
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatState
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
+from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from storage.database import SessionLocal, init_db
 from storage.repositories import CameraRepository, RoomRepository, SeatRepository, SiteRepository
@@ -45,7 +49,7 @@ logging.basicConfig(
     format="[%(asctime)s] [%(levelname)s] %(name)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("ClassroomDemo")
+logger = logging.getLogger("ClassroomDemoV2")
 
 # Pre-calibrated Seat ROIs for demo_video/india_classroom.mp4 (1280x720)
 DEFAULT_CALIBRATED_SEATS = [
@@ -53,30 +57,35 @@ DEFAULT_CALIBRATED_SEATS = [
         "seat_code": "SEAT-101-01",
         "seat_label": "Bàn 1 Dãy Trái (Hàng 1)",
         "polygon_json": [[92.0, 390.0], [299.0, 390.0], [299.0, 568.0], [92.0, 568.0]],
+        "desk_y": 480.0,
         "enabled": True,
     },
     {
         "seat_code": "SEAT-101-02",
         "seat_label": "Bàn 1 Dãy Giữa (Hàng 1)",
         "polygon_json": [[484.0, 485.0], [702.0, 485.0], [702.0, 651.0], [484.0, 651.0]],
+        "desk_y": 560.0,
         "enabled": True,
     },
     {
         "seat_code": "SEAT-101-03",
         "seat_label": "Bàn 1 Dãy Phải (Hàng 1)",
         "polygon_json": [[978.0, 413.0], [1168.0, 413.0], [1168.0, 682.0], [978.0, 682.0]],
+        "desk_y": 550.0,
         "enabled": True,
     },
     {
         "seat_code": "SEAT-101-04",
         "seat_label": "Bàn 2 Dãy Trái (Hàng 2)",
         "polygon_json": [[190.0, 283.0], [382.0, 283.0], [382.0, 418.0], [190.0, 418.0]],
+        "desk_y": 350.0,
         "enabled": True,
     },
     {
         "seat_code": "SEAT-101-05",
         "seat_label": "Bàn 2 Dãy Giữa (Hàng 2)",
         "polygon_json": [[470.0, 324.0], [650.0, 324.0], [650.0, 502.0], [470.0, 502.0]],
+        "desk_y": 410.0,
         "enabled": True,
     },
 ]
@@ -187,7 +196,7 @@ def run_classroom_demo(
     debug: bool = False,
     show_pose: bool = False,
 ) -> Dict[str, Any]:
-    """Execute end-to-end VIGIL AI pipeline on input video."""
+    """Execute end-to-end VIGIL AI SRS v2.0 pipeline on input video."""
     video_path = Path(input_video)
     if not video_path.exists():
         raise FileNotFoundError(f"Input video file does not exist: {input_video}")
@@ -203,33 +212,30 @@ def run_classroom_demo(
     duration_sec = total_video_frames / fps if fps > 0 else 0.0
 
     print("================================================================================")
-    print("[START] VIGIL AI END-TO-END PRODUCTION PIPELINE DEMO")
+    print("[START] VIGIL AI SRS v2.0 ACTOR-CENTRIC TEMPORAL PIPELINE DEMO")
     print("================================================================================")
     print(f"Input Video:      {video_path} ({orig_w}x{orig_h} @ {fps:.1f} FPS, {duration_sec:.1f}s, {total_video_frames} frames)")
     print(f"Room & Camera:    Room: {room_id} | Camera: {camera_id}")
 
     # 1. Setup Production Modules
-    # Database & Calibrated Seats
     seat_defs = setup_database_seats(room_id=room_id, camera_id=camera_id)
     seat_mgr = SeatManager(room_id=room_id, camera_id=camera_id)
     seat_mgr.load_seats(seat_defs)
-    print(f"SeatManager:      Loaded {len(seat_mgr.seats)} production Seat ROIs from CSDL.")
+    seat_graph = seat_mgr.to_seat_graph()
+    print(f"SeatManager:      Loaded {len(seat_mgr.seats)} production Seat ROIs into SeatGraph.")
 
-    # YOLO-Pose Detector
-    config = ClassroomConfig(
-        pipeline_mode="2stage_pose",
-        enable_sahi_tiling=False,
-    )
+    # 2. Perception & 7-Layer Pipeline Modules
+    config = ClassroomConfig(pipeline_mode="2stage_pose", enable_sahi_tiling=False)
     detector = PoseClassroomDetector(config=config)
-
-    # Behavior Signal Extractor
-    signal_extractor = BehaviorSignalExtractor(config=config)
-
-    # Per-Seat Temporal Risk Tracker & State Machine
+    observation_extractor = ObservationExtractor()
+    episode_engine = TemporalEpisodeEngine()
+    pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph)
     risk_tracker = SeatRiskTracker(room_id=room_id)
 
-    # 10s Ring Buffer & Async Evidence Writer
-    evidence_dir = Path("data/output_demo/evidence")
+    # 3. Evidence Subsystem
+    out_dir = Path(output_video).parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    evidence_dir = out_dir / "evidence"
     if save_evidence:
         evidence_dir.mkdir(parents=True, exist_ok=True)
 
@@ -241,30 +247,19 @@ def run_classroom_demo(
     )
     async_writer = AsyncEvidenceWriter(base_evidence_dir=evidence_dir, max_workers=2)
 
-    # Setup Video Output Writer
-    out_dir = Path(output_video).parent
-    out_dir.mkdir(parents=True, exist_ok=True)
+    # Video Writer
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(str(output_video), fourcc, fps / stride, (orig_w, orig_h))
 
-    # Tracking Statistics
+    # Metric & Telemetry Tracking
     frame_idx = 0
     inference_count = 0
     inference_times: List[float] = []
     max_persons_detected = 0
-    # Signal tracking (active frames, episodes, etc.)
-    signal_tracker = {
-        SignalType.PROLONGED_HEAD_TURN.value: {"active_frames": 0, "episodes": 0, "max_duration": 0.0, "total_duration": 0.0, "current_start": None},
-        SignalType.BODY_LEAN_SIDE.value: {"active_frames": 0, "episodes": 0, "max_duration": 0.0, "total_duration": 0.0, "current_start": None},
-        SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value: {"active_frames": 0, "episodes": 0, "max_duration": 0.0, "total_duration": 0.0, "current_start": None},
-        SignalType.LOOK_DOWN_LONG.value: {"active_frames": 0, "episodes": 0, "max_duration": 0.0, "total_duration": 0.0, "current_start": None},
-        SignalType.LOW_HAND_POSTURE.value: {"active_frames": 0, "episodes": 0, "max_duration": 0.0, "total_duration": 0.0, "current_start": None},
-    }
-
-    # Store active signal types per seat to detect episode boundaries
-    active_signals_per_seat = {seat_id: set() for seat_id in seat_mgr.seats.keys()}
 
     all_emitted_events: List[ClassroomEvent] = []
+    all_active_episodes: List[TemporalEpisode] = []
+    all_detected_patterns: List[BehaviorPattern] = []
     active_state_transitions: List[Dict[str, Any]] = []
     prev_states: Dict[str, str] = {}
 
@@ -286,7 +281,7 @@ def run_classroom_demo(
 
             video_time_ms = (frame_idx / fps) * 1000.0
 
-            # 2. Add frame into rolling ring buffer for evidence recording
+            # Step 1: Add frame to Evidence Video Buffer
             completed_clips = video_buffer.add_frame(
                 frame=frame,
                 frame_idx=frame_idx,
@@ -316,222 +311,185 @@ def run_classroom_demo(
                     except Exception as e_err:
                         logger.warning("Evidence package generation error: %s", e_err)
 
-            # 3. Perception: YOLO-Pose Single-Pass Forward
+            # Step 2: Person / Pose Perception (Single-Pass)
             inf_start = time.perf_counter()
             detections = detector.detect(frame, frame_index=frame_idx)
             inf_time = (time.perf_counter() - inf_start) * 1000.0
             inference_times.append(inf_time)
             inference_count += 1
-
             max_persons_detected = max(max_persons_detected, len(detections))
 
-            # 4. Seat ROI Mapping & Identity Persistence
+            # Step 3: Seat ROI Mapping & Identity Persistence
             mapped_seats, unmapped_dets = seat_mgr.map_detections_to_seats(
                 detections=detections,
                 timestamp_ms=video_time_ms,
                 frame_idx=frame_idx,
             )
 
-            # 5. Extract Behavior Signals & Update Risk State Machine
-            frame_signals: Dict[str, List[BehaviorSignal]] = {}
+            # Step 4: Extract Raw Observations & Temporal Episodes per Seat
+            current_frame_episodes: List[TemporalEpisode] = []
+            current_frame_patterns: List[BehaviorPattern] = []
+
             for seat_code, det in mapped_seats.items():
-                active_signals: List[BehaviorSignal] = []
-                s_def = seat_mgr.seats.get(seat_code)
-                eff_desk_y = s_def.get_effective_desk_y() if s_def else None
+                s_ctx = seat_graph.get_context(seat_code)
+                if not s_ctx:
+                    s_ctx = SeatContext(seat_id=seat_code, room_id=room_id, seat_code=seat_code)
+                    seat_graph.add_seat_context(s_ctx)
 
-                if det is not None:
-                    kp = det.keypoints if det.keypoints is not None else np.zeros((17, 3), dtype=np.float32)
-                    active_signals = signal_extractor.analyze_candidate_keypoints(
-                        keypoints=kp,
-                        timestamp_ms=video_time_ms,
-                        seat_id=seat_code,
-                        camera_id=camera_id,
-                        desk_y=eff_desk_y,
-                    )
-                    current_frame_signals = {sig.signal_type for sig in active_signals}
-                    prev_frame_signals = active_signals_per_seat[seat_code]
-                    
-                    for sig_type in current_frame_signals:
-                        if sig_type in signal_tracker:
-                            signal_tracker[sig_type]["active_frames"] += 1
-                            if sig_type not in prev_frame_signals:
-                                # New episode started
-                                signal_tracker[sig_type]["episodes"] += 1
-                                signal_tracker[sig_type]["current_start"] = video_time_ms
-                    
-                    for sig_type in prev_frame_signals:
-                        if sig_type not in current_frame_signals and sig_type in signal_tracker:
-                            # Episode ended
-                            start_time = signal_tracker[sig_type]["current_start"]
-                            if start_time is not None:
-                                duration = (video_time_ms - start_time) / 1000.0
-                                signal_tracker[sig_type]["total_duration"] += duration
-                                signal_tracker[sig_type]["max_duration"] = max(signal_tracker[sig_type]["max_duration"], duration)
-                                signal_tracker[sig_type]["current_start"] = None
-                    
-                    active_signals_per_seat[seat_code] = current_frame_signals
-                    
-                frame_signals[seat_code] = active_signals
+                # Extract Raw Observations
+                raw_obs = observation_extractor.extract(
+                    detection=det,
+                    seat_context=s_ctx,
+                    timestamp_ms=video_time_ms,
+                    nearby_person_count=1 if det is not None else 0,
+                )
 
-                # Update 0-100 Risk Engine & State Machine
-                event = risk_tracker.update_seat(
+                # Temporal Episode Engine
+                active_eps = episode_engine.process_observations(
+                    observations=raw_obs,
+                    timestamp_ms=video_time_ms,
+                )
+                current_frame_episodes.extend(active_eps)
+
+                # Contextual & Relational Pattern Engine
+                patterns = pattern_engine.ingest_episodes(
+                    active_episodes=active_eps,
+                    completed_episodes=episode_engine.completed_episodes,
+                    seat_context=s_ctx,
+                    timestamp_ms=video_time_ms,
+                )
+                current_frame_patterns.extend(patterns)
+
+                # Risk Prioritization & State Machine Update
+                new_event = risk_tracker.update_seat(
                     seat_id=seat_code,
-                    active_signals=active_signals,
+                    active_episodes=active_eps,
+                    detected_patterns=patterns,
                     timestamp_ms=video_time_ms,
                     detection=det,
                     frame_image=frame,
                 )
 
-                profile = risk_tracker.profiles.get(seat_code)
-                cur_state = profile.current_state if profile else RiskState.NORMAL.value
-                old_state = prev_states.get(seat_code, RiskState.NORMAL.value)
+                # Log State Transitions
+                prof = risk_tracker.get_or_create_profile(seat_code)
+                prev_st = prev_states.get(seat_code, RiskState.NORMAL.value)
+                if prof.current_state != prev_st:
+                    t_str = f"{int(video_time_ms/1000//60):02d}:{int(video_time_ms/1000%60):02d}.{int(video_time_ms%1000/100):01d}"
+                    print(f"[{t_str}] {seat_code}: {prev_st} -> {prof.current_state} (Risk: {prof.risk_score:.1f})")
+                    active_state_transitions.append({
+                        "timestamp_ms": video_time_ms,
+                        "seat_code": seat_code,
+                        "from_state": prev_st,
+                        "to_state": prof.current_state,
+                        "risk_score": round(prof.risk_score, 1),
+                    })
+                    prev_states[seat_code] = prof.current_state
 
-                # Track State Transition
-                if cur_state != old_state:
-                    trans_info = {
-                        "timestamp_ms": round(video_time_ms, 1),
-                        "time_str": f"{int(video_time_ms/1000//60):02d}:{int(video_time_ms/1000%60):02d}.{int(video_time_ms%1000):03d}",
-                        "seat_id": seat_code,
-                        "transition": f"{old_state} -> {cur_state}",
-                        "risk_score": profile.risk_score if profile else 0,
-                    }
-                    active_state_transitions.append(trans_info)
-                    prev_states[seat_code] = cur_state
-                    print(f"[{trans_info['time_str']}] {seat_code}: {trans_info['transition']} (Risk: {trans_info['risk_score']})")
+                # Handle New Review Events
+                if new_event:
+                    all_emitted_events.append(new_event)
+                    t_str = f"{int(video_time_ms/1000//60):02d}:{int(video_time_ms/1000%60):02d}.{int(video_time_ms%1000/100):01d}"
+                    print(f"[{t_str}] [EVENT FLAGGED] {seat_code} | Pattern: {new_event.behavior} | Severity: {new_event.severity} | Score: {new_event.metadata.get('risk_score', 0)}")
 
-                # Event Emitted
-                if event is not None:
-                    all_emitted_events.append(event)
-                    print(f"\n[EVENT TRIGGERED] Event ID: {event.event_id} | Seat: {seat_code} | Behavior: {event.behavior} | Conf: {event.confidence_peak:.2f} | Time: {video_time_ms/1000:.1f}s")
-
+                    # Trigger Video Clip Recording
                     if save_evidence:
-                        # Save Peak Snapshot
-                        if event.evidence_frame is not None:
-                            snap_path = evidence_dir / f"{event.event_id}_snapshot.jpg"
-                            cv2.imwrite(str(snap_path), event.evidence_frame)
-
                         video_buffer.trigger_clip(
-                            event_id=event.event_id,
-                            track_id=event.track_id,
-                            behavior=event.behavior,
+                            event_id=new_event.event_id,
+                            track_id=new_event.track_id,
+                            behavior=new_event.behavior,
                             frame_idx=frame_idx,
                             timestamp_ms=video_time_ms,
                         )
 
-            # 6. Visualization & Annotations
+            # Store cumulative episodes & patterns for export
+            for ep in current_frame_episodes:
+                if ep not in all_active_episodes:
+                    all_active_episodes.append(ep)
+            for pat in current_frame_patterns:
+                if pat not in all_detected_patterns:
+                    all_detected_patterns.append(pat)
+
+            # Step 5: Render Clean, Compact SRS v2 HUD
             annotated = frame.copy()
-            overlay = frame.copy()
 
-            # (a) Draw Seat ROI Polygons
+            # (a) Draw Calibrated Seat Polygons & Status Badges
             for s_code, s_def in seat_mgr.seats.items():
-                profile = risk_tracker.profiles.get(s_code)
-                r_score = profile.risk_score if profile else 0.0
-                state = profile.current_state if profile else RiskState.NORMAL.value
+                poly = s_def.polygon.astype(np.int32)
+                prof = risk_tracker.get_or_create_profile(s_code)
+                det = mapped_seats.get(s_code)
 
-                if state == RiskState.FLAGGED_FOR_REVIEW.value:
-                    poly_color = (0, 0, 235)       # Vivid Red
-                    alpha = 0.35
-                    border_thick = 2
-                elif state == RiskState.SUSPICIOUS.value:
-                    poly_color = (0, 140, 255)     # Vibrant Orange
-                    alpha = 0.25
-                    border_thick = 2
-                elif state == RiskState.OBSERVE.value:
-                    poly_color = (0, 215, 255)     # Amber / Yellow
-                    alpha = 0.15
-                    border_thick = 1
-                elif state == RiskState.COOLDOWN.value:
-                    poly_color = (180, 100, 210)   # Purple / Cooldown State
-                    alpha = 0.15
-                    border_thick = 1
+                # State color palette
+                if prof.current_state == RiskState.FLAGGED_FOR_REVIEW.value:
+                    color = (0, 0, 240)        # Red
+                    fill_color = (0, 0, 180)
+                elif prof.current_state == RiskState.SUSPICIOUS.value:
+                    color = (0, 140, 255)      # Orange
+                    fill_color = (0, 100, 200)
+                elif prof.current_state == RiskState.OBSERVE.value:
+                    color = (0, 220, 255)      # Amber / Yellow
+                    fill_color = (0, 160, 200)
+                elif prof.current_state == RiskState.COOLDOWN.value:
+                    color = (255, 100, 100)    # Blue-violet Cooldown
+                    fill_color = (180, 70, 70)
                 else:
-                    poly_color = (50, 205, 50)     # Emerald Green
-                    alpha = 0.08 if not debug else 0.18
-                    border_thick = 1
+                    color = (0, 200, 100)      # Green Normal
+                    fill_color = (0, 120, 50)
 
-                poly_pts = np.array(s_def.polygon, dtype=np.int32).reshape((-1, 1, 2))
-                cv2.fillPoly(overlay, [poly_pts], poly_color)
-                cv2.polylines(annotated, [poly_pts], isClosed=True, color=poly_color, thickness=border_thick)
+                # Draw Seat Boundary
+                cv2.polylines(annotated, [poly], isClosed=True, color=color, thickness=2)
 
-            cv2.addWeighted(overlay, 0.40, annotated, 0.60, 0, annotated)
+                # Draw Desk Boundary if calibrated
+                if s_def.desk_y is not None:
+                    min_x = int(np.min(poly[:, 0]))
+                    max_x = int(np.max(poly[:, 0]))
+                    dy = int(s_def.desk_y)
+                    cv2.line(annotated, (min_x, dy), (max_x, dy), (0, 255, 255), 1, cv2.LINE_AA)
 
-            # (b) Draw Persons, Bounding Boxes & Clean Seat HUD
-            for s_code, det in mapped_seats.items():
-                s_def = seat_mgr.seats.get(s_code)
-                profile = risk_tracker.profiles.get(s_code)
-                r_score = profile.risk_score if profile else 0.0
-                state = profile.current_state if profile else RiskState.NORMAL.value
-                sigs = frame_signals.get(s_code, [])
+                # Centroid for Badge
+                scx = int(np.mean(poly[:, 0]))
+                scy = int(np.mean(poly[:, 1]))
 
-                # Format short human-readable seat code (e.g. S01, S02)
-                seat_label = s_code.replace("SEAT-101-0", "S").replace("SEAT-101-", "S").replace("SEAT-", "S")
+                # Main Badge Text: Compact "SEAT | STATE | RISK"
+                badge_text = f"{s_code} | {prof.current_state} | {prof.risk_score:.0f}"
+                (tw, th), _ = cv2.getTextSize(badge_text, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)
+                bx = max(5, scx - tw // 2)
+                by = max(40, scy - 12)
 
-                if s_def is not None:
-                    scx = int(np.mean(s_def.polygon[:, 0]))
-                    scy = int(np.mean(s_def.polygon[:, 1]))
+                cv2.rectangle(annotated, (bx - 4, by - th - 4), (bx + tw + 4, by + 4), fill_color, -1)
+                cv2.rectangle(annotated, (bx - 4, by - th - 4), (bx + tw + 4, by + 4), (255, 255, 255), 1)
+                cv2.putText(annotated, badge_text, (bx, by), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
 
-                    # Format clean rounded risk score and state badge
-                    badge_title = f"{seat_label} | R:{r_score:.0f} | {state}" if not debug else f"{s_code} | Risk: {r_score:.1f} | {state}"
-                    
-                    # Prioritize suspicious composite signals over context observations
-                    active_types = {s.signal_type for s in sigs}
-                    sub_title = ""
-                    if SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value in active_types:
-                        sub_title = "[UNDER_DESK_ACT]" if not debug else "[SUSPICIOUS_BELOW_DESK_ACTIVITY]"
-                    elif SignalType.PROLONGED_HEAD_TURN.value in active_types:
-                        sub_title = "[HEAD_TURN]" if not debug else "[PROLONGED_HEAD_TURN]"
-                    elif SignalType.BODY_LEAN_SIDE.value in active_types:
-                        sub_title = "[BODY_LEAN]" if not debug else "[BODY_LEAN_SIDE]"
-                    elif debug and sigs:
-                        sub_title = f"[{sigs[0].signal_type}]"
-
-                    # State badge colors
-                    badge_bg = (15, 23, 42)
-                    badge_border = (0, 255, 200) if state == "NORMAL" else (poly_color)
-
-                    (tw, th), _ = cv2.getTextSize(badge_title, cv2.FONT_HERSHEY_SIMPLEX, 0.42, 1)
-                    box_h = th + 6 if not sub_title else th + 18
-                    cv2.rectangle(annotated, (scx - tw//2 - 5, scy - th - 5), (scx + tw//2 + 5, scy + box_h - th), badge_bg, -1)
-                    cv2.rectangle(annotated, (scx - tw//2 - 5, scy - th - 5), (scx + tw//2 + 5, scy + box_h - th), badge_border, 1)
-                    cv2.putText(annotated, badge_title, (scx - tw//2, scy), cv2.FONT_HERSHEY_SIMPLEX, 0.42, (255, 255, 255), 1, cv2.LINE_AA)
-
-                    if sub_title:
-                        (stw, sth), _ = cv2.getTextSize(sub_title, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)
-                        cv2.putText(annotated, sub_title, (scx - stw//2, scy + 12), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (200, 225, 255), 1, cv2.LINE_AA)
+                # Secondary Subtitle: Active Primary Pattern (if any)
+                active_seat_pats = [p for p in current_frame_patterns if p.seat_id == s_code]
+                if active_seat_pats:
+                    sub_pat = active_seat_pats[0].pattern_type
+                    (spw, sph), _ = cv2.getTextSize(sub_pat, cv2.FONT_HERSHEY_SIMPLEX, 0.35, 1)
+                    cv2.rectangle(annotated, (scx - spw//2 - 3, scy + 4), (scx + spw//2 + 3, scy + sph + 8), (15, 23, 42), -1)
+                    cv2.putText(annotated, sub_pat, (scx - spw//2, scy + sph + 6), cv2.FONT_HERSHEY_SIMPLEX, 0.35, (0, 255, 255), 1, cv2.LINE_AA)
 
                 if det is not None:
                     x1, y1, x2, y2 = [int(v) for v in det.bbox]
                     cv2.rectangle(annotated, (x1, y1), (x2, y2), (255, 180, 0), 2 if debug else 1)
-
-                    # Draw Skeletons if enabled or in debug mode
                     if (show_pose or debug) and det.keypoints is not None:
                         draw_skeletons(annotated, det.keypoints)
 
-                    # Draw Anchor Dot in debug mode only
-                    if debug:
-                        ac_x = int((x1 + x2) / 2)
-                        ac_y = int(y2 - (y2 - y1) * 0.15)
-                        cv2.circle(annotated, (ac_x, ac_y), 5, (0, 255, 255), -1)
-                        cv2.circle(annotated, (ac_x, ac_y), 7, (0, 0, 0), 1)
-
-            # (c) Draw Unmapped Persons (Explicitly UNMAPPED_PERSON per SRS Scope 04)
+            # (b) Draw Unmapped Persons (Explicitly tagged UNMAPPED_PERSON, never PROCTOR)
             for udet in unmapped_dets:
                 ux1, uy1, ux2, uy2 = [int(v) for v in udet.bbox]
-                # Subtle slate gray box
                 cv2.rectangle(annotated, (ux1, uy1), (ux2, uy2), (100, 116, 139), 1)
-                unmapped_label = "UNMAPPED" if not debug else f"UNMAPPED_PERSON (conf={udet.confidence:.2f})"
+                unmapped_label = "UNMAPPED_PERSON"
                 (utw, uth), _ = cv2.getTextSize(unmapped_label, cv2.FONT_HERSHEY_SIMPLEX, 0.36, 1)
                 cv2.rectangle(annotated, (ux1, max(0, uy1 - uth - 4)), (ux1 + utw + 4, uy1), (30, 41, 59), -1)
                 cv2.putText(annotated, unmapped_label, (ux1 + 2, uy1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (148, 163, 184), 1, cv2.LINE_AA)
 
-            # (d) Draw Top Telemetry Bar
+            # (c) Top Telemetry Header
             cv2.rectangle(annotated, (0, 0), (orig_w, 38), (15, 23, 42), -1)
             cv2.line(annotated, (0, 38), (orig_w, 38), (0, 255, 200), 1)
 
             time_str = f"{int(video_time_ms/1000//60):02d}:{int(video_time_ms/1000%60):02d}.{int(video_time_ms%1000/100):01d}"
             mapped_count = sum(1 for d in mapped_seats.values() if d is not None)
             hud_text = (
-                f"VIGIL AI ENTERPRISE | Room: {room_id} | Time: {time_str} | "
+                f"VIGIL AI SRS v2.0 | Room: {room_id} | Time: {time_str} | "
                 f"Frame: {frame_idx}/{total_video_frames} | "
                 f"Seats: {mapped_count}/{len(seat_mgr.seats)} | "
                 f"Unmapped: {len(unmapped_dets)} | "
@@ -539,30 +497,26 @@ def run_classroom_demo(
             )
             cv2.putText(annotated, hud_text, (14, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.50, (255, 255, 255), 1, cv2.LINE_AA)
 
-            # Save verification snapshots for manual review (SRS Section 38)
-            if 270 <= frame_idx <= 290 and (out_dir / "after_fix_sample.jpg").exists() is False:
-                cv2.imwrite(str(out_dir / "after_fix_sample.jpg"), annotated)
-                print(f"[OK] Saved After-Fix verification snapshot: {out_dir / 'after_fix_sample.jpg'}")
-            
-            # Save normal writing sample
-            if frame_idx == 350 and (out_dir / "normal_writing_sample.jpg").exists() is False:
+            # Save representative verification frames
+            if frame_idx == 350 and not (out_dir / "normal_writing_sample.jpg").exists():
                 cv2.imwrite(str(out_dir / "normal_writing_sample.jpg"), annotated)
-            
-            # Save look down context sample
-            if frame_idx == 450 and (out_dir / "look_down_sample.jpg").exists() is False:
-                cv2.imwrite(str(out_dir / "look_down_sample.jpg"), annotated)
+            if frame_idx == 280 and not (out_dir / "repeated_glance_sample.jpg").exists():
+                cv2.imwrite(str(out_dir / "repeated_glance_sample.jpg"), annotated)
+            if frame_idx == 520 and not (out_dir / "body_lean_sample.jpg").exists():
+                cv2.imwrite(str(out_dir / "body_lean_sample.jpg"), annotated)
+            if len(unmapped_dets) > 0 and not (out_dir / "unmapped_person_sample.jpg").exists():
+                cv2.imwrite(str(out_dir / "unmapped_person_sample.jpg"), annotated)
 
-            # Write Frame to Output MP4
+            # Write Frame to Video
             video_writer.write(annotated)
             last_annotated_frame = annotated
 
             if show_window:
-                cv2.imshow("VIGIL AI PRODUCTION DEMO", annotated)
+                cv2.imshow("VIGIL AI SRS v2.0 DEMO", annotated)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     print("[INFO] User interrupted the demo.")
                     break
 
-            # Progress log every 60 frames
             if frame_idx % 60 == 0:
                 print(f"[{time_str}] Processed {frame_idx}/{total_video_frames} frames (Inf: {inf_time:.1f}ms | Persons: {len(detections)} | Events: {len(all_emitted_events)})")
 
@@ -571,66 +525,20 @@ def run_classroom_demo(
         video_writer.release()
         if show_window:
             cv2.destroyAllWindows()
-        
-        # Flush any in-flight 10s video evidence clips that are pending post-frames
-        if save_evidence:
-            print("[SHUTDOWN] Flushing pending evidence video buffer...")
-            video_buffer._active_jobs  # To access jobs to get metadata
-            # We need to compute hashes for the flushed jobs before they are cleared
-            # Actually, flush_all just writes them. Let's process the active jobs manually.
-            with video_buffer._lock:
-                for clip_job in video_buffer._active_jobs:
-                    clip_job.is_completed = True
-                    clip_job.saved_file_path = video_buffer._write_clip_to_disk(clip_job)
-                    
-                    if clip_job.saved_file_path:
-                        try:
-                            sha_hash = compute_file_sha256(clip_job.saved_file_path)
-                            meta_path = Path(clip_job.saved_file_path).with_suffix(".json")
-                            meta_data = {
-                                "event_id": clip_job.event_id,
-                                "track_id": clip_job.track_id,
-                                "behavior": clip_job.behavior,
-                                "trigger_frame_idx": clip_job.trigger_frame_idx,
-                                "trigger_timestamp_ms": clip_job.trigger_timestamp_ms,
-                                "video_file": Path(clip_job.saved_file_path).name,
-                                "sha256_hash": sha_hash,
-                                "room_id": room_id,
-                                "camera_id": camera_id,
-                            }
-                            with open(meta_path, "w", encoding="utf-8") as mf:
-                                json.dump(meta_data, mf, indent=2)
-                            print(f"[SHUTDOWN EVIDENCE] Flushed package for {clip_job.event_id}")
-                        except Exception as e_err:
-                            logger.warning("Evidence package generation error: %s", e_err)
-                video_buffer._active_jobs.clear()
-            
-            async_writer.shutdown(wait=True)
 
-    # Close active episodes
-    for sig_type, stats in signal_tracker.items():
-        if stats["current_start"] is not None:
-            duration = (video_time_ms - stats["current_start"]) / 1000.0
-            stats["total_duration"] += duration
-            stats["max_duration"] = max(stats["max_duration"], duration)
-            stats["current_start"] = None
-        
-        # Calculate averages safely
-        stats["avg_duration"] = round(stats["total_duration"] / stats["episodes"], 2) if stats["episodes"] > 0 else 0.0
-        stats["max_duration"] = round(stats["max_duration"], 2)
-        stats["total_duration"] = round(stats["total_duration"], 2)
+    # Step 6: Flush all pending evidence buffer jobs (EOF Protection)
+    print("[SHUTDOWN] Flushing pending evidence video buffer at EOF...")
+    flushed_clips = video_buffer.flush_all()
+    async_writer.shutdown(wait=True)
+    print(f"[SHUTDOWN] Flushed {len(flushed_clips)} pending evidence clips successfully.")
 
-    total_processing_wall_time = time.time() - start_wall_time
-    avg_inf_time = float(np.mean(inference_times)) if inference_times else 0.0
-    avg_proc_fps = frame_idx / total_processing_wall_time if total_processing_wall_time > 0 else 0.0
-
-    # Save Representative Annotated Screenshot
+    # Save last annotated frame
     if last_annotated_frame is not None:
         sample_img_path = out_dir / "india_classroom_annotated_sample.jpg"
         cv2.imwrite(str(sample_img_path), last_annotated_frame)
         print(f"[OK] Representative annotated frame saved: {sample_img_path}")
 
-    # Peak Risk Per Seat
+    # Compute Peak Risks
     peak_risks = {}
     for s_code, prof in risk_tracker.profiles.items():
         peak_risks[s_code] = {
@@ -646,8 +554,25 @@ def run_classroom_demo(
         with open(events_json_path, "w", encoding="utf-8") as f:
             json.dump(events_dicts, f, indent=2)
 
+    # Save episodes.json
+    episodes_json_path = out_dir / "episodes.json"
+    episodes_dicts = [ep.to_dict() for ep in (episode_engine.completed_episodes + all_active_episodes)]
+    with open(episodes_json_path, "w", encoding="utf-8") as f:
+        json.dump(episodes_dicts, f, indent=2)
+
+    # Save patterns.json
+    patterns_json_path = out_dir / "patterns.json"
+    patterns_dicts = [pat.to_dict() for pat in all_detected_patterns]
+    with open(patterns_json_path, "w", encoding="utf-8") as f:
+        json.dump(patterns_dicts, f, indent=2)
+
     # Save demo_summary.json
+    total_elapsed = time.time() - start_wall_time
+    avg_inf_time = float(np.mean(inference_times)) if inference_times else 0.0
+    avg_proc_fps = frame_idx / total_elapsed if total_elapsed > 0 else 0.0
+
     summary_data = {
+        "srs_version": "2.0.0",
         "input_video": str(video_path),
         "resolution": f"{orig_w}x{orig_h}",
         "video_fps": round(fps, 2),
@@ -658,10 +583,11 @@ def run_classroom_demo(
         "average_processing_fps": round(avg_proc_fps, 2),
         "maximum_persons_detected": max_persons_detected,
         "configured_seats_count": len(seat_mgr.seats),
-        "signals_detected": signal_tracker,
-        "peak_risk_per_seat": peak_risks,
+        "total_episodes_extracted": len(episodes_dicts),
+        "total_patterns_detected": len(patterns_dicts),
         "events_generated_count": len(all_emitted_events),
         "state_transitions_count": len(active_state_transitions),
+        "peak_risk_per_seat": peak_risks,
         "output_video": str(output_video),
     }
 
@@ -669,50 +595,38 @@ def run_classroom_demo(
     with open(summary_json_path, "w", encoding="utf-8") as f:
         json.dump(summary_data, f, indent=2)
 
-    # Print Final Summary Report
+    # Print Final Summary Table
     print("\n============================================================")
-    print("VIGIL AI — INDIA CLASSROOM DEMO SUMMARY")
+    print("VIGIL AI SRS v2.0 — INDIA CLASSROOM DEMO SUMMARY")
     print("============================================================")
     print(f"Input:                    {video_path}")
     print(f"Resolution:               {orig_w}x{orig_h}")
     print(f"Video FPS:                {fps:.1f}")
     print(f"Duration:                 {duration_sec:.2f}s")
-    print()
-    print(f"Frames read:              {frame_idx}")
-    print(f"Inference frames:         {inference_count}")
-    print(f"Average inference time:   {avg_inf_time:.2f} ms")
-    print(f"Average processing FPS:   {avg_proc_fps:.2f} FPS")
-    print()
-    print(f"Maximum persons detected: {max_persons_detected}")
-    print(f"Configured seats:         {len(seat_mgr.seats)}")
-    print()
-    print("Signals detected (Behavioral Episodes):")
-    for sig_name, stats in signal_tracker.items():
-        print(f"  - {sig_name}: {stats['active_frames']} active frames, {stats['episodes']} episodes")
-        print(f"      => Active duration: {stats['total_duration']}s total, max {stats['max_duration']}s, avg {stats['avg_duration']}s/ep")
-    print()
-    print("Peak risk per seat:")
-    for s_code, pdata in peak_risks.items():
-        print(f"  - {s_code}: Peak Risk: {pdata['peak_risk_score']:.1f}/100 | Final State: {pdata['final_state']}")
-    print()
-    print(f"Events generated:         {len(all_emitted_events)}")
-    print(f"State transitions:        {len(active_state_transitions)}")
-    print(f"Output video:             {output_video}")
+    print(f"Total Frames:             {frame_idx}")
+    print(f"Average Inference Time:   {avg_inf_time:.2f} ms")
+    print(f"Average Processing FPS:   {avg_proc_fps:.2f} FPS")
+    print(f"Configured Seats:         {len(seat_mgr.seats)}")
+    print(f"Total Episodes:           {len(episodes_dicts)}")
+    print(f"Total Patterns:           {len(patterns_dicts)}")
+    print(f"Events Emitted:           {len(all_emitted_events)}")
+    print(f"State Transitions:        {len(active_state_transitions)}")
+    print(f"Output Video:             {output_video}")
     print("============================================================\n")
 
     return summary_data
 
 
 def main():
-    parser = argparse.ArgumentParser(description="VIGIL AI Classroom End-to-End Demo")
+    parser = argparse.ArgumentParser(description="VIGIL AI SRS v2.0 Classroom End-to-End Demo")
     parser.add_argument("--input", "--video", dest="input_video", type=str, default="demo_video/india_classroom.mp4", help="Path to input demo video")
     parser.add_argument("--output", type=str, default=None, help="Path to output annotated MP4")
-    parser.add_argument("--output-dir", type=str, default="data/output_demo", help="Directory for output files")
+    parser.add_argument("--output-dir", type=str, default="data/output_demo_v2", help="Directory for output files")
     parser.add_argument("--room-id", type=str, default="ROOM-101", help="Exam room identifier")
     parser.add_argument("--camera-id", type=str, default="CAM-01", help="Camera feed identifier")
     parser.add_argument("--no-show", action="store_true", help="Disable realtime annotated window (runs headlessly)")
     parser.add_argument("--show", "--preview", dest="show", action="store_true", help="Explicitly enable realtime annotated window")
-    parser.add_argument("--debug", action="store_true", help="Enable debug overlay (anchors, keypoint conf, detailed tags)")
+    parser.add_argument("--debug", action="store_true", help="Enable debug overlay")
     parser.add_argument("--show-pose", action="store_true", help="Render full pose skeleton overlay")
     parser.add_argument("--save-events", action="store_true", default=True, help="Save events.json")
     parser.add_argument("--save-evidence", action="store_true", default=True, help="Generate async evidence packages")
@@ -724,7 +638,6 @@ def main():
     if not out_video:
         out_video = str(Path(args.output_dir) / "india_classroom_result.mp4")
 
-    # If --no-show is set, show_window is False; otherwise True (default GUI on)
     show_win = False if args.no_show else True
 
     run_classroom_demo(

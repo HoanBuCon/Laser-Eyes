@@ -144,7 +144,7 @@ class SeatOccupancy:
     state: str = SeatState.EMPTY
     assigned_track_id: Optional[int] = None
     assigned_detection: Optional[Detection] = None
-    last_seen_timestamp_ms: float = 0.0
+    last_seen_timestamp_ms: Optional[float] = None
     consecutive_empty_frames: int = 0
     consecutive_occupied_frames: int = 0
     candidate_detections: List[Detection] = field(default_factory=list)
@@ -284,7 +284,7 @@ class SeatManager:
 
                 time_since_last_seen = (
                     timestamp_ms - occ.last_seen_timestamp_ms
-                    if occ.last_seen_timestamp_ms > 0
+                    if occ.last_seen_timestamp_ms is not None
                     else float("inf")
                 )
 
@@ -298,6 +298,31 @@ class SeatManager:
                 mapped_results[seat_code] = None
 
         return mapped_results, unmapped
+
+    def to_seat_graph(self) -> Any:
+        """Construct a connected SeatGraph representing all registered seats and spatial context."""
+        from classroom_monitor.scene_context import DeskGeometry, SeatContext, SeatGraph
+        graph = SeatGraph(room_id=self.room_id)
+        for s_code, s_def in self.seats.items():
+            desk_geo = None
+            if s_def.desk_y is not None or s_def.desk_polygon is not None:
+                desk_geo = DeskGeometry(
+                    desk_boundary_y=s_def.desk_y,
+                    writing_zone_polygon=s_def.desk_polygon,
+                )
+            ctx = SeatContext(
+                seat_id=s_def.seat_code,
+                room_id=s_def.room_id,
+                camera_id=s_def.camera_id,
+                seat_code=s_def.seat_code,
+                desk_geometry=desk_geo,
+                metadata=s_def.metadata,
+            )
+            graph.add_seat_context(ctx)
+
+        # Auto-infer neighbors based on polygon centroids if not explicitly set
+        graph.auto_infer_neighbors_from_polygons(list(self.seats.values()))
+        return graph
 
     def get_seat_status_summary(self) -> Dict[str, Any]:
         """Summary of current room seating occupancy."""

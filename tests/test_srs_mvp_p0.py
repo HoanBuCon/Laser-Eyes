@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from classroom_monitor.async_evidence_writer import AsyncEvidenceWriter, compute_file_sha256
+from classroom_monitor.behavior_pattern_engine import BehaviorPattern, PatternType
 from classroom_monitor.behavior_signals import (
     BehaviorSignal,
     BehaviorSignalExtractor,
@@ -33,6 +34,7 @@ from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.rtsp_reader import RTSPStreamReader, VideoFrame
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatROI, SeatState
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
+from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode
 from classroom_monitor.worker_node import WorkerNodeRunner
 
 
@@ -142,53 +144,69 @@ def test_p0_06_behavior_signals_and_unknown_safe():
 # ==============================================================================
 def test_p0_07_08_temporal_risk_scoring_and_recidivism():
     """Verify 0-100 normalized score progression, FLAGGED_FOR_REVIEW event, cooldown, and recidivism."""
-    tracker = SeatRiskTracker(room_id="ROOM_A101", cooldown_duration_ms=2000.0, recidivism_window_ms=5000.0)
+    tracker = SeatRiskTracker(room_id="ROOM_A101", flagged_threshold=65.0, cooldown_duration_ms=2000.0, recidivism_window_ms=5000.0)
 
-    sig_turn = BehaviorSignal(
-        signal_type=SignalType.PROLONGED_HEAD_TURN.value,
-        raw_score=1.0,
+    ep_turn1 = TemporalEpisode(
+        episode_id="ep-turn-01",
+        seat_id="SEAT_A01",
+        episode_type=EpisodeType.HEAD_TURN_LEFT.value,
+        state=EpisodeState.ACTIVE,
+        start_timestamp_ms=1000.0,
+        end_timestamp_ms=1000.0,
+        duration_ms=500.0,
         confidence=0.9,
         quality=0.9,
-        timestamp_ms=1000.0,
-        seat_id="SEAT_A01",
     )
-    sig_lean = BehaviorSignal(
-        signal_type=SignalType.BODY_LEAN_SIDE.value,
-        raw_score=1.0,
-        confidence=0.9,
-        quality=0.9,
-        timestamp_ms=1000.0,
+    pat_glance = BehaviorPattern(
+        pattern_id="pat-glance-01",
         seat_id="SEAT_A01",
+        pattern_type=PatternType.REPEATED_NEIGHBOR_GLANCE.value,
+        confidence=0.95,
+        quality=0.95,
+        start_timestamp_ms=1000.0,
+        end_timestamp_ms=3000.0,
+        target_neighbor_id="SEAT_A02",
+    )
+    pat_lean = BehaviorPattern(
+        pattern_id="pat-lean-01",
+        seat_id="SEAT_A01",
+        pattern_type=PatternType.NEIGHBOR_ORIENTED_LEAN.value,
+        confidence=0.95,
+        quality=0.95,
+        start_timestamp_ms=1000.0,
+        end_timestamp_ms=3000.0,
+        target_neighbor_id="SEAT_A02",
     )
 
-    # Step 1: Ingest single turn signal at t = 1000ms (dt=0.1s -> ~1.8 pts)
-    evt1 = tracker.update_seat("SEAT_A01", [sig_turn], timestamp_ms=1000.0)
+    # Step 1: Ingest single episode at t = 1000ms -> Score ~10.8 (NORMAL)
+    evt1 = tracker.update_seat("SEAT_A01", [ep_turn1], [], timestamp_ms=1000.0)
     assert evt1 is None
     profile = tracker.profiles["SEAT_A01"]
     assert profile.current_state == RiskState.NORMAL.value
+    assert profile.risk_score > 0.0
 
-    # Step 2: Ingest turn signal at t = 2500ms (dt=1.5s -> +27.0 pts -> score ~28.8, NORMAL/OBSERVE)
-    evt2 = tracker.update_seat("SEAT_A01", [sig_turn], timestamp_ms=2500.0)
-    assert evt2 is None
-    assert profile.risk_score >= 25.0
-
-    # Step 3: Ingest combined turn + lean at t = 4000ms (dt=1.5s -> +79.5 pts -> Score >= 80 -> FLAGGED_FOR_REVIEW)
+    # Step 2: Ingest pattern at t = 2500ms -> Score increases to SUSPICIOUS/FLAGGED
     dummy_det = Detection(0, "person", 0.95, (100, 100, 200, 250), frame_index=50)
-    evt3 = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=4000.0, detection=dummy_det)
-    assert evt3 is not None
-    assert evt3.status == "PENDING"
+    evt2 = tracker.update_seat("SEAT_A01", [ep_turn1], [pat_glance, pat_lean], timestamp_ms=2500.0, detection=dummy_det)
+    assert evt2 is not None
+    assert evt2.status in ("suspicious", "flagged_for_human_review", "PENDING")
     assert profile.current_state == RiskState.COOLDOWN.value  # Entered cooldown
 
-    # Step 4: During cooldown (t = 5000ms), no events emitted
-    evt_cool = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=5000.0)
+    # Step 3: During cooldown (t = 3000ms), no events emitted
+    evt_cool = tracker.update_seat("SEAT_A01", [], [pat_glance], timestamp_ms=3000.0)
     assert evt_cool is None
 
-    # Step 5: After cooldown expires (t = 8000ms), student immediately cheats again -> RECIDIVISM triggered!
-    for t_step in [8000.0, 9500.0, 11000.0]:
-        evt_recid = tracker.update_seat("SEAT_A01", [sig_turn, sig_lean], timestamp_ms=t_step, detection=dummy_det)
-        if evt_recid is not None:
-            break
-
+    # Step 4: After cooldown expires (t = 5500ms), student repeats pattern -> RECIDIVISM triggered!
+    pat_recid = BehaviorPattern(
+        pattern_id="pat-glance-02",
+        seat_id="SEAT_A01",
+        pattern_type=PatternType.REPEATED_NEIGHBOR_GLANCE.value,
+        confidence=0.95,
+        quality=0.95,
+        start_timestamp_ms=5500.0,
+        end_timestamp_ms=6000.0,
+    )
+    evt_recid = tracker.update_seat("SEAT_A01", [], [pat_recid], timestamp_ms=5500.0, detection=dummy_det)
     assert evt_recid is not None
     assert evt_recid.is_recidivist is True
     assert evt_recid.severity in ("HIGH", "CRITICAL")
@@ -274,49 +292,44 @@ def test_unmapped_person_semantics_no_proctor_inference():
 
 
 def test_look_down_long_contextual_contribution_and_combination_bonus():
-    """Verify LOOK_DOWN_LONG alone has mild contribution, while multi-cue combination triggers rapid escalation."""
-    config = ClassroomConfig(
-        risk_weights={"LOOK_DOWN_LONG": 3.0, "LOW_HAND_POSTURE": 12.0},
-        combination_weights={"LOOK_DOWN_LONG+LOW_HAND_POSTURE": 18.0},
-        decay_rate_per_sec=5.0,
-    )
-    tracker = SeatRiskTracker(room_id="ROOM_A101", config=config)
+    """Verify HEAD_PITCH_DOWN alone has zero direct risk contribution, while combined with below-desk activity escalates."""
+    tracker = SeatRiskTracker(room_id="ROOM_A101")
 
-    sig_look_down = BehaviorSignal(
-        signal_type=SignalType.LOOK_DOWN_LONG.value,
-        raw_score=1.0,
+    ep_pitch_down = TemporalEpisode(
+        episode_id="ep-pitch-01",
+        seat_id="SEAT_01",
+        episode_type=EpisodeType.HEAD_PITCH_DOWN.value,
+        state=EpisodeState.ACTIVE,
+        start_timestamp_ms=1000.0,
+        end_timestamp_ms=1000.0,
+        duration_ms=3000.0,
         confidence=0.9,
         quality=0.9,
-        timestamp_ms=1000.0,
-        seat_id="SEAT_01",
     )
 
-    # 1. Candidate writing normally (LOOK_DOWN_LONG alone for 3 seconds)
-    # At t=1000ms (first frame, dt=0.1s -> 3.0 * 0.1 = 0.3)
-    tracker.update_seat("SEAT_01", [sig_look_down], timestamp_ms=1000.0)
-    # At t=4000ms (dt=3.0s -> 3.0 * 3.0 = 9.0 -> total ~9.3)
-    tracker.update_seat("SEAT_01", [sig_look_down], timestamp_ms=4000.0)
+    # 1. Candidate writing normally (HEAD_PITCH_DOWN alone)
+    tracker.update_seat("SEAT_01", [ep_pitch_down], [], timestamp_ms=1000.0)
+    tracker.update_seat("SEAT_01", [ep_pitch_down], [], timestamp_ms=4000.0)
 
     prof = tracker.profiles["SEAT_01"]
-    assert prof.current_state == RiskState.NORMAL.value  # Remains NORMAL (0-29 band)
-    assert prof.risk_score < 20.0  # Normal writing DOES NOT saturate risk!
+    assert prof.current_state == RiskState.NORMAL.value
+    assert prof.risk_score == 0.0  # ZERO direct risk contribution in SRS v2!
 
-    # 2. Candidate looking down + concealing hands under desk (Multi-cue suspicious combo)
-    sig_low_hands = BehaviorSignal(
-        signal_type=SignalType.LOW_HAND_POSTURE.value,
-        raw_score=1.0,
-        confidence=0.9,
-        quality=0.9,
-        timestamp_ms=6000.0,
+    # 2. Candidate looking down + below desk interaction (Pattern)
+    pat_below_desk = BehaviorPattern(
+        pattern_id="pat-below-01",
         seat_id="SEAT_01",
+        pattern_type=PatternType.BELOW_DESK_INTERACTION.value,
+        confidence=0.95,
+        quality=0.95,
+        start_timestamp_ms=6000.0,
+        end_timestamp_ms=8000.0,
     )
-    # Ingest combination over 2 seconds (rate = 3.0 + 12.0 + 18.0 = 33.0 pts/sec -> +66.0 pts)
     dummy_det = Detection(0, "person", 0.95, (100, 100, 200, 250), frame_index=180)
-    evt = tracker.update_seat("SEAT_01", [sig_look_down, sig_low_hands], timestamp_ms=6000.0, detection=dummy_det)
+    tracker.update_seat("SEAT_01", [ep_pitch_down], [pat_below_desk], timestamp_ms=6000.0, detection=dummy_det)
 
-    # Total score >= 80 -> triggers FLAGGED_FOR_REVIEW
-    assert prof.current_state in (RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value)
-    assert prof.risk_score >= 60.0
+    assert prof.risk_score >= 30.0
+    assert prof.current_state in (RiskState.OBSERVE.value, RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value)
 
 
 def test_state_machine_srs_compliance_and_no_cheating_state():
@@ -403,47 +416,26 @@ def test_missing_wrist_unknown_safe():
 
 
 def test_anti_double_counting_component_suppression():
-    """Verify RiskEngine suppresses component signals when SUSPICIOUS_BELOW_DESK_ACTIVITY is active."""
-    config = ClassroomConfig(
-        risk_weights={
-            "SUSPICIOUS_BELOW_DESK_ACTIVITY": 24.0,
-            "LOOK_DOWN_LONG": 1.0,
-            "LOW_HAND_POSTURE": 3.0,
-        },
-        composite_suppression=True,
-    )
-    tracker = SeatRiskTracker(room_id="ROOM_A101", config=config)
+    """Verify RiskEngine deduplicates episodes and uses diminishing returns on patterns."""
+    tracker = SeatRiskTracker(room_id="ROOM_A101", decay_rate_per_sec=0.0)
 
-    sig_comp = BehaviorSignal(
-        signal_type=SignalType.SUSPICIOUS_BELOW_DESK_ACTIVITY.value,
-        raw_score=1.0,
-        confidence=0.9,
-        quality=0.9,
-        timestamp_ms=1000.0,
+    ep1 = TemporalEpisode(
+        episode_id="ep-turn-fixed-id",
         seat_id="S01",
-    )
-    sig_look = BehaviorSignal(
-        signal_type=SignalType.LOOK_DOWN_LONG.value,
-        raw_score=1.0,
-        confidence=0.9,
-        quality=0.9,
-        timestamp_ms=1000.0,
-        seat_id="S01",
-    )
-    sig_low = BehaviorSignal(
-        signal_type=SignalType.LOW_HAND_POSTURE.value,
-        raw_score=1.0,
-        confidence=0.9,
-        quality=0.9,
-        timestamp_ms=1000.0,
-        seat_id="S01",
+        episode_type=EpisodeType.HEAD_TURN_LEFT.value,
+        state=EpisodeState.ACTIVE,
+        start_timestamp_ms=1000.0,
+        end_timestamp_ms=1000.0,
+        duration_ms=1000.0,
+        confidence=1.0,
+        quality=1.0,
     )
 
-    # Ingest all three together over dt = 1.0s (from t=1000 to t=2000)
-    tracker.update_seat("S01", [sig_comp, sig_look, sig_low], timestamp_ms=1000.0)
-    tracker.update_seat("S01", [sig_comp, sig_look, sig_low], timestamp_ms=2000.0)
+    # Ingest the SAME episode across multiple frames
+    tracker.update_seat("S01", [ep1], [], timestamp_ms=1000.0)
+    score1 = tracker.profiles["S01"].risk_score
+    tracker.update_seat("S01", [ep1], [], timestamp_ms=2000.0)
+    score2 = tracker.profiles["S01"].risk_score
 
-    prof = tracker.profiles["S01"]
-    # Expected added risk over 1.0s is ONLY 24.0 * 1.0 = 24.0 (components 1.0 and 3.0 are suppressed!)
-    # First step (0.1s) ~ 2.4, second step (1.0s) ~ 24.0 => total ~ 26.4
-    assert 25.0 <= prof.risk_score <= 28.0
+    # Same episode ID must NOT be double-counted across frames
+    assert score1 == score2 == 12.0

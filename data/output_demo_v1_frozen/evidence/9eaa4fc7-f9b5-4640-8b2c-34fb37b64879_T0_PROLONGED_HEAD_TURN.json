@@ -1,0 +1,11 @@
+{
+  "event_id": "9eaa4fc7-f9b5-4640-8b2c-34fb37b64879",
+  "track_id": 0,
+  "behavior": "PROLONGED_HEAD_TURN",
+  "trigger_frame_idx": 1992,
+  "trigger_timestamp_ms": 66400.0,
+  "video_file": "9eaa4fc7-f9b5-4640-8b2c-34fb37b64879_T0_PROLONGED_HEAD_TURN.mp4",
+  "sha256_hash": "4a8cdececfaa4c38abe6588c931c0b01d8ab3bf296af6ddc7b7aeb4e2eb4a569",
+  "room_id": "ROOM-101",
+  "camera_id": "CAM-01"
+}

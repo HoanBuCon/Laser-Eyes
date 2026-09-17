@@ -1,0 +1,102 @@
+[
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-20_f300_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-20",
+    "frame_idx": 300,
+    "timestamp_ms": 10000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -13.222957533084944,
+    "sixd_yaw": 74.480712890625,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-04_f735_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-04",
+    "frame_idx": 735,
+    "timestamp_ms": 24500.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -16.64957929939703,
+    "sixd_yaw": 71.16272735595703,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-15_f825_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-15",
+    "frame_idx": 825,
+    "timestamp_ms": 27500.0,
+    "gt_label": "HEAD_TURN_LEFT",
+    "pose_yaw": 11.04683232771866,
+    "sixd_yaw": -39.75945281982422,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-15_f1080_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-15",
+    "frame_idx": 1080,
+    "timestamp_ms": 36000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -23.11476546884163,
+    "sixd_yaw": 54.85544967651367,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-04_f1335_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-04",
+    "frame_idx": 1335,
+    "timestamp_ms": 44500.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -65.90953020276832,
+    "sixd_yaw": 45.17520523071289,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-16_f1335_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-16",
+    "frame_idx": 1335,
+    "timestamp_ms": 44500.0,
+    "gt_label": "HEAD_TURN_LEFT",
+    "pose_yaw": 28.477882180813523,
+    "sixd_yaw": -73.25306701660156,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-02_f1500_BOTH_MISSED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-02",
+    "frame_idx": 1500,
+    "timestamp_ms": 50000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -37.00048094685449,
+    "sixd_yaw": -20.156774520874023,
+    "classification": "BOTH_MISSED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-04_f1500_POSE_MISSED_SIXD_DETECTED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-04",
+    "frame_idx": 1500,
+    "timestamp_ms": 50000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -67.78696913183882,
+    "sixd_yaw": 51.37031936645508,
+    "classification": "POSE_MISSED_SIXD_DETECTED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-02_f1830_BOTH_MISSED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-02",
+    "frame_idx": 1830,
+    "timestamp_ms": 61000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": -61.32865806632577,
+    "sixd_yaw": 4.992963790893555,
+    "classification": "BOTH_MISSED"
+  },
+  {
+    "file": "disagree_SEAT-ROOM-CALIB-01-03_f1830_BOTH_MISSED.jpg",
+    "seat_code": "SEAT-ROOM-CALIB-01-03",
+    "frame_idx": 1830,
+    "timestamp_ms": 61000.0,
+    "gt_label": "HEAD_TURN_RIGHT",
+    "pose_yaw": null,
+    "sixd_yaw": null,
+    "classification": "BOTH_MISSED"
+  }
+]

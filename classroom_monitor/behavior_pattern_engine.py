@@ -15,7 +15,7 @@ import logging
 import uuid
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -92,6 +92,7 @@ class BehaviorPatternEngine:
 
         # Historical episode store per seat: seat_id -> List[TemporalEpisode]
         self._episode_history: Dict[str, List[TemporalEpisode]] = {}
+        self._seen_episode_ids: Dict[str, Set[str]] = {}
         # Emitted pattern cooldown tracking: (seat_id, pattern_type) -> last_emitted_timestamp_ms
         self._pattern_cooldowns: Dict[Tuple[str, str], float] = {}
 
@@ -106,11 +107,14 @@ class BehaviorPatternEngine:
         seat_id = seat_context.seat_id
         if seat_id not in self._episode_history:
             self._episode_history[seat_id] = []
+            self._seen_episode_ids[seat_id] = set()
 
         # Store newly completed episodes
+        seen_ids = self._seen_episode_ids[seat_id]
         for ep in completed_episodes:
-            if ep.seat_id == seat_id and ep not in self._episode_history[seat_id]:
+            if ep.seat_id == seat_id and ep.episode_id not in seen_ids:
                 self._episode_history[seat_id].append(ep)
+                seen_ids.add(ep.episode_id)
 
         # Prune episodes older than rolling window
         self._episode_history[seat_id] = [

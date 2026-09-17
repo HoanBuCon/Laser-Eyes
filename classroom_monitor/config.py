@@ -30,6 +30,7 @@ class ClassroomConfig:
     pose_input_resolution: int = 1280
     pose_ai_fps_target: int = 10
     phone_wrist_ratio_threshold: float = 0.28
+    head_provider: str = "pose_heuristic"  # "pose_heuristic" (default) or "sixdrepnet"
 
     # ---- High-Resolution Slicing (SAHI / Dynamic Tiling) ----
     enable_sahi_tiling: bool = False

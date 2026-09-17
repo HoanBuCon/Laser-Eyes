@@ -90,6 +90,7 @@ class ObservationExtractor:
         timestamp_ms: float,
         nearby_person_count: Optional[int] = None,
         occupancy_state: Optional[str] = None,
+        frame: Optional[np.ndarray] = None,
     ) -> List[RawObservation]:
         """Extract all valid observations for the candidate person in the given seat context."""
         observations: List[RawObservation] = []
@@ -168,6 +169,7 @@ class ObservationExtractor:
                 bbox=detection.bbox,
                 seat_baseline_yaw=seat_context.reference_directions.baseline_yaw,
                 seat_baseline_pitch=seat_context.reference_directions.baseline_pitch,
+                frame=frame,
             )
 
             if head_est.yaw is not None:

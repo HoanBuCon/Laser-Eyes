@@ -41,6 +41,7 @@ from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatStat
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
+from classroom_monitor.head_pose_provider import create_head_pose_provider
 from storage.database import SessionLocal, init_db
 from storage.repositories import CameraRepository, RoomRepository, SeatRepository, SiteRepository
 
@@ -195,6 +196,7 @@ def run_classroom_demo(
     stride: int = 1,
     debug: bool = False,
     show_pose: bool = False,
+    head_provider: str = "pose_heuristic",
 ) -> Dict[str, Any]:
     """Execute end-to-end VIGIL AI SRS v2.0 pipeline on input video."""
     video_path = Path(input_video)
@@ -212,7 +214,7 @@ def run_classroom_demo(
     duration_sec = total_video_frames / fps if fps > 0 else 0.0
 
     print("================================================================================")
-    print("[START] VIGIL AI SRS v2.0 ACTOR-CENTRIC TEMPORAL PIPELINE DEMO")
+    print(f"[START] VIGIL AI SRS v2.0 ACTOR-CENTRIC PIPELINE (HPE Provider: {head_provider})")
     print("================================================================================")
     print(f"Input Video:      {video_path} ({orig_w}x{orig_h} @ {fps:.1f} FPS, {duration_sec:.1f}s, {total_video_frames} frames)")
     print(f"Room & Camera:    Room: {room_id} | Camera: {camera_id}")
@@ -225,9 +227,10 @@ def run_classroom_demo(
     print(f"SeatManager:      Loaded {len(seat_mgr.seats)} production Seat ROIs into SeatGraph.")
 
     # 2. Perception & 7-Layer Pipeline Modules
-    config = ClassroomConfig(pipeline_mode="2stage_pose", enable_sahi_tiling=False)
+    config = ClassroomConfig(pipeline_mode="2stage_pose", enable_sahi_tiling=False, head_provider=head_provider)
     detector = PoseClassroomDetector(config=config)
-    observation_extractor = ObservationExtractor()
+    head_pose_provider = create_head_pose_provider(provider_name=head_provider)
+    observation_extractor = ObservationExtractor(head_pose_provider=head_pose_provider)
     episode_engine = TemporalEpisodeEngine()
     pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph)
     risk_tracker = SeatRiskTracker(room_id=room_id)
@@ -258,8 +261,8 @@ def run_classroom_demo(
     max_persons_detected = 0
 
     all_emitted_events: List[ClassroomEvent] = []
-    all_active_episodes: List[TemporalEpisode] = []
     all_detected_patterns: List[BehaviorPattern] = []
+    seen_pattern_ids: Set[str] = set()
     active_state_transitions: List[Dict[str, Any]] = []
     prev_states: Dict[str, str] = {}
 
@@ -290,7 +293,7 @@ def run_classroom_demo(
 
             # Process completed clips
             for clip_job in completed_clips:
-                if clip_job.saved_file_path and save_evidence:
+                if clip_job.saved_file_path and os.path.exists(clip_job.saved_file_path) and save_evidence:
                     try:
                         sha_hash = compute_file_sha256(clip_job.saved_file_path)
                         meta_path = Path(clip_job.saved_file_path).with_suffix(".json")
@@ -307,7 +310,6 @@ def run_classroom_demo(
                         }
                         with open(meta_path, "w", encoding="utf-8") as mf:
                             json.dump(meta_data, mf, indent=2)
-                        print(f"[EVIDENCE] Generated package for {clip_job.event_id}: MP4 + SHA-256 ({sha_hash[:12]}...)")
                     except Exception as e_err:
                         logger.warning("Evidence package generation error: %s", e_err)
 
@@ -347,6 +349,7 @@ def run_classroom_demo(
                     timestamp_ms=video_time_ms,
                     occupancy_state=occ_state,
                     nearby_person_count=person_count,
+                    frame=frame,
                 )
 
                 # Temporal Episode Engine
@@ -363,7 +366,10 @@ def run_classroom_demo(
                     seat_context=s_ctx,
                     timestamp_ms=video_time_ms,
                 )
-                current_frame_patterns.extend(patterns)
+                for pat in patterns:
+                    if pat.pattern_id not in seen_pattern_ids:
+                        all_detected_patterns.append(pat)
+                        seen_pattern_ids.add(pat.pattern_id)
 
                 # Risk Prioritization & State Machine Update
                 new_event = risk_tracker.update_seat(
@@ -405,14 +411,6 @@ def run_classroom_demo(
                             frame_idx=frame_idx,
                             timestamp_ms=video_time_ms,
                         )
-
-            # Store cumulative episodes & patterns for export
-            for ep in current_frame_episodes:
-                if ep not in all_active_episodes:
-                    all_active_episodes.append(ep)
-            for pat in current_frame_patterns:
-                if pat not in all_detected_patterns:
-                    all_detected_patterns.append(pat)
 
             # Step 5: Render Clean, Compact SRS v2 HUD
             annotated = frame.copy()
@@ -531,11 +529,13 @@ def run_classroom_demo(
         if show_window:
             cv2.destroyAllWindows()
 
-    # Step 6: Flush all pending evidence buffer jobs (EOF Protection)
-    print("[SHUTDOWN] Flushing pending evidence video buffer at EOF...")
+    # Step 6: Flush all pending evidence buffer jobs & temporal episodes (EOF Protection)
+    print("[SHUTDOWN] Flushing pending evidence video buffer and temporal episodes at EOF...")
     flushed_clips = video_buffer.flush_all()
     async_writer.shutdown(wait=True)
-    print(f"[SHUTDOWN] Flushed {len(flushed_clips)} pending evidence clips successfully.")
+    video_time_eof_ms = (frame_idx / fps) * 1000.0 if fps > 0 else 0.0
+    episode_engine.flush_all(video_time_eof_ms)
+    print(f"[SHUTDOWN] Flushed {len(flushed_clips)} pending evidence clips, total completed episodes: {len(episode_engine.completed_episodes)}")
 
     # Save last annotated frame
     if last_annotated_frame is not None:
@@ -561,7 +561,7 @@ def run_classroom_demo(
 
     # Save episodes.json
     episodes_json_path = out_dir / "episodes.json"
-    episodes_dicts = [ep.to_dict() for ep in (episode_engine.completed_episodes + all_active_episodes)]
+    episodes_dicts = [ep.to_dict() for ep in episode_engine.completed_episodes]
     with open(episodes_json_path, "w", encoding="utf-8") as f:
         json.dump(episodes_dicts, f, indent=2)
 
@@ -637,6 +637,13 @@ def main():
     parser.add_argument("--save-evidence", action="store_true", default=True, help="Generate async evidence packages")
     parser.add_argument("--max-frames", type=int, default=None, help="Maximum frames to process (optional)")
     parser.add_argument("--stride", type=int, default=1, help="Frame subsampling stride (default 1 = every frame)")
+    parser.add_argument(
+        "--head-provider",
+        type=str,
+        default="pose_heuristic",
+        choices=["pose_heuristic", "sixdrepnet", "pose", "sixd"],
+        help="Head orientation estimation provider (pose_heuristic or sixdrepnet)",
+    )
     args = parser.parse_args()
 
     out_video = args.output
@@ -657,6 +664,7 @@ def main():
         stride=args.stride,
         debug=args.debug,
         show_pose=args.show_pose,
+        head_provider=args.head_provider,
     )
 
 

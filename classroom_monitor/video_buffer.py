@@ -4,10 +4,12 @@ Maintains a rolling RAM buffer of video frames (e.g. 5.0s pre-event)
 and automatically records subsequent frames (e.g. 5.0s post-event)
 when a cheating event is flagged, packaging the entire 10-second episode into
 a verifiable MP4 evidence video for academic integrity reviews.
+Uses a ThreadPoolExecutor to encode clips asynchronously without stalling video playback.
 """
 
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import threading
 import time
@@ -57,11 +59,14 @@ class EvidenceVideoBuffer:
         post_event_seconds: float = 5.0,
         fps: float = 30.0,
         output_dir: str | Path = "data/evidence_clips",
+        async_write: bool = False,
+        max_workers: int = 2,
     ):
         self.pre_event_seconds = max(0.5, pre_event_seconds)
         self.post_event_seconds = max(0.5, post_event_seconds)
         self.fps = max(1.0, fps)
         self.output_dir = Path(output_dir)
+        self.async_write = async_write
 
         self.max_pre_frames = int(round(self.pre_event_seconds * self.fps))
         self.max_post_frames = int(round(self.post_event_seconds * self.fps))
@@ -70,6 +75,8 @@ class EvidenceVideoBuffer:
         self._ring_buffer: Deque[BufferedFrame] = deque(maxlen=self.max_pre_frames)
         self._active_jobs: List[VideoClipJob] = []
         self._lock = threading.Lock()
+        self._executor = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="EvidenceClipWriter") if async_write else None
+        self._futures: List[concurrent.futures.Future] = []
 
     def add_frame(
         self,
@@ -104,9 +111,14 @@ class EvidenceVideoBuffer:
             for job in self._active_jobs:
                 job.post_frames.append(buffered_frame)
                 if len(job.post_frames) >= job.target_post_frames:
-                    # Finalize and write MP4 clip
-                    self._write_clip_to_disk(job)
-                    job.is_completed = True
+                    if self.async_write and self._executor is not None:
+                        job.is_completed = True
+                        job.saved_file_path = str(job.output_path)
+                        fut = self._executor.submit(self._write_clip_to_disk, job)
+                        self._futures.append(fut)
+                    else:
+                        self._write_clip_to_disk(job)
+                        job.is_completed = True
                     completed_jobs.append(job)
                 else:
                     remaining_jobs.append(job)
@@ -199,20 +211,38 @@ class EvidenceVideoBuffer:
         return job.saved_file_path
 
     def flush_all(self) -> List[str]:
-        """Force write all pending clipping jobs to disk immediately."""
+        """Force write all pending clipping jobs to disk and wait for background encoding."""
         saved_paths: List[str] = []
         with self._lock:
             for job in self._active_jobs:
-                path = self._write_clip_to_disk(job)
-                if path:
+                if self.async_write and self._executor is not None:
                     job.is_completed = True
-                    job.saved_file_path = path
-                    saved_paths.append(path)
+                    fut = self._executor.submit(self._write_clip_to_disk, job)
+                    self._futures.append(fut)
+                else:
+                    path = self._write_clip_to_disk(job)
+                    if path:
+                        job.is_completed = True
+                        saved_paths.append(path)
             self._active_jobs.clear()
+
+        # Wait for all background clipping jobs to finish
+        if self._futures:
+            done, _ = concurrent.futures.wait(self._futures, timeout=60.0)
+            for fut in done:
+                try:
+                    res = fut.result()
+                    if res:
+                        saved_paths.append(res)
+                except Exception as e:
+                    logger.error("Error in async evidence writing: %s", e)
+            self._futures.clear()
+
         return saved_paths
 
     def reset(self) -> None:
-        """Clear ring buffer and cancel all active jobs."""
+        """Clear ring buffer, cancel active jobs, and flush executor."""
         with self._lock:
             self._ring_buffer.clear()
             self._active_jobs.clear()
+            self.flush_all()

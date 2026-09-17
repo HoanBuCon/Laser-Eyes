@@ -584,3 +584,31 @@ class TemporalEpisodeEngine:
             )
 
         return None
+
+    def flush_all(self, timestamp_ms: float) -> List[TemporalEpisode]:
+        """Flush and finalize all active or ending episodes at stream termination (EOF)."""
+        flushed: List[TemporalEpisode] = []
+        for (seat_id, ep_type), tracker in self._trackers.items():
+            if tracker.state in (EpisodeState.ACTIVE, EpisodeState.ENDING):
+                tracker.state = EpisodeState.ENDED
+                duration = max(0.0, timestamp_ms - tracker.active_start_ms)
+                mean_conf = float(np.mean(tracker.confidences)) if tracker.confidences else 1.0
+                mean_qual = float(np.mean(tracker.qualities)) if tracker.qualities else 1.0
+
+                completed_ep = TemporalEpisode(
+                    episode_id=tracker.current_episode_id or str(uuid.uuid4()),
+                    seat_id=tracker.seat_id,
+                    episode_type=tracker.episode_type,
+                    state=EpisodeState.ENDED,
+                    start_timestamp_ms=tracker.active_start_ms,
+                    peak_timestamp_ms=tracker.peak_timestamp_ms,
+                    end_timestamp_ms=timestamp_ms,
+                    duration_ms=duration,
+                    confidence=mean_conf,
+                    quality=mean_qual,
+                    peak_intensity=tracker.peak_intensity,
+                )
+                self.completed_episodes.append(completed_ep)
+                flushed.append(completed_ep)
+            tracker.state = EpisodeState.INACTIVE
+        return flushed

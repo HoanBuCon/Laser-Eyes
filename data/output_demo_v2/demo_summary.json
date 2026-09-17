@@ -4,40 +4,40 @@
   "resolution": "1280x720",
   "video_fps": 30.0,
   "duration_seconds": 71.77,
-  "total_frames_read": 2150,
-  "inference_frames": 2150,
-  "average_inference_time_ms": 26.68,
-  "average_processing_fps": 19.79,
-  "maximum_persons_detected": 32,
+  "total_frames_read": 121,
+  "inference_frames": 120,
+  "average_inference_time_ms": 19.42,
+  "average_processing_fps": 13.86,
+  "maximum_persons_detected": 28,
   "configured_seats_count": 5,
-  "total_episodes_extracted": 12892,
-  "total_patterns_detected": 14,
-  "events_generated_count": 3,
-  "state_transitions_count": 25,
+  "total_episodes_extracted": 10,
+  "total_patterns_detected": 1,
+  "events_generated_count": 0,
+  "state_transitions_count": 1,
   "peak_risk_per_seat": {
     "SEAT-101-01": {
-      "peak_risk_score": 10.044778168201447,
-      "final_risk_score": 0.0,
+      "peak_risk_score": 9.381091074874767,
+      "final_risk_score": 3.6210910748747476,
       "final_state": "NORMAL"
     },
     "SEAT-101-02": {
-      "peak_risk_score": 84.89595212999814,
-      "final_risk_score": 51.90999863306724,
-      "final_state": "OBSERVE"
+      "peak_risk_score": 11.204809317222008,
+      "final_risk_score": 8.68480931722202,
+      "final_state": "NORMAL"
     },
     "SEAT-101-03": {
-      "peak_risk_score": 81.66335952484735,
-      "final_risk_score": 43.08000000000007,
-      "final_state": "COOLDOWN"
-    },
-    "SEAT-101-04": {
-      "peak_risk_score": 33.27231046175412,
+      "peak_risk_score": 0.0,
       "final_risk_score": 0.0,
       "final_state": "NORMAL"
     },
+    "SEAT-101-04": {
+      "peak_risk_score": 7.984948289222443,
+      "final_risk_score": 1.5649482892224347,
+      "final_state": "NORMAL"
+    },
     "SEAT-101-05": {
-      "peak_risk_score": 50.3008660421213,
-      "final_risk_score": 44.18086604212155,
+      "peak_risk_score": 56.16000000000007,
+      "final_risk_score": 53.57999999999997,
       "final_state": "OBSERVE"
     }
   },

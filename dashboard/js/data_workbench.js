@@ -14,6 +14,11 @@ let selectedBboxIndex = 0;
 let currentVideoAsset = null;
 let videoEpisodes = [];
 let activeRole = "AI_ML_ENGINEER";
+let availableSeats = [];
+let showSeatRois = true;
+let showSeatLabels = true;
+let hoveredSeatCode = null;
+let selectedSeatCode = null;
 
 // DOM Loaded
 document.addEventListener("DOMContentLoaded", () => {
@@ -22,6 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
   loadSummary();
   initImageReviewShortcuts();
   initTimelineControls();
+  initVideoOverlayCanvas();
+  loadAvailableSeats();
 });
 
 // Toast Notifications
@@ -59,7 +66,11 @@ function switchTab(tabId) {
 
   if (tabId === "overview") loadSummary();
   if (tabId === "images") loadImagesList();
-  if (tabId === "videos") loadVideosList();
+  if (tabId === "videos") {
+    loadVideosList();
+    loadAvailableSeats();
+    setTimeout(renderVideoOverlay, 150);
+  }
   if (tabId === "calibration") runCalibrationCheck();
   if (tabId === "events") loadEventReviewQueue();
   if (tabId === "export") loadDatasetsList();
@@ -150,7 +161,7 @@ function renderImageCarousel() {
   container.innerHTML = imageAssetsList
     .map((item, idx) => `
       <div class="carousel-item ${idx === currentImageIndex ? 'active' : ''}" onclick="selectImageByIndex(${idx})">
-        <img src="${API_BASE}/images/${item.id}/crop?padding_ratio=0.2&target_size=100" class="carousel-thumb" alt="${item.file_name}" />
+        <img src="${API_BASE}/images/${item.id}/crop?padding_ratio=0.2&target_size=100" class="carousel-thumb" alt="${item.file_name}" loading="lazy" />
         <div class="carousel-label">${item.file_name.substring(0, 14)}...</div>
         <span class="badge-tag ${item.audit_status === 'AUDITED' ? 'badge-green' : (item.audit_status === 'FLAGGED' ? 'badge-amber' : 'badge-blue')}">${item.audit_status}</span>
       </div>
@@ -158,11 +169,26 @@ function renderImageCarousel() {
     .join("");
 }
 
+function scrollCarousel(direction) {
+  const container = document.getElementById("image-carousel");
+  if (container) {
+    container.scrollBy({ left: direction * 350, behavior: "smooth" });
+  }
+}
+
 function selectImageByIndex(idx) {
   if (idx < 0 || idx >= imageAssetsList.length) return;
   currentImageIndex = idx;
   renderImageCarousel();
   loadImageDetail(imageAssetsList[idx].id);
+
+  // Smooth scroll active thumbnail into view
+  setTimeout(() => {
+    const activeItem = document.querySelector(".carousel-item.active");
+    if (activeItem) {
+      activeItem.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, 50);
 }
 
 async function loadImageDetail(assetId) {
@@ -338,6 +364,289 @@ function clearImageCanvas() {
 // -----------------------------------------------------------------------------
 // 3. VIDEO TEMPORAL EPISODE & AI DIFF
 // -----------------------------------------------------------------------------
+function toggleSeatRoiOverlay(checked) {
+  showSeatRois = checked;
+  renderVideoOverlay();
+}
+
+function toggleSeatLabels(checked) {
+  showSeatLabels = checked;
+  renderVideoOverlay();
+}
+
+async function loadAvailableSeats() {
+  try {
+    const res = await fetch(`${API_BASE}/seats`);
+    const data = await res.json();
+    availableSeats = data.seats || [];
+
+    if (availableSeats.length === 0) {
+      // Sensible classroom defaults based on 1280x720 video
+      availableSeats = [
+        { seat_code: "SEAT-101-01", seat_label: "Bàn 1 Dãy Trái", polygon: [[108, 382], [283, 382], [283, 544], [108, 544]] },
+        { seat_code: "SEAT-101-02", seat_label: "Bàn 1 Dãy Giữa", polygon: [[509, 478], [677, 478], [677, 629], [509, 629]] },
+        { seat_code: "SEAT-101-03", seat_label: "Bàn 1 Dãy Phải", polygon: [[1000, 401], [1146, 401], [1146, 646], [1000, 646]] },
+        { seat_code: "SEAT-101-04", seat_label: "Bàn 2 Dãy Trái", polygon: [[212, 277], [360, 277], [360, 400], [212, 400]] },
+        { seat_code: "SEAT-101-05", seat_label: "Bàn 2 Dãy Giữa", polygon: [[491, 316], [629, 316], [629, 478], [491, 478]] },
+      ];
+    }
+
+    populateSeatDropdowns();
+    renderVideoOverlay();
+  } catch (err) {
+    console.error("Error loading seats:", err);
+  }
+}
+
+function populateSeatDropdowns() {
+  const seatSelect = document.getElementById("ep-seat-code");
+  const neighborSelect = document.getElementById("ep-neighbor-code");
+  if (!seatSelect) return;
+
+  seatSelect.innerHTML = availableSeats
+    .map(s => `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + ' (' + s.seat_code + ')' : s.seat_code}</option>`)
+    .join("");
+
+  if (neighborSelect) {
+    neighborSelect.innerHTML = '<option value="">None</option>' + availableSeats
+      .map(s => `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + ' (' + s.seat_code + ')' : s.seat_code}</option>`)
+      .join("");
+  }
+
+  if (availableSeats.length > 0 && !selectedSeatCode) {
+    selectedSeatCode = availableSeats[0].seat_code;
+    seatSelect.value = selectedSeatCode;
+  }
+}
+
+function isPointInPoly(pt, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const xi = poly[i][0], yi = poly[i][1];
+    const xj = poly[j][0], yj = poly[j][1];
+    const intersect = ((yi > pt[1]) !== (yj > pt[1])) &&
+      (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function getVideoRenderBox(video, canvas) {
+  const containerWidth = canvas.width || 800;
+  const containerHeight = canvas.height || 450;
+  const videoWidth = video.videoWidth || 1280;
+  const videoHeight = video.videoHeight || 720;
+
+  const videoRatio = videoWidth / videoHeight;
+  const containerRatio = containerWidth / containerHeight;
+
+  let renderWidth, renderHeight, offsetX, offsetY;
+  if (containerRatio > videoRatio) {
+    renderHeight = containerHeight;
+    renderWidth = containerHeight * videoRatio;
+    offsetX = (containerWidth - renderWidth) / 2;
+    offsetY = 0;
+  } else {
+    renderWidth = containerWidth;
+    renderHeight = containerWidth / videoRatio;
+    offsetX = 0;
+    offsetY = (containerHeight - renderHeight) / 2;
+  }
+
+  return { offsetX, offsetY, renderWidth, renderHeight, videoWidth, videoHeight };
+}
+
+function findSeatAtPoint(mouseX, mouseY, canvas, video) {
+  const box = getVideoRenderBox(video, canvas);
+  for (const seat of availableSeats) {
+    if (!seat.polygon || seat.polygon.length < 3) continue;
+    const scaledPoly = seat.polygon.map(pt => {
+      let nx = pt[0], ny = pt[1];
+      if (nx > 1.0 || ny > 1.0) {
+        nx = nx / (box.videoWidth || 1280);
+        ny = ny / (box.videoHeight || 720);
+      }
+      return [
+        box.offsetX + nx * box.renderWidth,
+        box.offsetY + ny * box.renderHeight,
+      ];
+    });
+
+    if (isPointInPoly([mouseX, mouseY], scaledPoly)) {
+      return seat.seat_code;
+    }
+  }
+  return null;
+}
+
+function renderVideoOverlay() {
+  const canvas = document.getElementById("video-overlay-canvas");
+  const video = document.getElementById("workbench-video-player");
+  if (!canvas || !video) return;
+
+  const rect = video.getBoundingClientRect();
+  if (rect.width > 0 && rect.height > 0 && (canvas.width !== Math.round(rect.width) || canvas.height !== Math.round(rect.height))) {
+    canvas.width = Math.round(rect.width);
+    canvas.height = Math.round(rect.height);
+  }
+
+  const ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (!showSeatRois || availableSeats.length === 0) return;
+
+  const box = getVideoRenderBox(video, canvas);
+
+  availableSeats.forEach(seat => {
+    if (!seat.polygon || seat.polygon.length < 3) return;
+
+    const isSelected = seat.seat_code === selectedSeatCode;
+    const isHovered = seat.seat_code === hoveredSeatCode;
+
+    const scaledPoly = seat.polygon.map(pt => {
+      let nx = pt[0], ny = pt[1];
+      if (nx > 1.0 || ny > 1.0) {
+        nx = nx / (box.videoWidth || 1280);
+        ny = ny / (box.videoHeight || 720);
+      }
+      return [
+        box.offsetX + nx * box.renderWidth,
+        box.offsetY + ny * box.renderHeight,
+      ];
+    });
+
+    // Draw Polygon
+    ctx.beginPath();
+    ctx.moveTo(scaledPoly[0][0], scaledPoly[0][1]);
+    for (let i = 1; i < scaledPoly.length; i++) {
+      ctx.lineTo(scaledPoly[i][0], scaledPoly[i][1]);
+    }
+    ctx.closePath();
+
+    if (isSelected) {
+      ctx.fillStyle = "rgba(245, 158, 11, 0.32)";
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([]);
+    } else if (isHovered) {
+      ctx.fillStyle = "rgba(6, 182, 212, 0.35)";
+      ctx.strokeStyle = "#06b6d4";
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 2]);
+    } else {
+      ctx.fillStyle = "rgba(16, 185, 129, 0.16)";
+      ctx.strokeStyle = "#10b981";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+    }
+
+    ctx.fill();
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw Seat Centroid Badge
+    if (showSeatLabels) {
+      let cx = 0, cy = 0;
+      scaledPoly.forEach(p => { cx += p[0]; cy += p[1]; });
+      cx /= scaledPoly.length;
+      cy /= scaledPoly.length;
+
+      const labelText = seat.seat_label ? `${seat.seat_label}` : seat.seat_code;
+      ctx.font = isSelected ? "bold 11px sans-serif" : "10px sans-serif";
+      const textMetrics = ctx.measureText(labelText);
+      const textWidth = textMetrics.width;
+
+      ctx.fillStyle = isSelected ? "rgba(245, 158, 11, 0.95)" : (isHovered ? "rgba(6, 182, 212, 0.95)" : "rgba(17, 24, 39, 0.88)");
+      ctx.fillRect(cx - textWidth / 2 - 5, cy - 9, textWidth + 10, 18);
+      ctx.strokeStyle = isSelected ? "#ffffff" : (isHovered ? "#ffffff" : "rgba(16, 185, 129, 0.8)");
+      ctx.lineWidth = 1;
+      ctx.strokeRect(cx - textWidth / 2 - 5, cy - 9, textWidth + 10, 18);
+
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(labelText, cx, cy);
+    }
+  });
+}
+
+function initVideoOverlayCanvas() {
+  const video = document.getElementById("workbench-video-player");
+  const canvas = document.getElementById("video-overlay-canvas");
+  if (!video || !canvas) return;
+
+  const updateCanvasSize = () => {
+    const rect = video.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      canvas.width = Math.round(rect.width);
+      canvas.height = Math.round(rect.height);
+      renderVideoOverlay();
+    }
+  };
+
+  video.addEventListener("loadedmetadata", updateCanvasSize);
+  video.addEventListener("timeupdate", renderVideoOverlay);
+  video.addEventListener("play", () => renderVideoOverlay());
+  video.addEventListener("pause", () => renderVideoOverlay());
+  video.addEventListener("seeked", () => renderVideoOverlay());
+  window.addEventListener("resize", updateCanvasSize);
+
+  const seatSelect = document.getElementById("ep-seat-code");
+  if (seatSelect) {
+    seatSelect.addEventListener("change", (e) => {
+      selectedSeatCode = e.target.value;
+      renderVideoOverlay();
+    });
+  }
+
+  canvas.addEventListener("mousemove", (e) => {
+    if (!showSeatRois || availableSeats.length === 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const hit = findSeatAtPoint(mouseX, mouseY, canvas, video);
+    if (hit !== hoveredSeatCode) {
+      hoveredSeatCode = hit;
+      renderVideoOverlay();
+      const indicator = document.getElementById("hovered-seat-indicator");
+      if (indicator) {
+        if (hoveredSeatCode) {
+          const seatObj = availableSeats.find(s => s.seat_code === hoveredSeatCode);
+          indicator.innerText = `Hovering: ${seatObj ? (seatObj.seat_label || seatObj.seat_code) : hoveredSeatCode} (Click to select)`;
+        } else {
+          indicator.innerText = "";
+        }
+      }
+    }
+  });
+
+  canvas.addEventListener("mouseleave", () => {
+    if (hoveredSeatCode !== null) {
+      hoveredSeatCode = null;
+      renderVideoOverlay();
+      const indicator = document.getElementById("hovered-seat-indicator");
+      if (indicator) indicator.innerText = "";
+    }
+  });
+
+  canvas.addEventListener("click", (e) => {
+    if (!showSeatRois || availableSeats.length === 0) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const hit = findSeatAtPoint(mouseX, mouseY, canvas, video);
+    if (hit) {
+      selectedSeatCode = hit;
+      const seatSelect = document.getElementById("ep-seat-code");
+      if (seatSelect) seatSelect.value = hit;
+      showToast(`Selected ${hit} on video`, "info");
+      renderVideoOverlay();
+    }
+  });
+}
+
 async function loadVideosList() {
   try {
     const res = await fetch(`${API_BASE}/videos`);
@@ -368,6 +677,7 @@ async function selectVideoAsset(videoId) {
       videoEl.src = `${API_BASE}/videos/${currentVideoAsset.id}/file`;
     }
 
+    loadAvailableSeats();
     loadVideoEpisodes(videoId);
     loadVideoComparison(videoId);
   } catch (err) {

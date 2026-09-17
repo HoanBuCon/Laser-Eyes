@@ -208,8 +208,12 @@
           <div class="viewer-container">
             <canvas id="image-audit-canvas" class="viewer-canvas"></canvas>
           </div>
-          <!-- Thumbnail Carousel -->
-          <div id="image-carousel" style="display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.75rem 0; margin-top: 0.5rem;"></div>
+          <!-- Thumbnail Carousel with Prev / Next Scroll buttons -->
+          <div class="carousel-wrapper">
+            <button class="carousel-nav-btn" onclick="scrollCarousel(-1)" title="Scroll Left">‹</button>
+            <div id="image-carousel" class="carousel-container"></div>
+            <button class="carousel-nav-btn" onclick="scrollCarousel(1)" title="Scroll Right">›</button>
+          </div>
         </div>
 
         <!-- Bounding Box & Actor Crop Inspector -->
@@ -287,9 +291,29 @@
         <!-- Video Player & Dual Timeline -->
         <div class="panel-card">
           <div class="panel-header">
-            <div class="panel-title">Video Stream Player & Scrubber</div>
+            <div class="panel-title">Video Stream Player & Seat ROI Overlay</div>
+            <div style="display: flex; gap: 0.75rem; align-items: center;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; cursor: pointer; color: var(--text-secondary);">
+                <input type="checkbox" id="toggle-video-seat-roi" checked onchange="toggleSeatRoiOverlay(this.checked)" />
+                <span style="color: var(--accent-green); font-weight: 600;">👁️ Show Seat ROIs</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; cursor: pointer; color: var(--text-secondary);">
+                <input type="checkbox" id="toggle-video-labels" checked onchange="toggleSeatLabels(this.checked)" />
+                <span>Seat Labels</span>
+              </label>
+            </div>
           </div>
-          <video id="workbench-video-player" controls style="width: 100%; max-height: 420px; background: #000; border-radius: var(--radius-sm);"></video>
+
+          <!-- Video with Canvas Overlay -->
+          <div class="video-player-wrapper" id="video-wrapper">
+            <video id="workbench-video-player" controls></video>
+            <canvas id="video-overlay-canvas" class="video-overlay-canvas"></canvas>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
+            <span>💡 <em>Click any Seat ROI directly on video to select it for annotation.</em></span>
+            <span id="hovered-seat-indicator" style="color: var(--accent-cyan); font-weight: 600;"></span>
+          </div>
 
           <!-- Interactive Timeline -->
           <div class="timeline-container">

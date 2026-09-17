@@ -383,3 +383,28 @@ def test_api_ui_routes(client):
 
     res_cal = client.get("/calibration")
     assert res_cal.status_code == 200
+
+
+def test_api_seats_listing(client, db_session):
+    """Test GET /api/v1/data/seats endpoint for video overlay."""
+    room = ExamRoom(name="Room 101", room_code="ROOM-101")
+    db_session.add(room)
+    db_session.commit()
+
+    seat = SeatROI(
+        room_id=room.id,
+        seat_code="SEAT-01",
+        seat_label="Desk 1",
+        polygon_json=json.dumps([[100, 200], [300, 200], [300, 400], [100, 400]]),
+        enabled=True,
+    )
+    db_session.add(seat)
+    db_session.commit()
+
+    res = client.get("/api/v1/data/seats")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["total"] >= 1
+    assert data["seats"][0]["seat_code"] == "SEAT-01"
+    assert len(data["seats"][0]["polygon"]) == 4
+

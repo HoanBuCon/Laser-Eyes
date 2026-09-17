@@ -545,6 +545,35 @@ def compare_video_episodes(
 # 4. SPATIAL CALIBRATION & GEOMETRY QUALITY VALIDATION ENDPOINTS
 # ==============================================================================
 
+@router.get("/seats", summary="List active Seat ROIs for video overlay and selection")
+def list_seats_for_workbench(
+    room_id: Optional[str] = Query(None),
+    enabled_only: bool = Query(True),
+    db: Session = Depends(get_db),
+):
+    """Retrieve seat polygons and labels for video overlay visualization."""
+    query = db.query(SeatROI)
+    if enabled_only:
+        query = query.filter(SeatROI.enabled == True)
+    if room_id:
+        query = query.filter(SeatROI.room_id == room_id)
+    seats = query.all()
+
+    items = []
+    for s in seats:
+        poly = json.loads(s.polygon_json) if isinstance(s.polygon_json, str) else (s.polygon_json or [])
+        items.append({
+            "id": s.id,
+            "room_id": s.room_id,
+            "camera_id": s.camera_id,
+            "seat_code": s.seat_code,
+            "seat_label": s.seat_label,
+            "polygon": poly,
+            "enabled": s.enabled,
+        })
+    return {"total": len(items), "seats": items}
+
+
 @router.post("/calibration/validate", summary="Automated geometric quality check for seat polygons and writing zones")
 def validate_calibration_geometry(
     payload: SpatialCalibrationValidateRequest,

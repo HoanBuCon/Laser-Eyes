@@ -257,13 +257,14 @@ body {
 /* Panel Layouts */
 .panel-layout {
   display: grid;
-  grid-template-columns: 1fr 380px;
+  grid-template-columns: minmax(0, 1fr) 380px;
   gap: 1.5rem;
+  width: 100%;
 }
 
 @media (max-width: 1100px) {
   .panel-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -273,6 +274,9 @@ body {
   border-radius: var(--radius-md);
   padding: 1.25rem;
   box-shadow: var(--shadow-sm);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .panel-header {
@@ -303,13 +307,137 @@ body {
   justify-content: center;
   align-items: center;
   min-height: 480px;
+  max-width: 100%;
   border: 1px solid var(--border-color);
 }
 
 .viewer-canvas {
   max-width: 100%;
-  max-height: 600px;
+  max-height: 560px;
   display: block;
+}
+
+/* Image Carousel & Horizontal Selector */
+.carousel-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: rgba(17, 24, 39, 0.6);
+  padding: 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.carousel-nav-btn {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  border-radius: var(--radius-sm);
+  width: 28px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.carousel-nav-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-blue);
+  color: var(--accent-cyan);
+}
+
+.carousel-container {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+  scroll-behavior: smooth;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-color) var(--bg-secondary);
+}
+
+.carousel-container::-webkit-scrollbar {
+  height: 6px;
+}
+
+.carousel-container::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 3px;
+}
+
+.carousel-container::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+.carousel-container::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-blue);
+}
+
+.carousel-item {
+  flex: 0 0 105px;
+  width: 105px;
+  min-width: 105px;
+  max-width: 105px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  transition: all 0.2s ease;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.carousel-item:hover {
+  border-color: var(--accent-blue);
+  background-color: var(--bg-card-hover);
+  transform: translateY(-2px);
+}
+
+.carousel-item.active {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.5);
+  background-color: rgba(6, 182, 212, 0.1);
+}
+
+.carousel-thumb {
+  width: 100%;
+  height: 55px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #000;
+  display: block;
+}
+
+.carousel-label {
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  text-align: center;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Toolbar & Filters */
@@ -419,6 +547,38 @@ body {
   border: 1px solid var(--border-color);
   background-color: #000;
   object-fit: contain;
+}
+
+/* Video Player & Canvas Overlay */
+.video-player-wrapper {
+  position: relative;
+  width: 100%;
+  max-height: 480px;
+  background: #000;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid var(--border-color);
+}
+
+.video-player-wrapper video {
+  width: 100%;
+  max-height: 480px;
+  display: block;
+  object-fit: contain;
+}
+
+.video-overlay-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 2;
 }
 
 /* Timeline & Video Scrubber */

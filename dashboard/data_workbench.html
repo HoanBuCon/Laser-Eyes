@@ -322,13 +322,48 @@
 
           <!-- Video with Canvas Overlay -->
           <div class="video-player-wrapper" id="video-wrapper">
-            <video id="workbench-video-player" controls></video>
+            <video id="workbench-video-player" playsinline controls></video>
             <canvas id="video-overlay-canvas" class="video-overlay-canvas"></canvas>
+          </div>
+
+          <!-- Video Playback Controls Bar -->
+          <div class="video-controls-bar" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; background: var(--bg-secondary); padding: 0.5rem 0.75rem; border-radius: var(--radius-sm); margin-top: 0.5rem; border: 1px solid var(--border-color);">
+            <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
+              <button id="btn-video-play-pause" class="btn btn-sm btn-primary" onclick="toggleVideoPlay()" title="Play / Pause (Hotkey: Space)">
+                ▶ Play (Space)
+              </button>
+              <button class="btn btn-sm" onclick="stepVideoTime(-5)" title="Rewind 5s (← / J)">
+                ⏪ -5s
+              </button>
+              <button class="btn btn-sm" onclick="stepVideoTime(-0.04)" title="Previous Frame (, / <)">
+                ⏮ -1 Frame
+              </button>
+              <button class="btn btn-sm" onclick="stepVideoTime(0.04)" title="Next Frame (. / >)">
+                ⏭ +1 Frame
+              </button>
+              <button class="btn btn-sm" onclick="stepVideoTime(5)" title="Forward 5s (→ / L)">
+                ⏩ +5s
+              </button>
+              <select id="video-playback-rate" onchange="setVideoPlaybackRate(this.value)" class="form-select" style="font-size: 0.75rem; padding: 0.2rem 0.4rem;" title="Playback Speed">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="1.0" selected>1.0x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2.0">2.0x</option>
+              </select>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <span id="video-time-counter" style="font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-cyan); font-weight: 600;">00:00.00 / 00:00.00</span>
+              <button class="btn btn-sm" onclick="toggleVideoMute()" id="btn-video-mute" title="Mute / Unmute">
+                🔊
+              </button>
+            </div>
           </div>
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span>💡 <em>Click Seat ROI on video to select &bull; Press <span class="hotkey-pill">Del</span> / <span class="hotkey-pill">Backspace</span> to quick delete</em></span>
+              <span>💡 <em>Click video or <span class="hotkey-pill">Space</span> to Play/Pause &bull; Click Seat to select &bull; <span class="hotkey-pill">Del</span> Delete seat &bull; <span class="hotkey-pill">← / →</span> Seek 5s &bull; <span class="hotkey-pill">, / .</span> Step Frame</em></span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <span id="hovered-seat-indicator" style="color: var(--accent-cyan); font-weight: 600;"></span>

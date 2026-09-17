@@ -652,23 +652,42 @@ function initVideoOverlayCanvas() {
     }
   };
 
-  video.addEventListener("loadedmetadata", updateCanvasSize);
-  video.addEventListener("timeupdate", renderVideoOverlay);
-  video.addEventListener("play", () => renderVideoOverlay());
-  video.addEventListener("pause", () => renderVideoOverlay());
-  video.addEventListener("seeked", () => renderVideoOverlay());
+  video.addEventListener("loadedmetadata", () => {
+    updateCanvasSize();
+    updateVideoTimeCounter();
+  });
+  video.addEventListener("timeupdate", () => {
+    updateVideoTimeCounter();
+    renderVideoOverlay();
+  });
+  video.addEventListener("play", () => {
+    updatePlayPauseButtonState(true);
+    renderVideoOverlay();
+  });
+  video.addEventListener("pause", () => {
+    updatePlayPauseButtonState(false);
+    renderVideoOverlay();
+  });
+  video.addEventListener("seeked", () => {
+    updateVideoTimeCounter();
+    renderVideoOverlay();
+  });
   window.addEventListener("resize", updateCanvasSize);
 
   const seatSelect = document.getElementById("ep-seat-code");
   if (seatSelect) {
     seatSelect.addEventListener("change", (e) => {
       selectedSeatCode = e.target.value;
+      updateDeleteSeatButtonVisibility();
       renderVideoOverlay();
     });
   }
 
   canvas.addEventListener("mousemove", (e) => {
-    if (!showSeatRois || availableSeats.length === 0) return;
+    if (!showSeatRois || availableSeats.length === 0) {
+      canvas.style.cursor = "pointer";
+      return;
+    }
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
@@ -680,13 +699,14 @@ function initVideoOverlayCanvas() {
       const indicator = document.getElementById("hovered-seat-indicator");
       if (indicator) {
         if (hoveredSeatCode) {
-          const seatObj = availableSeats.find(s => s.seat_code === hoveredSeatCode);
-          indicator.innerText = `Hovering: ${seatObj ? (seatObj.seat_label || seatObj.seat_code) : hoveredSeatCode} (Click to select)`;
+          const seatObj = availableSeats.find((s) => s.seat_code === hoveredSeatCode);
+          indicator.innerText = `Hovering: ${seatObj ? seatObj.seat_label || seatObj.seat_code : hoveredSeatCode} (Click to select)`;
         } else {
           indicator.innerText = "";
         }
       }
     }
+    canvas.style.cursor = "pointer";
   });
 
   canvas.addEventListener("mouseleave", () => {
@@ -699,12 +719,15 @@ function initVideoOverlayCanvas() {
   });
 
   canvas.addEventListener("click", (e) => {
-    if (!showSeatRois || availableSeats.length === 0) return;
     const rect = canvas.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    const hit = findSeatAtPoint(mouseX, mouseY, canvas, video);
+    let hit = null;
+    if (showSeatRois && availableSeats.length > 0) {
+      hit = findSeatAtPoint(mouseX, mouseY, canvas, video);
+    }
+
     if (hit) {
       selectedSeatCode = hit;
       const seatSelect = document.getElementById("ep-seat-code");
@@ -712,8 +735,92 @@ function initVideoOverlayCanvas() {
       updateDeleteSeatButtonVisibility();
       showToast(`Selected ${hit} on video (Press Del to delete)`, "info");
       renderVideoOverlay();
+    } else {
+      // Click on video background -> Toggle Play / Pause
+      toggleVideoPlay();
     }
   });
+}
+
+function toggleVideoPlay() {
+  const video = document.getElementById("workbench-video-player");
+  if (!video) return;
+  if (video.paused || video.ended) {
+    const playPromise = video.play();
+    if (playPromise !== undefined) {
+      playPromise
+        .then(() => {
+          updatePlayPauseButtonState(true);
+        })
+        .catch((err) => {
+          console.warn("Video play error:", err);
+          showToast("Video playback: " + (err.message || "click play again"), "warning");
+        });
+    }
+  } else {
+    video.pause();
+    updatePlayPauseButtonState(false);
+  }
+}
+
+function stepVideoTime(seconds) {
+  const video = document.getElementById("workbench-video-player");
+  if (!video || isNaN(video.duration) || video.duration <= 0) return;
+  video.currentTime = Math.max(0, Math.min(video.duration, (video.currentTime || 0) + seconds));
+  updateVideoTimeCounter();
+  renderVideoOverlay();
+}
+
+function setVideoPlaybackRate(rate) {
+  const video = document.getElementById("workbench-video-player");
+  if (video) {
+    video.playbackRate = parseFloat(rate) || 1.0;
+    showToast(`Playback speed: ${video.playbackRate}x`, "info");
+  }
+}
+
+function toggleVideoMute() {
+  const video = document.getElementById("workbench-video-player");
+  const btn = document.getElementById("btn-video-mute");
+  if (!video || !btn) return;
+  video.muted = !video.muted;
+  btn.innerText = video.muted ? "🔇" : "🔊";
+}
+
+function updatePlayPauseButtonState(isPlaying) {
+  const btn = document.getElementById("btn-video-play-pause");
+  if (!btn) return;
+  if (isPlaying) {
+    btn.className = "btn btn-sm btn-danger";
+    btn.innerHTML = `<span>⏸ Pause (Space)</span>`;
+  } else {
+    btn.className = "btn btn-sm btn-primary";
+    btn.innerHTML = `<span>▶ Play (Space)</span>`;
+  }
+}
+
+function formatTime(seconds) {
+  if (isNaN(seconds) || seconds < 0) return "00:00.00";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 100);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(ms).padStart(2, "0")}`;
+}
+
+function updateVideoTimeCounter() {
+  const video = document.getElementById("workbench-video-player");
+  const display = document.getElementById("video-time-counter");
+  const playheadMs = document.getElementById("current-time-ms-display");
+  if (!video) return;
+
+  const cur = video.currentTime || 0;
+  const dur = video.duration || 0;
+  if (display) {
+    display.innerText = `${formatTime(cur)} / ${formatTime(dur)}`;
+  }
+  if (playheadMs) {
+    playheadMs.innerText = `${Math.round(cur * 1000)} ms`;
+  }
 }
 
 function updateDeleteSeatButtonVisibility() {
@@ -782,11 +889,32 @@ function initVideoHotkeys() {
     if (currentTab !== "videos") return;
     if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
 
-    if (e.key === "Delete" || e.key === "Backspace") {
+    if (e.code === "Space" || e.key === " " || e.key === "k" || e.key === "K") {
+      e.preventDefault();
+      toggleVideoPlay();
+    } else if (e.key === "Delete" || e.key === "Backspace") {
       if (selectedSeatCode) {
         e.preventDefault();
         deleteSelectedSeat(selectedSeatCode);
       }
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      stepVideoTime(e.shiftKey ? -5 : -1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      stepVideoTime(e.shiftKey ? 5 : 1);
+    } else if (e.key === "j" || e.key === "J") {
+      e.preventDefault();
+      stepVideoTime(-5);
+    } else if (e.key === "l" || e.key === "L") {
+      e.preventDefault();
+      stepVideoTime(5);
+    } else if (e.key === "," || e.key === "<") {
+      e.preventDefault();
+      stepVideoTime(-0.04);
+    } else if (e.key === "." || e.key === ">") {
+      e.preventDefault();
+      stepVideoTime(0.04);
     } else if (e.key === "[") {
       markStartTimestamp();
     } else if (e.key === "]") {

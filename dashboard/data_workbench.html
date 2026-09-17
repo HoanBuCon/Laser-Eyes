@@ -373,16 +373,20 @@
             </div>
           </div>
 
-          <!-- Interactive Timeline -->
+          <!-- Interactive Multi-Track Video Timeline -->
           <div class="timeline-container">
-            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem;">
               <span>0:00 (0ms)</span>
-              <span><strong>Dual Timeline:</strong> <span style="color:#10b981;">■ Human GT (Drag / Resize / Move ⬥ Peak)</span> | <span style="color:#8b5cf6;">■ AI Proposals</span></span>
-              <span>End</span>
+              <span><strong>Multi-Track Video Timeline:</strong> <span style="color:#10b981;">■ Human GT (Drag between tracks / Resize / ⬥ Peak)</span> | <span style="color:#8b5cf6;">■ AI Proposals</span></span>
+              <span id="timeline-duration-label">End</span>
             </div>
-            <div id="timeline-track-wrapper" class="timeline-track-wrapper">
-              <div id="timeline-playhead" class="timeline-playhead"></div>
-              <div id="timeline-track" class="timeline-track"></div>
+            <div class="timeline-main-layout">
+              <div id="timeline-track-headers" class="timeline-track-headers"></div>
+              <div id="timeline-track-wrapper" class="timeline-track-wrapper">
+                <div id="timeline-grid-lanes" class="timeline-grid-lanes"></div>
+                <div id="timeline-playhead" class="timeline-playhead"></div>
+                <div id="timeline-track" class="timeline-track"></div>
+              </div>
             </div>
           </div>
 

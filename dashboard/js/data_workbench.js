@@ -22,13 +22,21 @@ let showSeatLabels = true;
 let hoveredSeatCode = null;
 let selectedSeatCode = null;
 let selectedEpisodeId = null;
+
+// Multi-Track Timeline Constants & State
+const TRACK_HEIGHT = 38;
+const MIN_TRACK_COUNT = 3;
+let episodeTrackOverrides = {}; // ep.id -> track_index
 let isTimelineDragging = false;
 let dragMode = null; // 'resize-start' | 'resize-end' | 'move-peak' | 'move-all'
 let dragEpisodeId = null;
 let dragStartX = 0;
+let dragStartY = 0;
 let dragInitialStartMs = 0;
 let dragInitialPeakMs = 0;
 let dragInitialEndMs = 0;
+let dragInitialTrack = 0;
+let dragCurrentTrack = 0;
 let dragCurrentValues = null;
 
 // DOM Loaded
@@ -1052,6 +1060,11 @@ function initTimelineControls() {
     });
 
     trackWrapper.addEventListener("click", (e) => {
+      // Ignore click if user was dragging or clicked a block/handle
+      if (isTimelineDragging) return;
+      if (e.target.closest(".timeline-block") || e.target.closest(".timeline-handle") || e.target.closest(".timeline-peak-pin")) {
+        return;
+      }
       const rect = trackWrapper.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const pct = Math.max(0, Math.min(1, clickX / rect.width));
@@ -1062,6 +1075,76 @@ function initTimelineControls() {
   }
 
   initTimelineDragEvents();
+}
+
+function computeEpisodeTracks(episodes) {
+  if (!episodes || episodes.length === 0) {
+    return { totalTracks: MIN_TRACK_COUNT + 1, numHumanTracks: MIN_TRACK_COUNT };
+  }
+
+  const humanEpisodes = episodes.filter((e) => !e.is_ai_proposal);
+  const aiEpisodes = episodes.filter((e) => e.is_ai_proposal);
+
+  // Allocate non-overlapping tracks for Human GT
+  const humanTrackEndTimes = [];
+  const sortedHuman = [...humanEpisodes].sort((a, b) => a.start_ms - b.start_ms);
+
+  sortedHuman.forEach((ep) => {
+    if (episodeTrackOverrides[ep.id] != null) {
+      ep.track_index = episodeTrackOverrides[ep.id];
+      const t = ep.track_index;
+      while (humanTrackEndTimes.length <= t) humanTrackEndTimes.push(0);
+      humanTrackEndTimes[t] = Math.max(humanTrackEndTimes[t], ep.end_ms);
+    } else {
+      let assigned = -1;
+      for (let t = 0; t < humanTrackEndTimes.length; t++) {
+        if (humanTrackEndTimes[t] <= ep.start_ms - 50) {
+          assigned = t;
+          break;
+        }
+      }
+      if (assigned === -1) {
+        assigned = humanTrackEndTimes.length;
+        humanTrackEndTimes.push(ep.end_ms);
+      } else {
+        humanTrackEndTimes[assigned] = Math.max(humanTrackEndTimes[assigned], ep.end_ms);
+      }
+      ep.track_index = assigned;
+    }
+  });
+
+  const maxHumanTrack = sortedHuman.reduce((max, e) => Math.max(max, e.track_index != null ? e.track_index : 0), -1);
+  const numHumanTracks = Math.max(MIN_TRACK_COUNT, maxHumanTrack + 1);
+
+  // Allocate non-overlapping tracks for AI proposals (placed below Human GT tracks)
+  const aiTrackEndTimes = [];
+  const sortedAi = [...aiEpisodes].sort((a, b) => a.start_ms - b.start_ms);
+
+  sortedAi.forEach((ep) => {
+    if (episodeTrackOverrides[ep.id] != null) {
+      ep.track_index = episodeTrackOverrides[ep.id];
+    } else {
+      let assignedLane = -1;
+      for (let a = 0; a < aiTrackEndTimes.length; a++) {
+        if (aiTrackEndTimes[a] <= ep.start_ms - 50) {
+          assignedLane = a;
+          break;
+        }
+      }
+      if (assignedLane === -1) {
+        assignedLane = aiTrackEndTimes.length;
+        aiTrackEndTimes.push(ep.end_ms);
+      } else {
+        aiTrackEndTimes[assignedLane] = Math.max(aiTrackEndTimes[assignedLane], ep.end_ms);
+      }
+      ep.track_index = numHumanTracks + assignedLane;
+    }
+  });
+
+  const maxTotalTrack = episodes.reduce((max, e) => Math.max(max, e.track_index != null ? e.track_index : 0), numHumanTracks);
+  const totalTracks = Math.max(numHumanTracks + 1, maxTotalTrack + 1);
+
+  return { totalTracks, numHumanTracks };
 }
 
 function initTimelineDragEvents() {
@@ -1087,6 +1170,18 @@ function initTimelineDragEvents() {
       newEnd = newStart + originalDur;
       const peakOffset = dragInitialPeakMs - dragInitialStartMs;
       newPeak = newStart + peakOffset;
+
+      // Calculate Target Vertical Track
+      const relativeY = e.clientY - rect.top;
+      const { totalTracks } = computeEpisodeTracks(videoEpisodes);
+      const targetTrack = Math.max(0, Math.min(totalTracks - 1, Math.floor(relativeY / TRACK_HEIGHT)));
+      dragCurrentTrack = targetTrack;
+
+      // Live update lane highlight
+      document.querySelectorAll(".timeline-lane").forEach((lane) => {
+        const laneTrack = parseInt(lane.dataset.trackIndex, 10);
+        lane.classList.toggle("drag-over", laneTrack === targetTrack);
+      });
     } else if (dragMode === "resize-start") {
       newStart = Math.max(0, Math.min(dragInitialEndMs - 100, dragInitialStartMs + deltaMs));
       newEnd = dragInitialEndMs;
@@ -1115,6 +1210,10 @@ function initTimelineDragEvents() {
       block.style.left = `${leftPct}%`;
       block.style.width = `${widthPct}%`;
 
+      if (dragMode === "move-all") {
+        block.style.top = `${dragCurrentTrack * TRACK_HEIGHT + 4}px`;
+      }
+
       const peakPin = block.querySelector(".timeline-peak-pin");
       if (peakPin && newEnd - newStart > 0) {
         const peakPct = ((newPeak - newStart) / (newEnd - newStart)) * 100;
@@ -1141,29 +1240,87 @@ function initTimelineDragEvents() {
     if (!isTimelineDragging) return;
     const epId = dragEpisodeId;
     const values = dragCurrentValues;
+    const finalTrack = dragCurrentTrack;
+    const initialTrack = dragInitialTrack;
 
     isTimelineDragging = false;
     dragMode = null;
     dragEpisodeId = null;
     dragCurrentValues = null;
 
+    // Remove drag highlights
+    document.querySelectorAll(".timeline-lane").forEach((lane) => lane.classList.remove("drag-over"));
     const block = document.querySelector(`.timeline-block[data-ep-id="${epId}"]`);
     if (block) block.classList.remove("dragging");
 
-    if (values && (values.start_ms !== dragInitialStartMs || values.end_ms !== dragInitialEndMs || values.peak_ms !== dragInitialPeakMs)) {
+    const trackChanged = finalTrack !== initialTrack;
+    const timeChanged = values && (values.start_ms !== dragInitialStartMs || values.end_ms !== dragInitialEndMs || values.peak_ms !== dragInitialPeakMs);
+
+    if (trackChanged) {
+      episodeTrackOverrides[epId] = finalTrack;
+      const ep = videoEpisodes.find((e) => e.id === epId);
+      if (ep) ep.track_index = finalTrack;
+    }
+
+    if (timeChanged) {
       await updateEpisodeTimestamps(epId, values.start_ms, values.peak_ms, values.end_ms);
-      showToast(`Keyframe moved: ${values.start_ms}ms - ${values.end_ms}ms (Peak: ${values.peak_ms}ms)`, "success");
+      showToast(`Keyframe updated: Track ${finalTrack + 1} | ${values.start_ms}ms - ${values.end_ms}ms`, "success");
+    } else if (trackChanged) {
+      renderTimelineBlocks();
+      showToast(`Keyframe moved to Track ${finalTrack + 1}`, "success");
     }
   });
 }
 
 function renderTimelineBlocks() {
   const track = document.getElementById("timeline-track");
+  const trackWrapper = document.getElementById("timeline-track-wrapper");
+  const headersContainer = document.getElementById("timeline-track-headers");
+  const lanesContainer = document.getElementById("timeline-grid-lanes");
+  const durationLabel = document.getElementById("timeline-duration-label");
   if (!track || !currentVideoAsset) return;
 
   const durationMs = (currentVideoAsset.duration_seconds || 30.0) * 1000;
+  if (durationLabel) {
+    const durSec = (currentVideoAsset.duration_seconds || 30.0).toFixed(1);
+    durationLabel.innerText = `${durSec}s (${Math.round(durationMs)}ms)`;
+  }
+
+  const { totalTracks, numHumanTracks } = computeEpisodeTracks(videoEpisodes);
+  const totalHeight = totalTracks * TRACK_HEIGHT;
+
+  if (trackWrapper) trackWrapper.style.height = `${totalHeight}px`;
   track.innerHTML = "";
 
+  // Render Track Headers on the left
+  if (headersContainer) {
+    let headersHtml = "";
+    for (let t = 0; t < totalTracks; t++) {
+      const isAi = t >= numHumanTracks;
+      const trackNum = isAi ? t - numHumanTracks + 1 : t + 1;
+      headersHtml += `
+        <div class="timeline-track-header ${isAi ? 'ai' : 'human'}" data-track-index="${t}">
+          <div class="track-name-group">
+            <span class="track-dot ${isAi ? 'ai-dot' : 'human-dot'}"></span>
+            <span>${isAi ? `AI ${trackNum}` : `Track ${trackNum}`}</span>
+          </div>
+          <span class="track-badge ${isAi ? 'ai' : 'gt'}">${isAi ? 'AI' : 'GT'}</span>
+        </div>
+      `;
+    }
+    headersContainer.innerHTML = headersHtml;
+  }
+
+  // Render Grid Lanes (background horizontal rows)
+  if (lanesContainer) {
+    let lanesHtml = "";
+    for (let t = 0; t < totalTracks; t++) {
+      lanesHtml += `<div class="timeline-lane" data-track-index="${t}" style="top: ${t * TRACK_HEIGHT}px;"></div>`;
+    }
+    lanesContainer.innerHTML = lanesHtml;
+  }
+
+  // Render Episode Blocks
   videoEpisodes.forEach((ep) => {
     const isSelected = ep.id === selectedEpisodeId;
     const leftPct = (ep.start_ms / durationMs) * 100;
@@ -1171,20 +1328,24 @@ function renderTimelineBlocks() {
     const epDur = Math.max(1, ep.end_ms - ep.start_ms);
     const peakMs = ep.peak_ms || ep.start_ms;
     const peakPctInBlock = Math.min(100, Math.max(0, ((peakMs - ep.start_ms) / epDur) * 100));
+    const trackIdx = ep.track_index != null ? ep.track_index : 0;
+    const topPx = trackIdx * TRACK_HEIGHT + 4;
 
     const block = document.createElement("div");
     block.className = `timeline-block ${ep.is_ai_proposal ? "ai" : "human"} ${isSelected ? "selected" : ""}`;
     block.dataset.epId = ep.id;
+    block.dataset.trackIndex = trackIdx;
     block.style.left = `${leftPct}%`;
     block.style.width = `${widthPct}%`;
-    block.title = `${ep.is_ai_proposal ? "[AI PROPOSAL]" : "[HUMAN GT]"} ${ep.seat_code ? ep.seat_code + ": " : ""}${ep.episode_type}\nRange: ${ep.start_ms} - ${ep.end_ms} ms (Peak: ${peakMs}ms)\nClick to select & edit / drag to move`;
+    block.style.top = `${topPx}px`;
+    block.title = `${ep.is_ai_proposal ? "[AI PROPOSAL]" : "[HUMAN GT]"} ${ep.seat_code ? ep.seat_code + ": " : ""}${ep.episode_type}\nTrack: ${trackIdx + 1} | Range: ${ep.start_ms} - ${ep.end_ms} ms (Peak: ${peakMs}ms)\nClick to select & edit / drag horizontally to move / drag vertically between tracks`;
 
     let innerHtml = "";
     if (!ep.is_ai_proposal) {
       innerHtml += `<div class="timeline-handle left" title="Drag to adjust Start ms"></div>`;
     }
     innerHtml += `<div class="timeline-peak-pin" style="left: ${peakPctInBlock}%;" title="Keyframe Peak: ${peakMs}ms (Drag to move peak)"></div>`;
-    innerHtml += `<span class="timeline-block-label">${ep.seat_code ? ep.seat_code + ": " : ""}${ep.episode_type}</span>`;
+    innerHtml += `<span class="timeline-block-label">${ep.seat_code ? '[' + ep.seat_code + '] ' : ''}${ep.episode_type}</span>`;
     if (!ep.is_ai_proposal) {
       innerHtml += `<span class="timeline-delete-btn" title="Delete Keyframe Episode (Del)">×</span>`;
       innerHtml += `<div class="timeline-handle right" title="Drag to adjust End ms"></div>`;
@@ -1212,9 +1373,12 @@ function renderTimelineBlocks() {
       dragMode = mode;
       dragEpisodeId = ep.id;
       dragStartX = e.clientX;
+      dragStartY = e.clientY;
       dragInitialStartMs = ep.start_ms;
       dragInitialPeakMs = ep.peak_ms || ep.start_ms;
       dragInitialEndMs = ep.end_ms;
+      dragInitialTrack = trackIdx;
+      dragCurrentTrack = trackIdx;
       dragCurrentValues = { start_ms: ep.start_ms, peak_ms: dragInitialPeakMs, end_ms: ep.end_ms };
       block.classList.add("dragging");
       selectEpisode(ep.id);
@@ -1378,60 +1542,6 @@ function renderEpisodesTable() {
   `
     )
     .join("");
-}
-
-function markStartTimestamp() {
-  const videoEl = document.getElementById("workbench-video-player");
-  if (videoEl) {
-    const curMs = Math.round(videoEl.currentTime * 1000);
-    const startIn = document.getElementById("ep-start-ms");
-    if (startIn) startIn.value = curMs;
-
-    if (selectedEpisodeId) {
-      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
-      if (ep && !ep.is_ai_proposal) {
-        const peakMs = Math.max(curMs, ep.peak_ms || curMs);
-        const endMs = Math.max(curMs + 100, ep.end_ms);
-        updateEpisodeTimestamps(selectedEpisodeId, curMs, peakMs, endMs);
-      }
-    }
-  }
-}
-
-function markPeakTimestamp() {
-  const videoEl = document.getElementById("workbench-video-player");
-  if (videoEl) {
-    const curMs = Math.round(videoEl.currentTime * 1000);
-    const peakIn = document.getElementById("ep-peak-ms");
-    if (peakIn) peakIn.value = curMs;
-
-    if (selectedEpisodeId) {
-      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
-      if (ep && !ep.is_ai_proposal) {
-        const startMs = Math.min(curMs, ep.start_ms);
-        const endMs = Math.max(curMs, ep.end_ms);
-        updateEpisodeTimestamps(selectedEpisodeId, startMs, curMs, endMs);
-      }
-    }
-  }
-}
-
-function markEndTimestamp() {
-  const videoEl = document.getElementById("workbench-video-player");
-  if (videoEl) {
-    const curMs = Math.round(videoEl.currentTime * 1000);
-    const endIn = document.getElementById("ep-end-ms");
-    if (endIn) endIn.value = curMs;
-
-    if (selectedEpisodeId) {
-      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
-      if (ep && !ep.is_ai_proposal) {
-        const startMs = Math.min(Math.max(0, curMs - 100), ep.start_ms);
-        const peakMs = Math.min(curMs, ep.peak_ms || startMs);
-        updateEpisodeTimestamps(selectedEpisodeId, startMs, peakMs, curMs);
-      }
-    }
-  }
 }
 
 async function createEpisode() {

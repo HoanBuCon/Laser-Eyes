@@ -89,6 +89,8 @@ class _EpisodeTrackerState:
     peak_timestamp_ms: float = 0.0
     peak_intensity: float = 0.0
     ending_start_ms: float = 0.0
+    missing_start_ms: Optional[float] = None
+    last_valid_timestamp_ms: Optional[float] = None
     confidences: List[float] = field(default_factory=list)
     qualities: List[float] = field(default_factory=list)
     current_episode_id: Optional[str] = None
@@ -101,6 +103,7 @@ class TemporalEpisodeEngine:
         self,
         min_persistence_ms: float = 400.0,       # Min time to promote CANDIDATE -> ACTIVE
         release_hysteresis_ms: float = 350.0,    # Persistence below release threshold to transition -> ENDED
+        missing_observation_grace_ms: float = 1200.0, # Grace period before missing/unknown observation degrades episode
         yaw_activation_deg: float = 28.0,
         yaw_release_deg: float = 16.0,
         lean_activation_deg: float = 15.0,
@@ -109,6 +112,7 @@ class TemporalEpisodeEngine:
     ):
         self.min_persistence_ms = min_persistence_ms
         self.release_hysteresis_ms = release_hysteresis_ms
+        self.missing_observation_grace_ms = missing_observation_grace_ms
         self.yaw_activation_deg = yaw_activation_deg
         self.yaw_release_deg = yaw_release_deg
         self.lean_activation_deg = lean_activation_deg
@@ -141,9 +145,12 @@ class TemporalEpisodeEngine:
 
         # 1. Evaluate Head Turn Left / Right
         head_yaw_obs = obs_map.get(ObservationType.HEAD_YAW_RELATIVE.value)
-        if head_yaw_obs and head_yaw_obs.value is not None:
+        is_yaw_missing = (head_yaw_obs is None or head_yaw_obs.value is None)
+
+        if not is_yaw_missing:
             yaw = float(head_yaw_obs.value)
             quality = head_yaw_obs.quality
+            confidence = head_yaw_obs.confidence
 
             # Left Turn (negative yaw)
             is_active_left = yaw <= -self.yaw_activation_deg
@@ -155,8 +162,9 @@ class TemporalEpisodeEngine:
                 is_released_condition=is_released_left,
                 intensity=abs(yaw),
                 quality=quality,
-                confidence=head_yaw_obs.confidence,
+                confidence=confidence,
                 timestamp_ms=timestamp_ms,
+                is_missing=False,
             )
             if ep_left:
                 active_episodes.append(ep_left)
@@ -171,15 +179,46 @@ class TemporalEpisodeEngine:
                 is_released_condition=is_released_right,
                 intensity=yaw,
                 quality=quality,
-                confidence=head_yaw_obs.confidence,
+                confidence=confidence,
                 timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_right:
+                active_episodes.append(ep_right)
+        else:
+            ep_left = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.HEAD_TURN_LEFT.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
+            )
+            if ep_left:
+                active_episodes.append(ep_left)
+
+            ep_right = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.HEAD_TURN_RIGHT.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
             )
             if ep_right:
                 active_episodes.append(ep_right)
 
         # 2. Evaluate Head Pitch Down (Contextual Observation Episode)
         pitch_obs = obs_map.get(ObservationType.HEAD_PITCH_RELATIVE_DOWN.value)
-        if pitch_obs and pitch_obs.value is not None:
+        is_pitch_missing = (pitch_obs is None or pitch_obs.value is None)
+
+        if not is_pitch_missing:
             pitch = float(pitch_obs.value)
             is_down = pitch >= self.pitch_down_activation_deg
             is_released = pitch < (self.pitch_down_activation_deg - 8.0)
@@ -192,13 +231,30 @@ class TemporalEpisodeEngine:
                 quality=pitch_obs.quality,
                 confidence=pitch_obs.confidence,
                 timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_pitch:
+                active_episodes.append(ep_pitch)
+        else:
+            ep_pitch = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.HEAD_PITCH_DOWN.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
             )
             if ep_pitch:
                 active_episodes.append(ep_pitch)
 
         # 3. Evaluate Torso Lean Left / Right
         lean_obs = obs_map.get(ObservationType.TORSO_LEAN_X.value)
-        if lean_obs and lean_obs.value is not None:
+        is_lean_missing = (lean_obs is None or lean_obs.value is None)
+
+        if not is_lean_missing:
             angle = float(lean_obs.value)
             # Left Lean
             is_lean_left = angle <= -self.lean_activation_deg
@@ -212,6 +268,7 @@ class TemporalEpisodeEngine:
                 quality=lean_obs.quality,
                 confidence=lean_obs.confidence,
                 timestamp_ms=timestamp_ms,
+                is_missing=False,
             )
             if ep_lean_l:
                 active_episodes.append(ep_lean_l)
@@ -228,6 +285,35 @@ class TemporalEpisodeEngine:
                 quality=lean_obs.quality,
                 confidence=lean_obs.confidence,
                 timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_lean_r:
+                active_episodes.append(ep_lean_r)
+        else:
+            ep_lean_l = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.TORSO_LEAN_LEFT.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
+            )
+            if ep_lean_l:
+                active_episodes.append(ep_lean_l)
+
+            ep_lean_r = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.TORSO_LEAN_RIGHT.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
             )
             if ep_lean_r:
                 active_episodes.append(ep_lean_r)
@@ -235,53 +321,112 @@ class TemporalEpisodeEngine:
         # 4. Evaluate Wrist Zones
         lw_obs = obs_map.get(ObservationType.LEFT_WRIST_ZONE.value)
         rw_obs = obs_map.get(ObservationType.RIGHT_WRIST_ZONE.value)
-        is_under_desk = (lw_obs and lw_obs.value == WristZone.UNDER_DESK.value) or (rw_obs and rw_obs.value == WristZone.UNDER_DESK.value)
-        is_writing = (lw_obs and lw_obs.value == WristZone.WRITING.value) or (rw_obs and rw_obs.value == WristZone.WRITING.value)
-
-        ep_under = self._update_channel(
-            seat_id=seat_id,
-            ep_type=EpisodeType.WRIST_BELOW_DESK.value,
-            is_active_condition=bool(is_under_desk),
-            is_released_condition=bool(is_writing or not is_under_desk),
-            intensity=1.0,
-            quality=max(lw_obs.quality if lw_obs else 0.0, rw_obs.quality if rw_obs else 0.0),
-            confidence=1.0,
-            timestamp_ms=timestamp_ms,
+        has_wrist_obs = (lw_obs is not None and lw_obs.value != WristZone.UNKNOWN.value) or (
+            rw_obs is not None and rw_obs.value != WristZone.UNKNOWN.value
         )
-        if ep_under:
-            active_episodes.append(ep_under)
+
+        if has_wrist_obs:
+            is_under_desk = (lw_obs and lw_obs.value == WristZone.UNDER_DESK.value) or (
+                rw_obs and rw_obs.value == WristZone.UNDER_DESK.value
+            )
+            is_writing = (lw_obs and lw_obs.value == WristZone.WRITING.value) or (
+                rw_obs and rw_obs.value == WristZone.WRITING.value
+            )
+
+            ep_under = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.WRIST_BELOW_DESK.value,
+                is_active_condition=bool(is_under_desk),
+                is_released_condition=bool(is_writing or not is_under_desk),
+                intensity=1.0,
+                quality=max(lw_obs.quality if lw_obs else 0.0, rw_obs.quality if rw_obs else 0.0),
+                confidence=1.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_under:
+                active_episodes.append(ep_under)
+        else:
+            ep_under = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.WRIST_BELOW_DESK.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
+            )
+            if ep_under:
+                active_episodes.append(ep_under)
 
         # 5. Evaluate Seat Empty
         occ_obs = obs_map.get(ObservationType.SEAT_OCCUPANCY.value)
-        is_empty = (occ_obs and occ_obs.value == "EMPTY")
-        ep_empty = self._update_channel(
-            seat_id=seat_id,
-            ep_type=EpisodeType.SEAT_EMPTY.value,
-            is_active_condition=bool(is_empty),
-            is_released_condition=bool(not is_empty),
-            intensity=1.0,
-            quality=1.0,
-            confidence=1.0,
-            timestamp_ms=timestamp_ms,
-        )
-        if ep_empty:
-            active_episodes.append(ep_empty)
+        if occ_obs is not None and occ_obs.value in ("EMPTY", "OCCUPIED", "OCCLUDED", "MULTIPLE_PERSON"):
+            is_empty = (occ_obs.value == "EMPTY")
+            is_released = (occ_obs.value != "EMPTY")
+            ep_empty = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.SEAT_EMPTY.value,
+                is_active_condition=bool(is_empty),
+                is_released_condition=bool(is_released),
+                intensity=1.0,
+                quality=1.0,
+                confidence=1.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_empty:
+                active_episodes.append(ep_empty)
+        else:
+            ep_empty = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.SEAT_EMPTY.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
+            )
+            if ep_empty:
+                active_episodes.append(ep_empty)
 
         # 6. Evaluate Multiple Persons Near Seat
         pcount_obs = obs_map.get(ObservationType.PERSON_COUNT_NEAR_SEAT.value)
-        is_multi = (pcount_obs and int(pcount_obs.value or 0) > 1)
-        ep_multi = self._update_channel(
-            seat_id=seat_id,
-            ep_type=EpisodeType.MULTI_PERSON_NEAR_SEAT.value,
-            is_active_condition=bool(is_multi),
-            is_released_condition=bool(not is_multi),
-            intensity=float(pcount_obs.value or 1) if pcount_obs else 1.0,
-            quality=1.0,
-            confidence=1.0,
-            timestamp_ms=timestamp_ms,
-        )
-        if ep_multi:
-            active_episodes.append(ep_multi)
+        if pcount_obs is not None and pcount_obs.value is not None:
+            count = int(pcount_obs.value or 0)
+            is_multi = (count > 1)
+            is_released = (count <= 1)
+            ep_multi = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.MULTI_PERSON_NEAR_SEAT.value,
+                is_active_condition=bool(is_multi),
+                is_released_condition=bool(is_released),
+                intensity=float(count),
+                quality=1.0,
+                confidence=1.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=False,
+            )
+            if ep_multi:
+                active_episodes.append(ep_multi)
+        else:
+            ep_multi = self._update_channel(
+                seat_id=seat_id,
+                ep_type=EpisodeType.MULTI_PERSON_NEAR_SEAT.value,
+                is_active_condition=False,
+                is_released_condition=False,
+                intensity=0.0,
+                quality=0.0,
+                confidence=0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=True,
+            )
+            if ep_multi:
+                active_episodes.append(ep_multi)
 
         return active_episodes
 
@@ -295,9 +440,72 @@ class TemporalEpisodeEngine:
         quality: float,
         confidence: float,
         timestamp_ms: float,
+        is_missing: bool = False,
     ) -> Optional[TemporalEpisode]:
-        """Generic dual-threshold state machine for an episodic channel."""
+        """Generic dual-threshold state machine for an episodic channel with missing grace mechanism."""
         tracker = self._get_tracker(seat_id, ep_type)
+
+        if is_missing:
+            # Handle Missing / Unknown observation
+            if tracker.state == EpisodeState.CANDIDATE:
+                if tracker.missing_start_ms is None:
+                    tracker.missing_start_ms = timestamp_ms
+                if (timestamp_ms - tracker.missing_start_ms) > self.missing_observation_grace_ms:
+                    tracker.state = EpisodeState.INACTIVE
+                    tracker.missing_start_ms = None
+
+            elif tracker.state in (EpisodeState.ACTIVE, EpisodeState.ENDING):
+                if tracker.missing_start_ms is None:
+                    tracker.missing_start_ms = timestamp_ms
+                if (timestamp_ms - tracker.missing_start_ms) > self.missing_observation_grace_ms:
+                    # Missing period persisted beyond grace timeout -> gracefully close episode
+                    tracker.state = EpisodeState.ENDED
+                    end_time = tracker.last_valid_timestamp_ms or timestamp_ms
+                    duration = max(0.0, end_time - tracker.active_start_ms)
+                    mean_conf = float(np.mean(tracker.confidences)) if tracker.confidences else 1.0
+                    mean_qual = float(np.mean(tracker.qualities)) if tracker.qualities else 1.0
+
+                    completed_ep = TemporalEpisode(
+                        episode_id=tracker.current_episode_id or str(uuid.uuid4()),
+                        seat_id=seat_id,
+                        episode_type=ep_type,
+                        state=EpisodeState.ENDED,
+                        start_timestamp_ms=tracker.active_start_ms,
+                        peak_timestamp_ms=tracker.peak_timestamp_ms,
+                        end_timestamp_ms=end_time,
+                        duration_ms=duration,
+                        confidence=mean_conf,
+                        quality=mean_qual,
+                        peak_intensity=tracker.peak_intensity,
+                    )
+                    self.completed_episodes.append(completed_ep)
+                    tracker.missing_start_ms = None
+                    return completed_ep
+
+            # If inside grace period, preserve active status
+            if tracker.state in (EpisodeState.ACTIVE, EpisodeState.ENDING):
+                duration = max(0.0, (tracker.last_valid_timestamp_ms or timestamp_ms) - tracker.active_start_ms)
+                mean_conf = float(np.mean(tracker.confidences)) if tracker.confidences else 1.0
+                mean_qual = float(np.mean(tracker.qualities)) if tracker.qualities else 1.0
+                return TemporalEpisode(
+                    episode_id=tracker.current_episode_id or str(uuid.uuid4()),
+                    seat_id=seat_id,
+                    episode_type=ep_type,
+                    state=tracker.state,
+                    start_timestamp_ms=tracker.active_start_ms,
+                    peak_timestamp_ms=tracker.peak_timestamp_ms,
+                    end_timestamp_ms=None,
+                    duration_ms=duration,
+                    confidence=mean_conf,
+                    quality=mean_qual,
+                    peak_intensity=tracker.peak_intensity,
+                )
+
+            return None
+
+        # Observation is VALID (not missing)
+        tracker.missing_start_ms = None
+        tracker.last_valid_timestamp_ms = timestamp_ms
 
         if is_active_condition:
             tracker.confidences.append(confidence)

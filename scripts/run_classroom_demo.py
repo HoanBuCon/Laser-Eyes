@@ -337,11 +337,16 @@ def run_classroom_demo(
                     seat_graph.add_seat_context(s_ctx)
 
                 # Extract Raw Observations
+                occ = seat_mgr.occupancies.get(seat_code)
+                occ_state = occ.state if occ else None
+                person_count = len(occ.candidate_detections) if occ else (1 if det is not None else 0)
+
                 raw_obs = observation_extractor.extract(
                     detection=det,
                     seat_context=s_ctx,
                     timestamp_ms=video_time_ms,
-                    nearby_person_count=1 if det is not None else 0,
+                    occupancy_state=occ_state,
+                    nearby_person_count=person_count,
                 )
 
                 # Temporal Episode Engine

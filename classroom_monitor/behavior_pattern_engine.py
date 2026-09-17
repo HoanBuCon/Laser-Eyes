@@ -173,8 +173,16 @@ class BehaviorPatternEngine:
         seat_context: SeatContext,
         timestamp_ms: float,
     ) -> Optional[BehaviorPattern]:
-        """P0: Multi-episode head turn repetition toward a specific neighboring candidate."""
+        """P0: Multi-episode head turn repetition toward a specific neighboring candidate.
+        
+        Strict Gating:
+        - head_orientation capability != DISABLED
+        - pairwise_relation capability != DISABLED
+        - target_neighbor_id must exist in SeatGraph for the glance direction.
+        """
         if seat_context.capabilities.head_orientation == CapabilityStatus.DISABLED:
+            return None
+        if seat_context.capabilities.pairwise_relation == CapabilityStatus.DISABLED:
             return None
 
         seat_id = seat_context.seat_id
@@ -182,10 +190,21 @@ class BehaviorPatternEngine:
             ep for ep in active_episodes if ep.seat_id == seat_id and ep.state in (EpisodeState.ACTIVE, EpisodeState.ENDING)
         ]
 
-        # Check Left glances
-        left_turns = [ep for ep in all_recent if ep.episode_type == EpisodeType.HEAD_TURN_LEFT.value]
-        # Check Right glances
-        right_turns = [ep for ep in all_recent if ep.episode_type == EpisodeType.HEAD_TURN_RIGHT.value]
+        # Check Left glances (strictly requires configured left neighbor)
+        left_neighbor = seat_context.neighbors.left_neighbor_id
+        left_turns = (
+            [ep for ep in all_recent if ep.episode_type == EpisodeType.HEAD_TURN_LEFT.value]
+            if left_neighbor is not None
+            else []
+        )
+
+        # Check Right glances (strictly requires configured right neighbor)
+        right_neighbor = seat_context.neighbors.right_neighbor_id
+        right_turns = (
+            [ep for ep in all_recent if ep.episode_type == EpisodeType.HEAD_TURN_RIGHT.value]
+            if right_neighbor is not None
+            else []
+        )
 
         target_turns: List[TemporalEpisode] = []
         target_dir = ""
@@ -194,13 +213,13 @@ class BehaviorPatternEngine:
         if len(left_turns) >= self.min_glance_episodes:
             target_turns = left_turns
             target_dir = "LEFT"
-            target_neighbor = seat_context.neighbors.left_neighbor_id
+            target_neighbor = left_neighbor
         elif len(right_turns) >= self.min_glance_episodes:
             target_turns = right_turns
             target_dir = "RIGHT"
-            target_neighbor = seat_context.neighbors.right_neighbor_id
+            target_neighbor = right_neighbor
 
-        if not target_turns or len(target_turns) < self.min_glance_episodes:
+        if not target_turns or target_neighbor is None or len(target_turns) < self.min_glance_episodes:
             return None
 
         # Check rate limiting cooldown (e.g. 10.0s per pattern)
@@ -234,8 +253,16 @@ class BehaviorPatternEngine:
         seat_context: SeatContext,
         timestamp_ms: float,
     ) -> Optional[BehaviorPattern]:
-        """P0: Persistent torso lean pointing toward a neighboring candidate."""
+        """P0: Persistent torso lean pointing toward a neighboring candidate.
+        
+        Strict Gating:
+        - body_lean capability != DISABLED
+        - pairwise_relation capability != DISABLED
+        - target_neighbor_id must exist in SeatGraph for the lean direction.
+        """
         if seat_context.capabilities.body_lean == CapabilityStatus.DISABLED:
+            return None
+        if seat_context.capabilities.pairwise_relation == CapabilityStatus.DISABLED:
             return None
 
         seat_id = seat_context.seat_id
@@ -249,11 +276,20 @@ class BehaviorPatternEngine:
         if not lean_episodes:
             return None
 
-        target_ep = lean_episodes[0]
-        direction = "LEFT" if target_ep.episode_type == EpisodeType.TORSO_LEAN_LEFT.value else "RIGHT"
-        target_neighbor = (
-            seat_context.neighbors.left_neighbor_id if direction == "LEFT" else seat_context.neighbors.right_neighbor_id
-        )
+        # Filter lean episodes to only those with a real configured neighbor in the lean direction
+        valid_lean_episodes: List[Tuple[TemporalEpisode, str, str]] = []
+        for ep in lean_episodes:
+            direction = "LEFT" if ep.episode_type == EpisodeType.TORSO_LEAN_LEFT.value else "RIGHT"
+            neighbor_id = (
+                seat_context.neighbors.left_neighbor_id if direction == "LEFT" else seat_context.neighbors.right_neighbor_id
+            )
+            if neighbor_id is not None:
+                valid_lean_episodes.append((ep, direction, neighbor_id))
+
+        if not valid_lean_episodes:
+            return None
+
+        target_ep, direction, target_neighbor = valid_lean_episodes[0]
 
         cooldown_key = (seat_id, PatternType.NEIGHBOR_ORIENTED_LEAN.value)
         if (timestamp_ms - self._pattern_cooldowns.get(cooldown_key, -100000.0)) < 8000.0:

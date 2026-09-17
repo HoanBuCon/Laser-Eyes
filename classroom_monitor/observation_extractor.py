@@ -88,20 +88,44 @@ class ObservationExtractor:
         detection: Optional[Detection],
         seat_context: SeatContext,
         timestamp_ms: float,
-        nearby_person_count: int = 1,
+        nearby_person_count: Optional[int] = None,
+        occupancy_state: Optional[str] = None,
     ) -> List[RawObservation]:
         """Extract all valid observations for the candidate person in the given seat context."""
         observations: List[RawObservation] = []
         seat_id = seat_context.seat_id
 
-        # 1. Occupancy Observation
+        # Determine effective occupancy state
+        if occupancy_state is None:
+            eff_occupancy = "OCCUPIED" if detection is not None else "EMPTY"
+        else:
+            eff_occupancy = str(occupancy_state).upper()
+
+        # Determine effective nearby person count
+        if nearby_person_count is None:
+            eff_person_count = 1 if detection is not None else 0
+        else:
+            eff_person_count = int(nearby_person_count)
+
+        # 1. Occupancy & Person Count Observation
         if detection is None:
             observations.append(
                 RawObservation(
                     seat_id=seat_id,
                     timestamp_ms=timestamp_ms,
                     observation_type=ObservationType.SEAT_OCCUPANCY.value,
-                    value="EMPTY",
+                    value=eff_occupancy,
+                    quality=1.0,
+                    confidence=1.0,
+                    source="seat_mapping",
+                )
+            )
+            observations.append(
+                RawObservation(
+                    seat_id=seat_id,
+                    timestamp_ms=timestamp_ms,
+                    observation_type=ObservationType.PERSON_COUNT_NEAR_SEAT.value,
+                    value=eff_person_count,
                     quality=1.0,
                     confidence=1.0,
                     source="seat_mapping",
@@ -114,7 +138,7 @@ class ObservationExtractor:
                 seat_id=seat_id,
                 timestamp_ms=timestamp_ms,
                 observation_type=ObservationType.SEAT_OCCUPANCY.value,
-                value="OCCUPIED",
+                value=eff_occupancy,
                 quality=detection.confidence,
                 confidence=detection.confidence,
                 source="seat_mapping",
@@ -126,7 +150,7 @@ class ObservationExtractor:
                 seat_id=seat_id,
                 timestamp_ms=timestamp_ms,
                 observation_type=ObservationType.PERSON_COUNT_NEAR_SEAT.value,
-                value=nearby_person_count,
+                value=eff_person_count,
                 quality=1.0,
                 confidence=detection.confidence,
                 source="seat_mapping",

@@ -548,7 +548,7 @@ def compare_video_episodes(
 @router.get("/seats", summary="List active Seat ROIs for video overlay and selection")
 def list_seats_for_workbench(
     room_id: Optional[str] = Query(None),
-    enabled_only: bool = Query(True),
+    enabled_only: bool = Query(False),
     db: Session = Depends(get_db),
 ):
     """Retrieve seat polygons and labels for video overlay visualization."""
@@ -557,7 +557,7 @@ def list_seats_for_workbench(
         query = query.filter(SeatROI.enabled == True)
     if room_id:
         query = query.filter(SeatROI.room_id == room_id)
-    seats = query.all()
+    seats = query.order_by(SeatROI.seat_code.asc()).all()
 
     items = []
     for s in seats:
@@ -571,7 +571,7 @@ def list_seats_for_workbench(
             "polygon": poly,
             "enabled": s.enabled,
         })
-    return {"total": len(items), "seats": items}
+    return {"total": len(items), "room_id": room_id, "seats": items}
 
 
 @router.delete("/seats/{seat_id}", summary="Delete Seat ROI from database")

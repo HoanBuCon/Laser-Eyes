@@ -386,34 +386,71 @@ def test_api_ui_routes(client):
 
 
 def test_api_seats_listing(client, db_session):
-    """Test GET /api/v1/data/seats endpoint for video overlay."""
-    room = ExamRoom(name="Room 101", room_code="ROOM-101")
-    db_session.add(room)
+    """Test GET /api/v1/data/seats endpoint for video overlay with room filtering and bulk sync."""
+    room1 = ExamRoom(name="Room 101", room_code="ROOM-101")
+    room2 = ExamRoom(name="Room 102", room_code="ROOM-102")
+    db_session.add_all([room1, room2])
     db_session.commit()
 
-    seat = SeatROI(
-        room_id=room.id,
-        seat_code="SEAT-01",
+    seat1 = SeatROI(
+        room_id=room1.id,
+        seat_code="SEAT-101-01",
         seat_label="Desk 1",
         polygon_json=json.dumps([[100, 200], [300, 200], [300, 400], [100, 400]]),
         enabled=True,
     )
-    db_session.add(seat)
+    seat2 = SeatROI(
+        room_id=room2.id,
+        seat_code="SEAT-102-01",
+        seat_label="Desk 2",
+        polygon_json=json.dumps([[150, 250], [350, 250], [350, 450], [150, 450]]),
+        enabled=True,
+    )
+    db_session.add_all([seat1, seat2])
     db_session.commit()
 
+    # 1. Test fetch all seats
     res = client.get("/api/v1/data/seats")
     assert res.status_code == 200
     data = res.json()
-    assert data["total"] >= 1
-    assert data["seats"][0]["seat_code"] == "SEAT-01"
-    assert len(data["seats"][0]["polygon"]) == 4
+    assert data["total"] == 2
 
-    # Test delete by seat_code
-    res_del = client.delete(f"/api/v1/data/seats/{seat.id}")
+    # 2. Test filter by room_id
+    res_r1 = client.get(f"/api/v1/data/seats?room_id={room1.id}")
+    assert res_r1.status_code == 200
+    data_r1 = res_r1.json()
+    assert data_r1["total"] == 1
+    assert data_r1["seats"][0]["seat_code"] == "SEAT-101-01"
+
+    # 3. Test Bulk Upsert sync with replacement of missing seats
+    bulk_payload = {
+        "room_id": room1.id,
+        "camera_id": "cam-01",
+        "seats": [
+            {
+                "room_id": room1.id,
+                "seat_code": "SEAT-101-NEW",
+                "seat_label": "New Calibrated Desk",
+                "polygon_json": [[50, 50], [150, 50], [150, 150], [50, 150]],
+                "enabled": True,
+            }
+        ],
+    }
+    res_bulk = client.post(f"/api/v1/rooms/{room1.id}/seats/bulk", json=bulk_payload)
+    assert res_bulk.status_code == 200
+    assert len(res_bulk.json()) == 1
+
+    # Verify old seat in room 1 was replaced
+    res_r1_after = client.get(f"/api/v1/data/seats?room_id={room1.id}")
+    assert res_r1_after.json()["total"] == 1
+    assert res_r1_after.json()["seats"][0]["seat_code"] == "SEAT-101-NEW"
+
+    # 4. Test delete single seat
+    res_del = client.delete(f"/api/v1/data/seats/by-code/SEAT-101-NEW")
     assert res_del.status_code == 200
     assert res_del.json()["status"] == "deleted"
 
-    res_after = client.get("/api/v1/data/seats")
+    res_after = client.get(f"/api/v1/data/seats?room_id={room1.id}")
     assert res_after.json()["total"] == 0
 
 

@@ -229,9 +229,21 @@ class SeatRepository:
         return self.db.query(SeatROI).filter(SeatROI.camera_id == camera_id).all()
 
     def bulk_upsert_for_camera(
-        self, room_id: str, camera_id: str, seats_data: List[Dict[str, Any]]
+        self, room_id: str, camera_id: str, seats_data: List[Dict[str, Any]], replace_missing: bool = True
     ) -> List[SeatROI]:
         """Atomically sync seat polygons for a given room/camera."""
+        incoming_codes = {s["seat_code"] for s in seats_data}
+
+        # If replace_missing is True, remove seats in this room/camera that are no longer in the payload
+        if replace_missing:
+            query = self.db.query(SeatROI).filter(SeatROI.room_id == room_id)
+            if camera_id:
+                query = query.filter((SeatROI.camera_id == camera_id) | (SeatROI.camera_id.is_(None)) | (SeatROI.camera_id == ""))
+            for old_s in query.all():
+                if old_s.seat_code not in incoming_codes:
+                    self.db.delete(old_s)
+            self.db.flush()
+
         results = []
         for s in seats_data:
             seat_code = s["seat_code"]

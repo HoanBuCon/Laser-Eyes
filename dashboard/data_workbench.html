@@ -280,11 +280,27 @@
     <!-- TAB 3: VIDEO TEMPORAL EPISODES & AI DIFF -->
     <!-- ===================================================================== -->
     <div id="videos-pane" class="tab-pane">
-      <div class="toolbar">
-        <select id="video-asset-select" class="form-select" onchange="selectVideoAsset(this.value)" style="min-width: 320px;"></select>
-        <span style="font-size: 0.85rem; color: var(--text-secondary);">
+      <div class="toolbar" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem;">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem;">
+          <div>
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Exam Room Calibration:</label>
+            <select id="video-room-select" class="form-select" onchange="onWorkbenchRoomChanged(this.value)" style="min-width: 220px;">
+              <option value="">Loading rooms...</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Video Asset:</label>
+            <select id="video-asset-select" class="form-select" onchange="selectVideoAsset(this.value)" style="min-width: 280px;"></select>
+          </div>
+          <div style="align-self: flex-end;">
+            <button class="btn btn-sm btn-outline" onclick="reloadSeatsFromActiveRoom()" title="Reload and synchronize seat ROIs from Database">
+              🔄 Sync Seats
+            </button>
+          </div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); align-self: center;">
           Current Playhead: <strong id="current-time-ms-display" style="color: var(--accent-cyan); font-family: var(--font-mono);">0 ms</strong>
-        </span>
+        </div>
       </div>
 
       <div class="panel-layout">

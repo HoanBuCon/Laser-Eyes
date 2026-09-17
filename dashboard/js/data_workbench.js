@@ -14,6 +14,8 @@ let selectedBboxIndex = 0;
 let currentVideoAsset = null;
 let videoEpisodes = [];
 let activeRole = "AI_ML_ENGINEER";
+let workbenchRooms = [];
+let activeWorkbenchRoomId = "";
 let availableSeats = [];
 let showSeatRois = true;
 let showSeatLabels = true;
@@ -29,7 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTimelineControls();
   initVideoOverlayCanvas();
   initVideoHotkeys();
-  loadAvailableSeats();
+  loadWorkbenchRooms();
 });
 
 // Toast Notifications
@@ -69,7 +71,11 @@ function switchTab(tabId) {
   if (tabId === "images") loadImagesList();
   if (tabId === "videos") {
     loadVideosList();
-    loadAvailableSeats();
+    if (workbenchRooms.length === 0) {
+      loadWorkbenchRooms();
+    } else {
+      loadAvailableSeats(activeWorkbenchRoomId);
+    }
     setTimeout(renderVideoOverlay, 150);
   }
   if (tabId === "calibration") runCalibrationCheck();
@@ -375,24 +381,72 @@ function toggleSeatLabels(checked) {
   renderVideoOverlay();
 }
 
-async function loadAvailableSeats() {
+async function loadWorkbenchRooms() {
   try {
-    const res = await fetch(`${API_BASE}/seats`);
+    const res = await fetch("/api/v1/rooms");
+    if (!res.ok) return;
+    workbenchRooms = await res.json();
+    const roomSelect = document.getElementById("video-room-select");
+    if (!roomSelect) return;
+
+    if (workbenchRooms.length === 0) {
+      roomSelect.innerHTML = `<option value="">No rooms configured</option>`;
+      activeWorkbenchRoomId = "";
+      await loadAvailableSeats("");
+      return;
+    }
+
+    roomSelect.innerHTML = workbenchRooms
+      .map(
+        (r) =>
+          `<option value="${r.id}">${r.room_code ? `[${r.room_code}] ` : ""}${r.name}</option>`
+      )
+      .join("");
+
+    if (!activeWorkbenchRoomId || !workbenchRooms.some((r) => r.id === activeWorkbenchRoomId)) {
+      activeWorkbenchRoomId = workbenchRooms[0].id;
+    }
+    roomSelect.value = activeWorkbenchRoomId;
+    await loadAvailableSeats(activeWorkbenchRoomId);
+  } catch (err) {
+    console.error("Error loading workbench rooms:", err);
+  }
+}
+
+async function onWorkbenchRoomChanged(roomId) {
+  activeWorkbenchRoomId = roomId;
+  await loadAvailableSeats(roomId);
+  const roomObj = workbenchRooms.find((r) => r.id === roomId);
+  showToast(`Loaded ${availableSeats.length} seats for ${roomObj ? roomObj.name : "selected room"}`, "info");
+}
+
+async function reloadSeatsFromActiveRoom() {
+  await loadAvailableSeats(activeWorkbenchRoomId);
+  showToast(`Synchronized ${availableSeats.length} Seat ROIs from Database`, "success");
+}
+
+async function loadAvailableSeats(roomId = null) {
+  try {
+    const targetRoomId = roomId || activeWorkbenchRoomId;
+    const url = targetRoomId
+      ? `${API_BASE}/seats?room_id=${encodeURIComponent(targetRoomId)}&enabled_only=false`
+      : `${API_BASE}/seats?enabled_only=false`;
+
+    const res = await fetch(url);
     const data = await res.json();
     availableSeats = data.seats || [];
 
-    if (availableSeats.length === 0) {
-      // Sensible classroom defaults based on 1280x720 video
-      availableSeats = [
-        { seat_code: "SEAT-101-01", seat_label: "Bàn 1 Dãy Trái", polygon: [[108, 382], [283, 382], [283, 544], [108, 544]] },
-        { seat_code: "SEAT-101-02", seat_label: "Bàn 1 Dãy Giữa", polygon: [[509, 478], [677, 478], [677, 629], [509, 629]] },
-        { seat_code: "SEAT-101-03", seat_label: "Bàn 1 Dãy Phải", polygon: [[1000, 401], [1146, 401], [1146, 646], [1000, 646]] },
-        { seat_code: "SEAT-101-04", seat_label: "Bàn 2 Dãy Trái", polygon: [[212, 277], [360, 277], [360, 400], [212, 400]] },
-        { seat_code: "SEAT-101-05", seat_label: "Bàn 2 Dãy Giữa", polygon: [[491, 316], [629, 316], [629, 478], [491, 478]] },
-      ];
+    // Reset selected seat to first seat of current room if previous not found
+    if (availableSeats.length > 0) {
+      if (!selectedSeatCode || !availableSeats.some((s) => s.seat_code === selectedSeatCode)) {
+        selectedSeatCode = availableSeats[0].seat_code;
+      }
+    } else {
+      selectedSeatCode = null;
     }
 
     populateSeatDropdowns();
+    updateDeleteSeatButtonVisibility();
     renderVideoOverlay();
   } catch (err) {
     console.error("Error loading seats:", err);
@@ -404,18 +458,31 @@ function populateSeatDropdowns() {
   const neighborSelect = document.getElementById("ep-neighbor-code");
   if (!seatSelect) return;
 
+  if (availableSeats.length === 0) {
+    seatSelect.innerHTML = `<option value="">No seats in this room</option>`;
+    if (neighborSelect) neighborSelect.innerHTML = '<option value="">None</option>';
+    return;
+  }
+
   seatSelect.innerHTML = availableSeats
-    .map(s => `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + ' (' + s.seat_code + ')' : s.seat_code}</option>`)
+    .map(
+      (s) =>
+        `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + " (" + s.seat_code + ")" : s.seat_code}</option>`
+    )
     .join("");
 
   if (neighborSelect) {
-    neighborSelect.innerHTML = '<option value="">None</option>' + availableSeats
-      .map(s => `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + ' (' + s.seat_code + ')' : s.seat_code}</option>`)
-      .join("");
+    neighborSelect.innerHTML =
+      '<option value="">None</option>' +
+      availableSeats
+        .map(
+          (s) =>
+            `<option value="${s.seat_code}">${s.seat_label ? s.seat_label + " (" + s.seat_code + ")" : s.seat_code}</option>`
+        )
+        .join("");
   }
 
-  if (availableSeats.length > 0 && !selectedSeatCode) {
-    selectedSeatCode = availableSeats[0].seat_code;
+  if (selectedSeatCode) {
     seatSelect.value = selectedSeatCode;
   }
 }

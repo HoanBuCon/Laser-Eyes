@@ -574,6 +574,35 @@ def list_seats_for_workbench(
     return {"total": len(items), "seats": items}
 
 
+@router.delete("/seats/{seat_id}", summary="Delete Seat ROI from database")
+def delete_seat_from_workbench(seat_id: str, db: Session = Depends(get_db)):
+    """Delete a configured Seat ROI by ID or seat_code."""
+    seat = db.query(SeatROI).filter(SeatROI.id == seat_id).first()
+    if not seat:
+        seat = db.query(SeatROI).filter(SeatROI.seat_code == seat_id).first()
+    if not seat:
+        raise HTTPException(status_code=404, detail="Seat ROI not found.")
+
+    deleted_code = seat.seat_code
+    db.delete(seat)
+    db.commit()
+    return {"status": "deleted", "seat_id": seat_id, "seat_code": deleted_code}
+
+
+@router.delete("/seats/by-code/{seat_code}", summary="Delete Seat ROI by seat code")
+def delete_seat_by_code_from_workbench(seat_code: str, db: Session = Depends(get_db)):
+    """Delete all Seat ROIs matching a given seat code."""
+    seats = db.query(SeatROI).filter(SeatROI.seat_code == seat_code).all()
+    if not seats:
+        raise HTTPException(status_code=404, detail=f"No Seat ROI found with code {seat_code}")
+
+    del_count = len(seats)
+    for s in seats:
+        db.delete(s)
+    db.commit()
+    return {"status": "deleted", "seat_code": seat_code, "deleted_count": del_count}
+
+
 @router.post("/calibration/validate", summary="Automated geometric quality check for seat polygons and writing zones")
 def validate_calibration_geometry(
     payload: SpatialCalibrationValidateRequest,

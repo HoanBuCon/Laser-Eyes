@@ -408,3 +408,12 @@ def test_api_seats_listing(client, db_session):
     assert data["seats"][0]["seat_code"] == "SEAT-01"
     assert len(data["seats"][0]["polygon"]) == 4
 
+    # Test delete by seat_code
+    res_del = client.delete(f"/api/v1/data/seats/{seat.id}")
+    assert res_del.status_code == 200
+    assert res_del.json()["status"] == "deleted"
+
+    res_after = client.get("/api/v1/data/seats")
+    assert res_after.json()["total"] == 0
+
+

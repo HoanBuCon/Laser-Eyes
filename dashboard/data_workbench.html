@@ -310,9 +310,16 @@
             <canvas id="video-overlay-canvas" class="video-overlay-canvas"></canvas>
           </div>
 
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.4rem;">
-            <span>💡 <em>Click any Seat ROI directly on video to select it for annotation.</em></span>
-            <span id="hovered-seat-indicator" style="color: var(--accent-cyan); font-weight: 600;"></span>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span>💡 <em>Click Seat ROI on video to select &bull; Press <span class="hotkey-pill">Del</span> / <span class="hotkey-pill">Backspace</span> to quick delete</em></span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <span id="hovered-seat-indicator" style="color: var(--accent-cyan); font-weight: 600;"></span>
+              <button id="delete-selected-seat-btn" class="btn btn-sm btn-danger" style="display: none; padding: 0.2rem 0.6rem; font-size: 0.75rem;" onclick="deleteSelectedSeat()">
+                🗑️ Delete Selected Seat (Del)
+              </button>
+            </div>
           </div>
 
           <!-- Interactive Timeline -->

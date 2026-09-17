@@ -28,6 +28,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initImageReviewShortcuts();
   initTimelineControls();
   initVideoOverlayCanvas();
+  initVideoHotkeys();
   loadAvailableSeats();
 });
 
@@ -641,8 +642,90 @@ function initVideoOverlayCanvas() {
       selectedSeatCode = hit;
       const seatSelect = document.getElementById("ep-seat-code");
       if (seatSelect) seatSelect.value = hit;
-      showToast(`Selected ${hit} on video`, "info");
+      updateDeleteSeatButtonVisibility();
+      showToast(`Selected ${hit} on video (Press Del to delete)`, "info");
       renderVideoOverlay();
+    }
+  });
+}
+
+function updateDeleteSeatButtonVisibility() {
+  const btn = document.getElementById("delete-selected-seat-btn");
+  if (!btn) return;
+  if (selectedSeatCode) {
+    btn.style.display = "inline-flex";
+    btn.innerText = `🗑️ Delete ${selectedSeatCode} (Del)`;
+  } else {
+    btn.style.display = "none";
+  }
+}
+
+async function deleteSelectedSeat(targetSeatCode) {
+  const codeToDelete = targetSeatCode || selectedSeatCode;
+  if (!codeToDelete) {
+    showToast("Please click a Seat ROI on video first to select it.", "warning");
+    return;
+  }
+
+  const seatObj = availableSeats.find((s) => s.seat_code === codeToDelete);
+  const seatLabel = seatObj ? (seatObj.seat_label || seatObj.seat_code) : codeToDelete;
+
+  if (!confirm(`Are you sure you want to permanently delete Seat ROI: ${seatLabel} (${codeToDelete})?`)) {
+    return;
+  }
+
+  try {
+    const seatId = seatObj?.id || codeToDelete;
+    let res = await fetch(`${API_BASE}/seats/${encodeURIComponent(seatId)}`, {
+      method: "DELETE",
+    });
+
+    if (!res.ok) {
+      // Fallback by code
+      res = await fetch(`${API_BASE}/seats/by-code/${encodeURIComponent(codeToDelete)}`, {
+        method: "DELETE",
+      });
+    }
+
+    if (res.ok || res.status === 204) {
+      showToast(`Deleted Seat ROI: ${seatLabel}`, "success");
+    } else {
+      showToast(`Deleted Seat ROI locally: ${seatLabel}`, "info");
+    }
+
+    // Remove from local active seats
+    availableSeats = availableSeats.filter((s) => s.seat_code !== codeToDelete);
+    if (selectedSeatCode === codeToDelete) {
+      selectedSeatCode = availableSeats.length > 0 ? availableSeats[0].seat_code : null;
+    }
+    if (hoveredSeatCode === codeToDelete) {
+      hoveredSeatCode = null;
+    }
+
+    populateSeatDropdowns();
+    updateDeleteSeatButtonVisibility();
+    renderVideoOverlay();
+  } catch (err) {
+    showToast(`Failed to delete seat: ${err.message}`, "error");
+  }
+}
+
+function initVideoHotkeys() {
+  window.addEventListener("keydown", (e) => {
+    if (currentTab !== "videos") return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+
+    if (e.key === "Delete" || e.key === "Backspace") {
+      if (selectedSeatCode) {
+        e.preventDefault();
+        deleteSelectedSeat(selectedSeatCode);
+      }
+    } else if (e.key === "[") {
+      markStartTimestamp();
+    } else if (e.key === "]") {
+      markEndTimestamp();
+    } else if (e.key === "p" || e.key === "P") {
+      markPeakTimestamp();
     }
   });
 }

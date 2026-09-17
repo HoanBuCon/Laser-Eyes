@@ -218,11 +218,39 @@ function handleCanvasMouseMove(event) {
     }
 }
 
+function isPointInPolygon(point, polygon) {
+    if (!polygon || polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > point.y) !== (yj > point.y)) &&
+            (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 function handleCanvasMouseDown(event) {
     if (event.button !== 0) return; // Left click only
     const pt = getCanvasCoordinates(event);
 
-    // If clicking close to start point and length >= 4, auto complete polygon
+    // If not actively drawing a new polygon, check if user clicked an existing seat
+    if (currentPolygon.length === 0) {
+        let clickedSeatIdx = null;
+        for (let i = seats.length - 1; i >= 0; i--) {
+            if (isPointInPolygon(pt, seats[i].polygon)) {
+                clickedSeatIdx = i;
+                break;
+            }
+        }
+        if (clickedSeatIdx !== null) {
+            selectSeatIndex(clickedSeatIdx);
+            return;
+        }
+    }
+
+    // If clicking close to start point and length >= 3, auto complete polygon
     if (currentPolygon.length >= 3) {
         const start = currentPolygon[0];
         const dist = Math.hypot(pt.x - start[0], pt.y - start[1]);
@@ -245,13 +273,24 @@ function handleCanvasDblClick(event) {
 }
 
 function handleGlobalKeydown(event) {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
         event.preventDefault();
         undoLastPoint();
     } else if (event.key === 'Escape') {
         clearCurrentPolygon();
+        selectedSeatIndex = null;
+        renderSeatList();
+        redrawCanvas();
     } else if (event.key === 'Enter' && currentPolygon.length >= 3) {
         completeCurrentPolygon();
+    } else if (event.key === 'Delete' || event.key === 'Backspace') {
+        if (selectedSeatIndex !== null && selectedSeatIndex >= 0 && selectedSeatIndex < seats.length) {
+            event.preventDefault();
+            deleteSeat(selectedSeatIndex);
+        }
     }
 }
 
@@ -510,7 +549,7 @@ function renderSeatList() {
         const enabledBadgeCls = s.enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-400 border-gray-700';
 
         return `
-        <div onclick="selectSeatIndex(${idx})" class="p-3 rounded-xl bg-gray-900/80 border border-gray-800 seat-item ${activeClass} transition cursor-pointer flex items-center justify-between gap-2">
+        <div id="seat-item-${idx}" onclick="selectSeatIndex(${idx})" class="p-3 rounded-xl bg-gray-900/80 border border-gray-800 seat-item ${activeClass} transition cursor-pointer flex items-center justify-between gap-2">
             <div>
                 <div class="flex items-center gap-2">
                     <span class="font-bold text-xs font-mono text-white">${s.seat_code}</span>
@@ -537,6 +576,14 @@ function selectSeatIndex(idx) {
     selectedSeatIndex = selectedSeatIndex === idx ? null : idx;
     renderSeatList();
     redrawCanvas();
+
+    if (selectedSeatIndex !== null) {
+        const item = document.getElementById(`seat-item-${selectedSeatIndex}`);
+        if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setDrawingStatus(`SELECTED ${seats[selectedSeatIndex].seat_code} (PRESS DEL TO DELETE)`, 'text-cyan-400');
+    } else {
+        setDrawingStatus('READY', 'text-emerald-400');
+    }
 }
 
 function toggleSeatEnabled(idx) {
@@ -545,23 +592,65 @@ function toggleSeatEnabled(idx) {
     redrawCanvas();
 }
 
-function deleteSeat(idx) {
-    if (confirm(`Delete Seat ${seats[idx].seat_code}?`)) {
-        seats.splice(idx, 1);
-        if (selectedSeatIndex === idx) selectedSeatIndex = null;
-        renderSeatList();
-        redrawCanvas();
+async function deleteSeat(idx) {
+    if (idx < 0 || idx >= seats.length) return;
+    const seatToDelete = seats[idx];
+
+    if (!confirm(`Are you sure you want to delete Seat ${seatToDelete.seat_code}?`)) {
+        return;
     }
+
+    // If seat was loaded from database, delete from database immediately
+    if (seatToDelete.id && !seatToDelete.id.startsWith('temp_')) {
+        try {
+            const res = await fetch(`/api/v1/seats/${seatToDelete.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                // Fallback delete by code
+                await fetch(`/api/v1/data/seats/by-code/${encodeURIComponent(seatToDelete.seat_code)}`, { method: 'DELETE' });
+            }
+        } catch (e) {
+            console.warn('Failed to delete seat from DB:', e);
+        }
+    } else if (seatToDelete.seat_code) {
+        // Fallback delete by code
+        try {
+            await fetch(`/api/v1/data/seats/by-code/${encodeURIComponent(seatToDelete.seat_code)}`, { method: 'DELETE' });
+        } catch (e) {
+            console.warn('Failed to delete seat by code:', e);
+        }
+    }
+
+    seats.splice(idx, 1);
+    if (selectedSeatIndex === idx) {
+        selectedSeatIndex = null;
+    } else if (selectedSeatIndex > idx) {
+        selectedSeatIndex--;
+    }
+
+    renderSeatList();
+    redrawCanvas();
+    setDrawingStatus(`DELETED ${seatToDelete.seat_code}`, 'text-rose-400');
 }
 
-function clearAllSeats() {
+async function clearAllSeats() {
     if (seats.length === 0) return;
-    if (confirm(`Are you sure you want to remove all ${seats.length} seats from the current view?`)) {
-        seats = [];
-        selectedSeatIndex = null;
-        renderSeatList();
-        redrawCanvas();
+    if (!confirm(`Are you sure you want to remove all ${seats.length} seats from the current view and database?`)) {
+        return;
     }
+
+    for (const s of seats) {
+        if (s.id && !s.id.startsWith('temp_')) {
+            try {
+                await fetch(`/api/v1/seats/${s.id}`, { method: 'DELETE' });
+            } catch (e) {}
+        }
+    }
+
+    seats = [];
+    selectedSeatIndex = null;
+    renderSeatList();
+    redrawCanvas();
+    setDrawingStatus('ALL SEATS CLEARED', 'text-amber-400');
 }
 
 // ==============================================================================

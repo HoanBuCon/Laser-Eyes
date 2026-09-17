@@ -80,6 +80,7 @@ data/evidence/
 data/sessions/
 data/uploads/
 data/output_demo/
+data/exported_datasets/
 data/settings.json
 *.log
 *.sqlite-journal

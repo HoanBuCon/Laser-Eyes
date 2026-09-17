@@ -20,6 +20,7 @@ from fastapi.staticfiles import StaticFiles
 
 from api.routes import (
     cameras,
+    data_workbench,
     events,
     inference,
     rooms,
@@ -103,6 +104,7 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(workers.router, prefix=prefix)
     app.include_router(statistics.router, prefix=prefix)
     app.include_router(inference.router, prefix=prefix)
+    app.include_router(data_workbench.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
@@ -153,3 +155,12 @@ if dashboard_dir.exists():
         if calib_file.exists():
             return FileResponse(str(calib_file))
         return {"message": "Calibration tool calibration.html not found, please visit /docs"}
+
+    @app.get("/data-workbench", tags=["Dashboard"])
+    def serve_data_workbench():
+        """Serve the Human Data Operations Workbench UI."""
+        workbench_file = dashboard_dir / "data_workbench.html"
+        if workbench_file.exists():
+            return FileResponse(str(workbench_file))
+        return {"message": "Data Workbench data_workbench.html not found, please visit /docs"}
+

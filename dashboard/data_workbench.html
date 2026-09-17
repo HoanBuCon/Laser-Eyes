@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VIGIL AI — Human Data Operations Workbench</title>
+  <link rel="stylesheet" href="/static/css/data_workbench.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👁️</text></svg>">
+</head>
+<body>
+
+  <!-- Top Navbar -->
+  <header class="navbar">
+    <a href="/" class="brand">
+      <span class="brand-badge">VIGIL AI</span>
+      <span class="brand-title">Data Operations Workbench</span>
+    </a>
+
+    <div class="nav-links">
+      <a href="/" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        Live Monitor
+      </a>
+      <a href="/calibration" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+        Seat ROI Calibration
+      </a>
+      <a href="/data-workbench" class="nav-item active">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+        Data Workbench
+      </a>
+      <a href="/docs" target="_blank" class="nav-item">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        REST API
+      </a>
+
+      <!-- Role Switcher -->
+      <div class="user-badge">
+        <span>Role:</span>
+        <select id="active-role-select" class="form-select" style="padding: 0.15rem 0.4rem; font-size: 0.75rem;">
+          <option value="AI_ML_ENGINEER" selected>AI / ML Engineer</option>
+          <option value="ANNOTATOR">Human Annotator</option>
+          <option value="REVIEWER">Proctor Reviewer</option>
+          <option value="ADMIN">System Admin</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs Bar -->
+  <nav class="tabs-bar">
+    <button class="tab-btn active" data-tab="overview">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      Overview & Metrics
+    </button>
+    <button class="tab-btn" data-tab="images">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+      707 Image Audit & Crops
+      <span class="badge" id="img-tab-badge">707</span>
+    </button>
+    <button class="tab-btn" data-tab="videos">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+      Video Temporal Episodes & AI Diff
+    </button>
+    <button class="tab-btn" data-tab="calibration">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+      Spatial Geometry Validator
+    </button>
+    <button class="tab-btn" data-tab="events">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+      AI Event Review Queue
+    </button>
+    <button class="tab-btn" data-tab="export">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      Dataset Curation & Versioning
+    </button>
+    <button class="tab-btn" data-tab="staged">
+      <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+      Staged Recording Protocol
+    </button>
+  </nav>
+
+  <!-- Main Content Area -->
+  <main class="workbench-content">
+
+    <!-- ===================================================================== -->
+    <!-- TAB 1: OVERVIEW & QUALITY METRICS -->
+    <!-- ===================================================================== -->
+    <div id="overview-pane" class="tab-pane active">
+      <div class="grid-cards">
+        <div class="stat-card" style="--card-accent: var(--accent-blue)">
+          <div class="stat-title">Legacy 707 Image Dataset</div>
+          <div class="stat-value" id="stat-total-images">707</div>
+          <div class="stat-subtitle" id="splits-breakdown">train: 501, val: 141, test: 65</div>
+        </div>
+        <div class="stat-card" style="--card-accent: var(--accent-green)">
+          <div class="stat-title">Image Audit Progress</div>
+          <div class="stat-value" id="stat-audit-progress">0%</div>
+          <div class="stat-subtitle" id="stat-audited-count">0 / 707 reviewed</div>
+        </div>
+        <div class="stat-card" style="--card-accent: var(--accent-purple)">
+          <div class="stat-title">Temporal Video Episodes</div>
+          <div class="stat-value" id="stat-total-episodes">6</div>
+          <div class="stat-subtitle" id="stat-human-episodes">3 Human GT, 3 AI Proposals</div>
+        </div>
+        <div class="stat-card" style="--card-accent: var(--accent-rose)">
+          <div class="stat-title">Pending AI Event Reviews</div>
+          <div class="stat-value" id="stat-pending-events">0</div>
+          <div class="stat-subtitle">Human-in-the-Loop Triage</div>
+        </div>
+        <div class="stat-card" style="--card-accent: var(--accent-cyan)">
+          <div class="stat-title">Curated Dataset Versions</div>
+          <div class="stat-value" id="stat-dataset-versions">0</div>
+          <div class="stat-subtitle">Reproducible exports with Manifest</div>
+        </div>
+      </div>
+
+      <div class="panel-layout">
+        <!-- Quick Actions & Guidelines -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Operations Workflow Guide (Sprint 2)</div>
+            <button class="btn btn-primary btn-sm" onclick="triggerIndexAllAssets()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+              Index Local Assets
+            </button>
+          </div>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+            The <strong>Human Data Operations Workbench</strong> enables rapid review and curation of proctoring observation data without modifying core behavior heuristics or altering raw dataset files on disk.
+          </p>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem;">
+            <div style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <h4 style="color: var(--accent-cyan); margin-bottom: 0.5rem;">1. Image Audit & Crops</h4>
+              <p style="font-size: 0.8rem; color: var(--text-secondary);">Audit legacy 707 images. Normalize classes to observable posture labels. Preview actor crops dynamically.</p>
+              <button class="btn btn-sm btn-primary" style="margin-top: 0.75rem;" onclick="switchTab('images')">Open Image Audit →</button>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <h4 style="color: var(--accent-purple); margin-bottom: 0.5rem;">2. Video Timeline & Diff</h4>
+              <p style="font-size: 0.8rem; color: var(--text-secondary);">Annotate millisecond episodes on demo video. Compare Human GT vs AI proposals with Temporal IoU.</p>
+              <button class="btn btn-sm btn-primary" style="margin-top: 0.75rem;" onclick="switchTab('videos')">Open Video Annotation →</button>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <h4 style="color: var(--accent-green); margin-bottom: 0.5rem;">3. Spatial Quality Check</h4>
+              <p style="font-size: 0.8rem; color: var(--text-secondary);">Validate 4-point seat polygons, verify writing zones, and detect overlapping desk bounding boxes.</p>
+              <button class="btn btn-sm btn-primary" style="margin-top: 0.75rem;" onclick="switchTab('calibration')">Validate Geometry →</button>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <h4 style="color: var(--accent-amber); margin-bottom: 0.5rem;">4. Curate ML Dataset</h4>
+              <p style="font-size: 0.8rem; color: var(--text-secondary);">Package reviewed data with group-safe deterministic hashing (no split leakage) and manifest.json.</p>
+              <button class="btn btn-sm btn-primary" style="margin-top: 0.75rem;" onclick="switchTab('export')">Dataset Studio →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Observable Semantics Card -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Observable Label Mapping</div>
+          </div>
+          <div style="font-size: 0.8rem;">
+            <p style="color: var(--text-muted); margin-bottom: 0.75rem;">Ground-truth must represent <em>observable physical actions</em>, not legal conclusions:</p>
+            <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.5rem;">
+              <li><span class="badge-tag badge-green">NORMAL_WRITING</span> Candidate upright, looking at paper</li>
+              <li><span class="badge-tag badge-purple">HEAD_TURN_LEFT</span> Head turned &gt;35° toward left neighbor</li>
+              <li><span class="badge-tag badge-purple">HEAD_TURN_RIGHT</span> Head turned &gt;35° toward right neighbor</li>
+              <li><span class="badge-tag badge-blue">TORSO_LEAN_RIGHT</span> Upper body leaned across aisle</li>
+              <li><span class="badge-tag badge-amber">HAND_BELOW_DESK</span> Hand reaching under table or into pocket</li>
+              <li><span class="badge-tag badge-rose">PHONE_OR_DEVICE</span> Direct device holding or viewing</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 2: 707 IMAGE AUDIT & RAPID REVIEW -->
+    <!-- ===================================================================== -->
+    <div id="images-pane" class="tab-pane">
+      <div class="toolbar">
+        <select id="img-split-filter" class="form-select" onchange="loadImagesList()">
+          <option value="">All Splits</option>
+          <option value="train">Train (501)</option>
+          <option value="val">Val (141)</option>
+          <option value="test">Test (65)</option>
+        </select>
+        <select id="img-status-filter" class="form-select" onchange="loadImagesList()">
+          <option value="">All Statuses</option>
+          <option value="UNAUDITED">Unaudited</option>
+          <option value="AUDITED">Audited</option>
+          <option value="FLAGGED">Flagged / Ambiguous</option>
+        </select>
+        <button class="btn btn-primary" onclick="loadImagesList()">Filter</button>
+        <span style="font-size: 0.8rem; color: var(--text-secondary); margin-left: auto;">
+          Hotkeys: <span class="hotkey-pill">A</span> Accept & Next | <span class="hotkey-pill">X</span> Ambiguous | <span class="hotkey-pill">←/→</span> Nav | <span class="hotkey-pill">S</span> Side | <span class="hotkey-pill">N</span> Normal | <span class="hotkey-pill">P</span> Phone
+        </span>
+      </div>
+
+      <div class="panel-layout">
+        <!-- Canvas Viewer -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title" id="current-image-title">707 Dataset Image Viewer</div>
+            <div>
+              <button class="btn btn-sm" onclick="selectImageByIndex(currentImageIndex - 1)">← Prev</button>
+              <button class="btn btn-sm btn-primary" onclick="saveCurrentImageReview(true)">Accept & Next (A) →</button>
+            </div>
+          </div>
+          <div class="viewer-container">
+            <canvas id="image-audit-canvas" class="viewer-canvas"></canvas>
+          </div>
+          <!-- Thumbnail Carousel -->
+          <div id="image-carousel" style="display: flex; gap: 0.5rem; overflow-x: auto; padding: 0.75rem 0; margin-top: 0.5rem;"></div>
+        </div>
+
+        <!-- Bounding Box & Actor Crop Inspector -->
+        <div class="panel-card" id="bbox-inspector-panel">
+          <div class="panel-header">
+            <div class="panel-title">Actor Crop & Label Review</div>
+          </div>
+
+          <!-- Dynamic Actor Crop Live Box -->
+          <div class="crop-preview-box">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem;">Dynamic Actor Crop Preview (224x224)</div>
+            <img id="actor-crop-preview-img" class="crop-preview-img" src="" alt="Actor Crop" />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Raw YOLO Label:</label>
+              <strong id="orig-class-display" style="font-size: 0.95rem; color: var(--text-secondary);">-</strong>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Reviewed Observable Class:</label>
+              <select id="reviewed-class-select" class="form-select" style="width: 100%;">
+                <option value="NORMAL_WRITING">NORMAL_WRITING (Candidate Attentive)</option>
+                <option value="HEAD_TURN_LEFT">HEAD_TURN_LEFT (Looking Left Neighbor)</option>
+                <option value="HEAD_TURN_RIGHT">HEAD_TURN_RIGHT (Looking Right Neighbor)</option>
+                <option value="HEAD_TURN_SIDE">HEAD_TURN_SIDE (Generic Side Glance)</option>
+                <option value="HEAD_TURN_BACK">HEAD_TURN_BACK (Looking Behind)</option>
+                <option value="HEAD_LEAN_FRONT">HEAD_LEAN_FRONT (Peeking in Front)</option>
+                <option value="TORSO_LEAN_LEFT">TORSO_LEAN_LEFT (Leaning Left)</option>
+                <option value="TORSO_LEAN_RIGHT">TORSO_LEAN_RIGHT (Leaning Right)</option>
+                <option value="HAND_BELOW_DESK">HAND_BELOW_DESK (Hands out of sight)</option>
+                <option value="PHONE_OR_DEVICE_INTERACTION">PHONE_OR_DEVICE_INTERACTION</option>
+                <option value="OTHER_ANOMALY">OTHER_ANOMALY (Ambiguous / Occluded)</option>
+              </select>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 0.25rem;">
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" id="is-ambiguous-checkbox" />
+                <span>Flag Ambiguous (X)</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; cursor: pointer;">
+                <input type="checkbox" id="is-rejected-checkbox" />
+                <span>Reject / Corrupt</span>
+              </label>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 0.2rem;">Audit Notes:</label>
+              <input type="text" id="audit-notes-input" class="form-control" placeholder="e.g. slight glare, candidate looking at watch" style="width: 100%;" />
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 0.5rem;">
+              <button class="btn btn-success" style="flex: 1;" onclick="saveCurrentImageReview(false)">Save Revision</button>
+              <button class="btn btn-primary" style="flex: 1;" onclick="saveCurrentImageReview(true)">Save & Next →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 3: VIDEO TEMPORAL EPISODES & AI DIFF -->
+    <!-- ===================================================================== -->
+    <div id="videos-pane" class="tab-pane">
+      <div class="toolbar">
+        <select id="video-asset-select" class="form-select" onchange="selectVideoAsset(this.value)" style="min-width: 320px;"></select>
+        <span style="font-size: 0.85rem; color: var(--text-secondary);">
+          Current Playhead: <strong id="current-time-ms-display" style="color: var(--accent-cyan); font-family: var(--font-mono);">0 ms</strong>
+        </span>
+      </div>
+
+      <div class="panel-layout">
+        <!-- Video Player & Dual Timeline -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Video Stream Player & Scrubber</div>
+          </div>
+          <video id="workbench-video-player" controls style="width: 100%; max-height: 420px; background: #000; border-radius: var(--radius-sm);"></video>
+
+          <!-- Interactive Timeline -->
+          <div class="timeline-container">
+            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
+              <span>0:00 (0ms)</span>
+              <span><strong>Dual Timeline:</strong> <span style="color:#10b981;">■ Human GT</span> | <span style="color:#8b5cf6;">■ AI Proposals</span></span>
+              <span>End</span>
+            </div>
+            <div id="timeline-track-wrapper" class="timeline-track-wrapper">
+              <div id="timeline-playhead" class="timeline-playhead"></div>
+              <div id="timeline-track" class="timeline-track"></div>
+            </div>
+          </div>
+
+          <!-- AI vs Human Diff Metrics -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-top: 1rem;">
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: 0.7rem; color: var(--text-muted);">Precision</div>
+              <div id="comp-precision" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">100%</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: 0.7rem; color: var(--text-muted);">Recall</div>
+              <div id="comp-recall" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-green);">100%</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: 0.7rem; color: var(--text-muted);">F1-Score</div>
+              <div id="comp-f1" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-cyan);">1.00</div>
+            </div>
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); text-align: center;">
+              <div style="font-size: 0.7rem; color: var(--text-muted);">Avg Temporal IoU</div>
+              <div id="comp-avg-iou" style="font-size: 1.25rem; font-weight: 700; color: var(--accent-purple);">0.85</div>
+            </div>
+          </div>
+
+          <!-- Comparison Table -->
+          <h4 style="margin: 1.25rem 0 0.5rem 0; font-size: 0.9rem; color: var(--text-secondary);">Temporal IoU Matched Episodes</h4>
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Seat</th>
+                <th>Human GT Window</th>
+                <th>AI Proposal Window</th>
+                <th>IoU (time)</th>
+                <th>Start Latency</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="comparison-table-body"></tbody>
+          </table>
+        </div>
+
+        <!-- Episode Annotation Tool -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Add Temporal Episode</div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Observable Episode Type:</label>
+              <select id="ep-type-select" class="form-select" style="width: 100%;">
+                <option value="HEAD_TURN_LEFT">HEAD_TURN_LEFT (Gaze / Yaw Left)</option>
+                <option value="HEAD_TURN_RIGHT">HEAD_TURN_RIGHT (Gaze / Yaw Right)</option>
+                <option value="TORSO_LEAN_LEFT">TORSO_LEAN_LEFT (Torso Left)</option>
+                <option value="TORSO_LEAN_RIGHT">TORSO_LEAN_RIGHT (Torso Right)</option>
+                <option value="HAND_BELOW_DESK">HAND_BELOW_DESK (Under desk)</option>
+                <option value="NORMAL_WRITING">NORMAL_WRITING (Candidate Attentive)</option>
+                <option value="PHONE_OR_DEVICE_INTERACTION">PHONE_OR_DEVICE_INTERACTION</option>
+              </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Seat Code:</label>
+                <select id="ep-seat-code" class="form-select" style="width: 100%;">
+                  <option value="SEAT-01">SEAT-01</option>
+                  <option value="SEAT-02">SEAT-02</option>
+                  <option value="SEAT-03">SEAT-03</option>
+                  <option value="SEAT-04">SEAT-04</option>
+                  <option value="SEAT-05">SEAT-05</option>
+                </select>
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Target Neighbor:</label>
+                <select id="ep-neighbor-code" class="form-select" style="width: 100%;">
+                  <option value="">None</option>
+                  <option value="SEAT-01">SEAT-01</option>
+                  <option value="SEAT-02">SEAT-02</option>
+                  <option value="SEAT-03">SEAT-03</option>
+                  <option value="SEAT-04">SEAT-04</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Timestamps Setters -->
+            <div style="background: var(--bg-secondary); padding: 0.75rem; border-radius: var(--radius-sm); border: 1px solid var(--border-color);">
+              <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                <input type="number" id="ep-start-ms" class="form-control" placeholder="Start ms" style="width: 90px;" />
+                <button class="btn btn-sm btn-primary" onclick="markStartTimestamp()">Mark Start [</button>
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem;">
+                <input type="number" id="ep-peak-ms" class="form-control" placeholder="Peak ms" style="width: 90px;" />
+                <button class="btn btn-sm" onclick="markPeakTimestamp()">Mark Peak P</button>
+              </div>
+              <div style="display: flex; gap: 0.5rem; align-items: center;">
+                <input type="number" id="ep-end-ms" class="form-control" placeholder="End ms" style="width: 90px;" />
+                <button class="btn btn-sm btn-primary" onclick="markEndTimestamp()">Mark End ]</button>
+              </div>
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Observation Notes:</label>
+              <textarea id="ep-notes" class="form-control" rows="2" placeholder="Describe physical movement..." style="width: 100%;"></textarea>
+            </div>
+
+            <button class="btn btn-success" onclick="createEpisode()">+ Add Ground-Truth Episode</button>
+          </div>
+
+          <h4 style="margin: 1.25rem 0 0.5rem 0; font-size: 0.9rem; color: var(--text-secondary);">All Annotated Episodes</h4>
+          <div class="table-responsive" style="max-height: 240px; overflow-y: auto;">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Source</th>
+                  <th>Seat</th>
+                  <th>Type</th>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Dur</th>
+                  <th>Target</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="episodes-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 4: SPATIAL CALIBRATION & GEOMETRY VALIDATOR -->
+    <!-- ===================================================================== -->
+    <div id="calibration-pane" class="tab-pane">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">Classroom Spatial Context & Seat ROI Geometric Quality Checker</div>
+          <button class="btn btn-primary" onclick="runCalibrationCheck()">Re-run Validation</button>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+          Automatically checks seat polygons for convexity, minimum area, frame boundary compliance, inter-seat overlap percentage, and desk writing zone assignments.
+        </p>
+        <div id="calibration-check-results"></div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 5: AI EVENT REVIEW QUEUE -->
+    <!-- ===================================================================== -->
+    <div id="events-pane" class="tab-pane">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">Human-in-the-Loop AI Event Triage Queue</div>
+          <button class="btn btn-sm" onclick="loadEventReviewQueue()">Refresh Queue</button>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+          Proctor triage decisions are logged into immutable audit logs. Verified true positives can be curated into validation benchmarks.
+        </p>
+        <div id="event-review-queue-container"></div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 6: DATASET CURATION & VERSIONED EXPORT -->
+    <!-- ===================================================================== -->
+    <div id="export-pane" class="tab-pane">
+      <div class="panel-layout">
+        <!-- Export Form -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Curate & Export Versioned ML Dataset</div>
+          </div>
+          <p style="color: var(--text-secondary); margin-bottom: 1rem; font-size: 0.85rem;">
+            Packages reviewed ground truth with <strong>deterministic group-safe splitting</strong> (MD5 hash on parent asset ID) to guarantee zero train/val/test data leakage.
+          </p>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Collection Name:</label>
+              <input type="text" id="export-collection-name" class="form-control" value="VIGIL_707_ACTOR_CROPS" style="width: 100%;" />
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Version Tag:</label>
+              <input type="text" id="export-version-tag" class="form-control" value="v1.0.0" style="width: 100%;" />
+            </div>
+
+            <div>
+              <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Export Format:</label>
+              <select id="export-format-select" class="form-select" style="width: 100%;">
+                <option value="CLASSIFICATION_CROPS">Actor-Crop Classification Folders (train/val/test/{class})</option>
+                <option value="EPISODE_JSON">Temporal Episodes JSON with Ground-Truth Windows</option>
+              </select>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;">
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Train Ratio:</label>
+                <input type="number" step="0.05" id="export-train-ratio" class="form-control" value="0.70" />
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Val Ratio:</label>
+                <input type="number" step="0.05" id="export-val-ratio" class="form-control" value="0.15" />
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Test Ratio:</label>
+                <input type="number" step="0.05" id="export-test-ratio" class="form-control" value="0.15" />
+              </div>
+            </div>
+
+            <button class="btn btn-primary" style="margin-top: 0.5rem;" onclick="triggerDatasetExport()">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export Dataset & Generate Manifest.json
+            </button>
+          </div>
+        </div>
+
+        <!-- Exported Releases List -->
+        <div class="panel-card">
+          <div class="panel-header">
+            <div class="panel-title">Released Dataset Versions</div>
+          </div>
+          <div id="dataset-versions-container"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- TAB 7: STAGED RECORDING PROTOCOL -->
+    <!-- ===================================================================== -->
+    <div id="staged-pane" class="tab-pane">
+      <div class="panel-card">
+        <div class="panel-header">
+          <div class="panel-title">Staged Exam Recording Protocol & Scenario Checklist</div>
+        </div>
+        <p style="color: var(--text-secondary); margin-bottom: 1.25rem;">
+          Standard operating protocol for recording scripted multi-actor classroom scenarios to validate AI perception under controlled proctoring conditions.
+        </p>
+        <div id="staged-sessions-container"></div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Client Script -->
+  <script src="/static/js/data_workbench.js"></script>
+</body>
+</html>

@@ -363,7 +363,7 @@
 
           <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-              <span>💡 <em>Click video or <span class="hotkey-pill">Space</span> to Play/Pause &bull; Click Seat to select &bull; <span class="hotkey-pill">Del</span> Delete seat &bull; <span class="hotkey-pill">← / →</span> Seek 5s &bull; <span class="hotkey-pill">, / .</span> Step Frame</em></span>
+              <span>💡 <em>Click keyframe/block on timeline to select/move/delete &bull; Drag handles to resize &bull; <span class="hotkey-pill">Space</span> Play/Pause &bull; <span class="hotkey-pill">Del</span> Delete &bull; <span class="hotkey-pill">Alt + ← / →</span> Nudge 100ms &bull; <span class="hotkey-pill">, / .</span> Step Frame</em></span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
               <span id="hovered-seat-indicator" style="color: var(--accent-cyan); font-weight: 600;"></span>
@@ -377,7 +377,7 @@
           <div class="timeline-container">
             <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--text-muted);">
               <span>0:00 (0ms)</span>
-              <span><strong>Dual Timeline:</strong> <span style="color:#10b981;">■ Human GT</span> | <span style="color:#8b5cf6;">■ AI Proposals</span></span>
+              <span><strong>Dual Timeline:</strong> <span style="color:#10b981;">■ Human GT (Drag / Resize / Move ⬥ Peak)</span> | <span style="color:#8b5cf6;">■ AI Proposals</span></span>
               <span>End</span>
             </div>
             <div id="timeline-track-wrapper" class="timeline-track-wrapper">
@@ -424,9 +424,10 @@
         </div>
 
         <!-- Episode Annotation Tool -->
-        <div class="panel-card">
+        <div class="panel-card" id="episode-inspector-panel">
           <div class="panel-header">
-            <div class="panel-title">Add Temporal Episode</div>
+            <div class="panel-title" id="ep-panel-title">Add Temporal Episode</div>
+            <button id="btn-reset-ep-form" class="btn btn-sm btn-outline" style="display: none;" onclick="resetEpisodeForm()">+ New Episode</button>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
@@ -482,12 +483,28 @@
               </div>
             </div>
 
+            <!-- Micro Nudge Toolbar (Visible when episode selected) -->
+            <div id="ep-nudge-toolbar" style="display: none; background: rgba(59, 130, 246, 0.08); padding: 0.5rem; border-radius: var(--radius-sm); border: 1px dashed var(--accent-blue);">
+              <div style="font-size: 0.72rem; color: var(--accent-cyan); font-weight: 600; margin-bottom: 0.35rem;">
+                ⏱️ Nudge / Move Episode Window:
+              </div>
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                <button class="btn btn-sm" onclick="nudgeSelectedEpisode(-500)" title="Shift entire window left by 500ms">⏪ -500ms</button>
+                <button class="btn btn-sm" onclick="nudgeSelectedEpisode(-100)" title="Shift entire window left by 100ms">◀ -100ms</button>
+                <button class="btn btn-sm" onclick="nudgeSelectedEpisode(100)" title="Shift entire window right by 100ms">+100ms ▶</button>
+                <button class="btn btn-sm" onclick="nudgeSelectedEpisode(500)" title="Shift entire window right by 500ms">+500ms ⏩</button>
+              </div>
+            </div>
+
             <div>
               <label style="font-size: 0.75rem; color: var(--text-muted); display: block;">Observation Notes:</label>
               <textarea id="ep-notes" class="form-control" rows="2" placeholder="Describe physical movement..." style="width: 100%;"></textarea>
             </div>
 
-            <button class="btn btn-success" onclick="createEpisode()">+ Add Ground-Truth Episode</button>
+            <!-- Dynamic Action Buttons -->
+            <div id="ep-actions-container">
+              <button id="btn-create-episode" class="btn btn-success" style="width: 100%;" onclick="createEpisode()">+ Add Ground-Truth Episode</button>
+            </div>
           </div>
 
           <h4 style="margin: 1.25rem 0 0.5rem 0; font-size: 0.9rem; color: var(--text-secondary);">All Annotated Episodes</h4>

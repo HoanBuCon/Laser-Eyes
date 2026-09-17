@@ -21,6 +21,15 @@ let showSeatRois = true;
 let showSeatLabels = true;
 let hoveredSeatCode = null;
 let selectedSeatCode = null;
+let selectedEpisodeId = null;
+let isTimelineDragging = false;
+let dragMode = null; // 'resize-start' | 'resize-end' | 'move-peak' | 'move-all'
+let dragEpisodeId = null;
+let dragStartX = 0;
+let dragInitialStartMs = 0;
+let dragInitialPeakMs = 0;
+let dragInitialEndMs = 0;
+let dragCurrentValues = null;
 
 // DOM Loaded
 document.addEventListener("DOMContentLoaded", () => {
@@ -893,10 +902,21 @@ function initVideoHotkeys() {
       e.preventDefault();
       toggleVideoPlay();
     } else if (e.key === "Delete" || e.key === "Backspace") {
-      if (selectedSeatCode) {
+      if (selectedEpisodeId) {
+        e.preventDefault();
+        deleteSelectedEpisode();
+      } else if (selectedSeatCode) {
         e.preventDefault();
         deleteSelectedSeat(selectedSeatCode);
       }
+    } else if (e.altKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      if (selectedEpisodeId) {
+        const delta = (e.key === "ArrowLeft" ? -1 : 1) * (e.shiftKey ? 500 : 100);
+        nudgeSelectedEpisode(delta);
+      }
+    } else if (e.key === "Escape") {
+      resetEpisodeForm();
     } else if (e.key === "ArrowLeft") {
       e.preventDefault();
       stepVideoTime(e.shiftKey ? -5 : -1);
@@ -955,6 +975,7 @@ async function selectVideoAsset(videoId) {
       videoEl.src = `${API_BASE}/videos/${currentVideoAsset.id}/file`;
     }
 
+    resetEpisodeForm();
     loadAvailableSeats();
     loadVideoEpisodes(videoId);
     loadVideoComparison(videoId);
@@ -970,6 +991,14 @@ async function loadVideoEpisodes(videoId) {
     videoEpisodes = data.episodes || [];
     renderTimelineBlocks();
     renderEpisodesTable();
+    if (selectedEpisodeId) {
+      const exists = videoEpisodes.some((e) => e.id === selectedEpisodeId);
+      if (exists) {
+        selectEpisode(selectedEpisodeId);
+      } else {
+        resetEpisodeForm();
+      }
+    }
   } catch (err) {
     console.error("Error loading video episodes:", err);
   }
@@ -1010,9 +1039,9 @@ async function loadVideoComparison(videoId) {
 function initTimelineControls() {
   const videoEl = document.getElementById("workbench-video-player");
   const playhead = document.getElementById("timeline-playhead");
-  const track = document.getElementById("timeline-track-wrapper");
+  const trackWrapper = document.getElementById("timeline-track-wrapper");
 
-  if (videoEl && playhead && track) {
+  if (videoEl && playhead && trackWrapper) {
     videoEl.addEventListener("timeupdate", () => {
       if (videoEl.duration > 0) {
         const pct = (videoEl.currentTime / videoEl.duration) * 100;
@@ -1022,41 +1051,306 @@ function initTimelineControls() {
       }
     });
 
-    track.addEventListener("click", (e) => {
-      const rect = track.getBoundingClientRect();
+    trackWrapper.addEventListener("click", (e) => {
+      const rect = trackWrapper.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
-      const pct = clickX / rect.width;
+      const pct = Math.max(0, Math.min(1, clickX / rect.width));
       if (videoEl.duration > 0) {
         videoEl.currentTime = pct * videoEl.duration;
       }
     });
   }
+
+  initTimelineDragEvents();
+}
+
+function initTimelineDragEvents() {
+  window.addEventListener("mousemove", (e) => {
+    if (!isTimelineDragging || !dragEpisodeId || !currentVideoAsset) return;
+
+    const trackWrapper = document.getElementById("timeline-track-wrapper");
+    const videoEl = document.getElementById("workbench-video-player");
+    if (!trackWrapper) return;
+
+    const rect = trackWrapper.getBoundingClientRect();
+    const durationMs = (currentVideoAsset.duration_seconds || 30.0) * 1000;
+    const deltaX = e.clientX - dragStartX;
+    const deltaMs = (deltaX / rect.width) * durationMs;
+
+    let newStart = dragInitialStartMs;
+    let newPeak = dragInitialPeakMs;
+    let newEnd = dragInitialEndMs;
+    const originalDur = Math.max(100, dragInitialEndMs - dragInitialStartMs);
+
+    if (dragMode === "move-all") {
+      newStart = Math.max(0, Math.min(durationMs - originalDur, dragInitialStartMs + deltaMs));
+      newEnd = newStart + originalDur;
+      const peakOffset = dragInitialPeakMs - dragInitialStartMs;
+      newPeak = newStart + peakOffset;
+    } else if (dragMode === "resize-start") {
+      newStart = Math.max(0, Math.min(dragInitialEndMs - 100, dragInitialStartMs + deltaMs));
+      newEnd = dragInitialEndMs;
+      newPeak = Math.max(newStart, Math.min(newEnd, dragInitialPeakMs));
+    } else if (dragMode === "resize-end") {
+      newStart = dragInitialStartMs;
+      newEnd = Math.min(durationMs, Math.max(dragInitialStartMs + 100, dragInitialEndMs + deltaMs));
+      newPeak = Math.max(newStart, Math.min(newEnd, dragInitialPeakMs));
+    } else if (dragMode === "move-peak") {
+      newStart = dragInitialStartMs;
+      newEnd = dragInitialEndMs;
+      newPeak = Math.max(newStart, Math.min(newEnd, dragInitialPeakMs + deltaMs));
+    }
+
+    dragCurrentValues = {
+      start_ms: Math.round(newStart),
+      peak_ms: Math.round(newPeak),
+      end_ms: Math.round(newEnd),
+    };
+
+    // Live update block element
+    const block = document.querySelector(`.timeline-block[data-ep-id="${dragEpisodeId}"]`);
+    if (block) {
+      const leftPct = (newStart / durationMs) * 100;
+      const widthPct = Math.max(1.2, ((newEnd - newStart) / durationMs) * 100);
+      block.style.left = `${leftPct}%`;
+      block.style.width = `${widthPct}%`;
+
+      const peakPin = block.querySelector(".timeline-peak-pin");
+      if (peakPin && newEnd - newStart > 0) {
+        const peakPct = ((newPeak - newStart) / (newEnd - newStart)) * 100;
+        peakPin.style.left = `${Math.min(100, Math.max(0, peakPct))}%`;
+      }
+    }
+
+    // Live update form fields
+    const startIn = document.getElementById("ep-start-ms");
+    const peakIn = document.getElementById("ep-peak-ms");
+    const endIn = document.getElementById("ep-end-ms");
+    if (startIn) startIn.value = dragCurrentValues.start_ms;
+    if (peakIn) peakIn.value = dragCurrentValues.peak_ms;
+    if (endIn) endIn.value = dragCurrentValues.end_ms;
+
+    // Live scrub video to head or peak
+    if (videoEl && videoEl.duration > 0) {
+      const seekTime = (dragMode === "move-peak" ? newPeak : newStart) / 1000.0;
+      videoEl.currentTime = Math.max(0, Math.min(videoEl.duration, seekTime));
+    }
+  });
+
+  window.addEventListener("mouseup", async () => {
+    if (!isTimelineDragging) return;
+    const epId = dragEpisodeId;
+    const values = dragCurrentValues;
+
+    isTimelineDragging = false;
+    dragMode = null;
+    dragEpisodeId = null;
+    dragCurrentValues = null;
+
+    const block = document.querySelector(`.timeline-block[data-ep-id="${epId}"]`);
+    if (block) block.classList.remove("dragging");
+
+    if (values && (values.start_ms !== dragInitialStartMs || values.end_ms !== dragInitialEndMs || values.peak_ms !== dragInitialPeakMs)) {
+      await updateEpisodeTimestamps(epId, values.start_ms, values.peak_ms, values.end_ms);
+      showToast(`Keyframe moved: ${values.start_ms}ms - ${values.end_ms}ms (Peak: ${values.peak_ms}ms)`, "success");
+    }
+  });
 }
 
 function renderTimelineBlocks() {
   const track = document.getElementById("timeline-track");
-  const videoEl = document.getElementById("workbench-video-player");
   if (!track || !currentVideoAsset) return;
 
   const durationMs = (currentVideoAsset.duration_seconds || 30.0) * 1000;
   track.innerHTML = "";
 
   videoEpisodes.forEach((ep) => {
+    const isSelected = ep.id === selectedEpisodeId;
     const leftPct = (ep.start_ms / durationMs) * 100;
-    const widthPct = Math.max(1, ((ep.end_ms - ep.start_ms) / durationMs) * 100);
+    const widthPct = Math.max(1.2, ((ep.end_ms - ep.start_ms) / durationMs) * 100);
+    const epDur = Math.max(1, ep.end_ms - ep.start_ms);
+    const peakMs = ep.peak_ms || ep.start_ms;
+    const peakPctInBlock = Math.min(100, Math.max(0, ((peakMs - ep.start_ms) / epDur) * 100));
 
     const block = document.createElement("div");
-    block.className = `timeline-block ${ep.is_ai_proposal ? 'ai' : 'human'}`;
+    block.className = `timeline-block ${ep.is_ai_proposal ? "ai" : "human"} ${isSelected ? "selected" : ""}`;
+    block.dataset.epId = ep.id;
     block.style.left = `${leftPct}%`;
     block.style.width = `${widthPct}%`;
-    block.title = `${ep.episode_type} (${ep.start_ms} - ${ep.end_ms} ms) [${ep.seat_code || 'SEAT'}]`;
-    block.innerText = `${ep.seat_code ? ep.seat_code + ': ' : ''}${ep.episode_type}`;
-    block.onclick = (e) => {
+    block.title = `${ep.is_ai_proposal ? "[AI PROPOSAL]" : "[HUMAN GT]"} ${ep.seat_code ? ep.seat_code + ": " : ""}${ep.episode_type}\nRange: ${ep.start_ms} - ${ep.end_ms} ms (Peak: ${peakMs}ms)\nClick to select & edit / drag to move`;
+
+    let innerHtml = "";
+    if (!ep.is_ai_proposal) {
+      innerHtml += `<div class="timeline-handle left" title="Drag to adjust Start ms"></div>`;
+    }
+    innerHtml += `<div class="timeline-peak-pin" style="left: ${peakPctInBlock}%;" title="Keyframe Peak: ${peakMs}ms (Drag to move peak)"></div>`;
+    innerHtml += `<span class="timeline-block-label">${ep.seat_code ? ep.seat_code + ": " : ""}${ep.episode_type}</span>`;
+    if (!ep.is_ai_proposal) {
+      innerHtml += `<span class="timeline-delete-btn" title="Delete Keyframe Episode (Del)">×</span>`;
+      innerHtml += `<div class="timeline-handle right" title="Drag to adjust End ms"></div>`;
+    }
+
+    block.innerHTML = innerHtml;
+
+    // Hook events
+    const leftHandle = block.querySelector(".timeline-handle.left");
+    const rightHandle = block.querySelector(".timeline-handle.right");
+    const peakPin = block.querySelector(".timeline-peak-pin");
+    const delBtn = block.querySelector(".timeline-delete-btn");
+
+    if (delBtn) {
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        deleteEpisode(ep.id);
+      });
+    }
+
+    const startDrag = (e, mode) => {
       e.stopPropagation();
-      if (videoEl) videoEl.currentTime = ep.start_ms / 1000.0;
+      e.preventDefault();
+      isTimelineDragging = true;
+      dragMode = mode;
+      dragEpisodeId = ep.id;
+      dragStartX = e.clientX;
+      dragInitialStartMs = ep.start_ms;
+      dragInitialPeakMs = ep.peak_ms || ep.start_ms;
+      dragInitialEndMs = ep.end_ms;
+      dragCurrentValues = { start_ms: ep.start_ms, peak_ms: dragInitialPeakMs, end_ms: ep.end_ms };
+      block.classList.add("dragging");
+      selectEpisode(ep.id);
     };
+
+    if (leftHandle) {
+      leftHandle.addEventListener("mousedown", (e) => startDrag(e, "resize-start"));
+    }
+    if (rightHandle) {
+      rightHandle.addEventListener("mousedown", (e) => startDrag(e, "resize-end"));
+    }
+    if (peakPin && !ep.is_ai_proposal) {
+      peakPin.addEventListener("mousedown", (e) => startDrag(e, "move-peak"));
+    }
+
+    block.addEventListener("mousedown", (e) => {
+      if (e.target === delBtn || e.target === leftHandle || e.target === rightHandle || (e.target === peakPin && !ep.is_ai_proposal)) {
+        return;
+      }
+      if (!ep.is_ai_proposal) {
+        startDrag(e, "move-all");
+      } else {
+        selectEpisode(ep.id);
+      }
+    });
+
+    block.addEventListener("click", (e) => {
+      e.stopPropagation();
+      selectEpisode(ep.id);
+    });
+
     track.appendChild(block);
   });
+}
+
+function selectEpisode(epId) {
+  selectedEpisodeId = epId;
+  const ep = videoEpisodes.find((e) => e.id === epId);
+  if (!ep) return;
+
+  const panelTitle = document.getElementById("ep-panel-title");
+  const resetBtn = document.getElementById("btn-reset-ep-form");
+  const nudgeToolbar = document.getElementById("ep-nudge-toolbar");
+  const actionsContainer = document.getElementById("ep-actions-container");
+
+  if (panelTitle) {
+    panelTitle.innerHTML = `<span>Edit Episode: <strong style="color: ${ep.is_ai_proposal ? 'var(--accent-purple)' : 'var(--accent-green)'};">[${ep.seat_code || 'SEAT'}] ${ep.episode_type}</strong></span>`;
+  }
+  if (resetBtn) resetBtn.style.display = "inline-flex";
+  if (nudgeToolbar) nudgeToolbar.style.display = ep.is_ai_proposal ? "none" : "block";
+
+  // Populate form fields
+  const typeSelect = document.getElementById("ep-type-select");
+  const seatSelect = document.getElementById("ep-seat-code");
+  const neighborSelect = document.getElementById("ep-neighbor-code");
+  const startIn = document.getElementById("ep-start-ms");
+  const peakIn = document.getElementById("ep-peak-ms");
+  const endIn = document.getElementById("ep-end-ms");
+  const notesArea = document.getElementById("ep-notes");
+
+  if (typeSelect) typeSelect.value = ep.episode_type;
+  if (seatSelect && ep.seat_code) {
+    seatSelect.value = ep.seat_code;
+    selectedSeatCode = ep.seat_code;
+    updateDeleteSeatButtonVisibility();
+    renderVideoOverlay();
+  }
+  if (neighborSelect) neighborSelect.value = ep.target_neighbor_id || "";
+  if (startIn) startIn.value = ep.start_ms;
+  if (peakIn) peakIn.value = ep.peak_ms || ep.start_ms;
+  if (endIn) endIn.value = ep.end_ms;
+  if (notesArea) notesArea.value = ep.notes || "";
+
+  // Update action buttons
+  if (actionsContainer) {
+    if (!ep.is_ai_proposal) {
+      actionsContainer.innerHTML = `
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-primary" style="flex: 1;" onclick="saveSelectedEpisode()">💾 Save Changes</button>
+          <button class="btn btn-danger" style="flex: 1;" onclick="deleteSelectedEpisode()">🗑️ Delete (Del)</button>
+        </div>
+      `;
+    } else {
+      actionsContainer.innerHTML = `
+        <button class="btn btn-success" style="width: 100%;" onclick="adoptAiEpisode('${ep.id}')">⭐ Adopt as Human Ground-Truth</button>
+      `;
+    }
+  }
+
+  // Highlight block on timeline
+  document.querySelectorAll(".timeline-block").forEach((b) => {
+    b.classList.toggle("selected", b.dataset.epId === epId);
+  });
+
+  // Highlight table row
+  document.querySelectorAll("#episodes-table-body tr").forEach((tr) => {
+    tr.classList.toggle("selected-row", tr.dataset.epId === epId);
+  });
+
+  // Seek video to start
+  const videoEl = document.getElementById("workbench-video-player");
+  if (videoEl && videoEl.duration > 0) {
+    videoEl.currentTime = ep.start_ms / 1000.0;
+  }
+}
+
+function resetEpisodeForm() {
+  selectedEpisodeId = null;
+
+  const panelTitle = document.getElementById("ep-panel-title");
+  const resetBtn = document.getElementById("btn-reset-ep-form");
+  const nudgeToolbar = document.getElementById("ep-nudge-toolbar");
+  const actionsContainer = document.getElementById("ep-actions-container");
+
+  if (panelTitle) panelTitle.innerText = "Add Temporal Episode";
+  if (resetBtn) resetBtn.style.display = "none";
+  if (nudgeToolbar) nudgeToolbar.style.display = "none";
+
+  const startIn = document.getElementById("ep-start-ms");
+  const peakIn = document.getElementById("ep-peak-ms");
+  const endIn = document.getElementById("ep-end-ms");
+  const notesArea = document.getElementById("ep-notes");
+
+  if (startIn) startIn.value = "";
+  if (peakIn) peakIn.value = "";
+  if (endIn) endIn.value = "";
+  if (notesArea) notesArea.value = "";
+
+  if (actionsContainer) {
+    actionsContainer.innerHTML = `
+      <button id="btn-create-episode" class="btn btn-success" style="width: 100%;" onclick="createEpisode()">+ Add Ground-Truth Episode</button>
+    `;
+  }
+
+  document.querySelectorAll(".timeline-block").forEach((b) => b.classList.remove("selected"));
+  document.querySelectorAll("#episodes-table-body tr").forEach((tr) => tr.classList.remove("selected-row"));
 }
 
 function renderEpisodesTable() {
@@ -1066,7 +1360,7 @@ function renderEpisodesTable() {
   tbody.innerHTML = videoEpisodes
     .map(
       (ep) => `
-    <tr>
+    <tr data-ep-id="${ep.id}" class="${ep.id === selectedEpisodeId ? "selected-row" : ""}" style="cursor: pointer;" onclick="selectEpisode('${ep.id}')">
       <td><span class="badge-tag ${ep.is_ai_proposal ? 'badge-purple' : 'badge-green'}">${ep.is_ai_proposal ? 'AI PROPOSAL' : 'HUMAN GT'}</span></td>
       <td><strong>${ep.seat_code || 'SEAT'}</strong></td>
       <td><span class="badge-tag badge-blue">${ep.episode_type}</span></td>
@@ -1075,7 +1369,10 @@ function renderEpisodesTable() {
       <td>${ep.duration_ms} ms</td>
       <td>${ep.target_neighbor_id || '-'}</td>
       <td>
-        ${!ep.is_ai_proposal ? `<button class="btn btn-sm btn-danger" onclick="deleteEpisode('${ep.id}')">Delete</button>` : ''}
+        ${!ep.is_ai_proposal
+          ? `<button class="btn btn-sm btn-danger" onclick="event.stopPropagation(); deleteEpisode('${ep.id}')">Delete</button>`
+          : `<button class="btn btn-sm btn-success" onclick="event.stopPropagation(); adoptAiEpisode('${ep.id}')">Adopt</button>`
+        }
       </td>
     </tr>
   `
@@ -1086,21 +1383,54 @@ function renderEpisodesTable() {
 function markStartTimestamp() {
   const videoEl = document.getElementById("workbench-video-player");
   if (videoEl) {
-    document.getElementById("ep-start-ms").value = Math.round(videoEl.currentTime * 1000);
+    const curMs = Math.round(videoEl.currentTime * 1000);
+    const startIn = document.getElementById("ep-start-ms");
+    if (startIn) startIn.value = curMs;
+
+    if (selectedEpisodeId) {
+      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+      if (ep && !ep.is_ai_proposal) {
+        const peakMs = Math.max(curMs, ep.peak_ms || curMs);
+        const endMs = Math.max(curMs + 100, ep.end_ms);
+        updateEpisodeTimestamps(selectedEpisodeId, curMs, peakMs, endMs);
+      }
+    }
   }
 }
 
 function markPeakTimestamp() {
   const videoEl = document.getElementById("workbench-video-player");
   if (videoEl) {
-    document.getElementById("ep-peak-ms").value = Math.round(videoEl.currentTime * 1000);
+    const curMs = Math.round(videoEl.currentTime * 1000);
+    const peakIn = document.getElementById("ep-peak-ms");
+    if (peakIn) peakIn.value = curMs;
+
+    if (selectedEpisodeId) {
+      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+      if (ep && !ep.is_ai_proposal) {
+        const startMs = Math.min(curMs, ep.start_ms);
+        const endMs = Math.max(curMs, ep.end_ms);
+        updateEpisodeTimestamps(selectedEpisodeId, startMs, curMs, endMs);
+      }
+    }
   }
 }
 
 function markEndTimestamp() {
   const videoEl = document.getElementById("workbench-video-player");
   if (videoEl) {
-    document.getElementById("ep-end-ms").value = Math.round(videoEl.currentTime * 1000);
+    const curMs = Math.round(videoEl.currentTime * 1000);
+    const endIn = document.getElementById("ep-end-ms");
+    if (endIn) endIn.value = curMs;
+
+    if (selectedEpisodeId) {
+      const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+      if (ep && !ep.is_ai_proposal) {
+        const startMs = Math.min(Math.max(0, curMs - 100), ep.start_ms);
+        const peakMs = Math.min(curMs, ep.peak_ms || startMs);
+        updateEpisodeTimestamps(selectedEpisodeId, startMs, peakMs, curMs);
+      }
+    }
   }
 }
 
@@ -1138,23 +1468,179 @@ async function createEpisode() {
       body: jsonSafeStringify(payload),
     });
     if (res.ok) {
+      const data = await res.json();
       showToast("Ground-truth episode added!", "success");
-      loadVideoEpisodes(currentVideoAsset.id);
-      loadVideoComparison(currentVideoAsset.id);
+      await loadVideoEpisodes(currentVideoAsset.id);
+      await loadVideoComparison(currentVideoAsset.id);
+      if (data.episode_id) selectEpisode(data.episode_id);
     }
   } catch (err) {
     showToast("Failed to create episode", "error");
   }
 }
 
+async function saveSelectedEpisode() {
+  if (!currentVideoAsset || !selectedEpisodeId) return;
+
+  const epType = document.getElementById("ep-type-select").value;
+  const startMs = parseFloat(document.getElementById("ep-start-ms").value || "0");
+  const peakMs = parseFloat(document.getElementById("ep-peak-ms").value || startMs);
+  const endMs = parseFloat(document.getElementById("ep-end-ms").value || "0");
+  const seatCode = document.getElementById("ep-seat-code").value;
+  const targetNeighbor = document.getElementById("ep-neighbor-code").value;
+  const notes = document.getElementById("ep-notes").value;
+
+  if (endMs <= startMs) {
+    showToast("End timestamp must be greater than Start timestamp", "error");
+    return;
+  }
+
+  const payload = {
+    episode_type: epType,
+    start_ms: startMs,
+    peak_ms: peakMs,
+    end_ms: endMs,
+    seat_code: seatCode,
+    target_neighbor_id: targetNeighbor || null,
+    notes: notes,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/videos/${currentVideoAsset.id}/episodes/${selectedEpisodeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: jsonSafeStringify(payload),
+    });
+
+    if (res.ok) {
+      showToast("Episode updated successfully!", "success");
+      await loadVideoEpisodes(currentVideoAsset.id);
+      await loadVideoComparison(currentVideoAsset.id);
+      selectEpisode(selectedEpisodeId);
+    } else {
+      const err = await res.json();
+      showToast(`Failed to update: ${err.detail || "Server error"}`, "error");
+    }
+  } catch (err) {
+    showToast(`Error updating episode: ${err.message}`, "error");
+  }
+}
+
+async function deleteSelectedEpisode() {
+  if (!selectedEpisodeId) return;
+  await deleteEpisode(selectedEpisodeId);
+}
+
+async function nudgeSelectedEpisode(deltaMs) {
+  if (!selectedEpisodeId || !currentVideoAsset) return;
+  const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+  if (!ep || ep.is_ai_proposal) return;
+
+  const durationMs = (currentVideoAsset.duration_seconds || 30.0) * 1000;
+  const curDur = ep.end_ms - ep.start_ms;
+  let newStart = Math.max(0, Math.min(durationMs - curDur, ep.start_ms + deltaMs));
+  let newEnd = newStart + curDur;
+  let newPeak = (ep.peak_ms || ep.start_ms) + deltaMs;
+  newPeak = Math.max(newStart, Math.min(newEnd, newPeak));
+
+  await updateEpisodeTimestamps(selectedEpisodeId, Math.round(newStart), Math.round(newPeak), Math.round(newEnd));
+  showToast(`Nudged episode by ${deltaMs > 0 ? "+" : ""}${deltaMs}ms`, "info");
+}
+
+async function adoptAiEpisode(aiEpId) {
+  const targetId = aiEpId || selectedEpisodeId;
+  const aiEp = videoEpisodes.find((e) => e.id === targetId);
+  if (!aiEp || !currentVideoAsset) return;
+
+  const payload = {
+    episode_type: aiEp.episode_type,
+    start_ms: aiEp.start_ms,
+    peak_ms: aiEp.peak_ms || aiEp.start_ms,
+    end_ms: aiEp.end_ms,
+    seat_code: aiEp.seat_code,
+    target_neighbor_id: aiEp.target_neighbor_id || null,
+    reviewer_id: activeRole,
+    notes: `Adopted from AI Proposal (${aiEp.id})`,
+  };
+
+  try {
+    const res = await fetch(`${API_BASE}/videos/${currentVideoAsset.id}/episodes`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: jsonSafeStringify(payload),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      showToast("Adopted AI Proposal as Human Ground-Truth!", "success");
+      await loadVideoEpisodes(currentVideoAsset.id);
+      await loadVideoComparison(currentVideoAsset.id);
+      if (data.episode_id) selectEpisode(data.episode_id);
+    }
+  } catch (err) {
+    showToast(`Failed to adopt AI episode: ${err.message}`, "error");
+  }
+}
+
+async function updateEpisodeTimestamps(epId, startMs, peakMs, endMs) {
+  if (!currentVideoAsset) return;
+  try {
+    const res = await fetch(`${API_BASE}/videos/${currentVideoAsset.id}/episodes/${epId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: jsonSafeStringify({
+        start_ms: startMs,
+        peak_ms: peakMs,
+        end_ms: endMs,
+      }),
+    });
+
+    if (res.ok) {
+      // Update local item
+      const ep = videoEpisodes.find((e) => e.id === epId);
+      if (ep) {
+        ep.start_ms = startMs;
+        ep.peak_ms = peakMs;
+        ep.end_ms = endMs;
+        ep.duration_ms = Math.max(0, endMs - startMs);
+      }
+      renderTimelineBlocks();
+      renderEpisodesTable();
+      loadVideoComparison(currentVideoAsset.id);
+
+      // Update form fields if currently selected
+      if (selectedEpisodeId === epId) {
+        const startIn = document.getElementById("ep-start-ms");
+        const peakIn = document.getElementById("ep-peak-ms");
+        const endIn = document.getElementById("ep-end-ms");
+        if (startIn) startIn.value = startMs;
+        if (peakIn) peakIn.value = peakMs;
+        if (endIn) endIn.value = endMs;
+      }
+    }
+  } catch (err) {
+    console.error("Error updating episode timestamps:", err);
+  }
+}
+
 async function deleteEpisode(epId) {
   if (!currentVideoAsset) return;
+  const ep = videoEpisodes.find((e) => e.id === epId);
+  const label = ep ? `[${ep.seat_code || 'SEAT'}] ${ep.episode_type}` : epId;
+
+  if (!confirm(`Are you sure you want to permanently delete Episode: ${label}?`)) {
+    return;
+  }
+
   try {
     const res = await fetch(`${API_BASE}/videos/${currentVideoAsset.id}/episodes/${epId}`, { method: "DELETE" });
     if (res.ok) {
-      showToast("Episode deleted", "info");
-      loadVideoEpisodes(currentVideoAsset.id);
-      loadVideoComparison(currentVideoAsset.id);
+      showToast(`Deleted keyframe episode: ${label}`, "info");
+      if (selectedEpisodeId === epId) {
+        resetEpisodeForm();
+      }
+      await loadVideoEpisodes(currentVideoAsset.id);
+      await loadVideoComparison(currentVideoAsset.id);
     }
   } catch (err) {
     showToast("Failed to delete episode", "error");

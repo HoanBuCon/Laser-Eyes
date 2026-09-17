@@ -1513,6 +1513,12 @@ function resetEpisodeForm() {
     `;
   }
 
+  // Preserve selected seat code in dropdown
+  const seatSelect = document.getElementById("ep-seat-code");
+  if (seatSelect && selectedSeatCode) {
+    seatSelect.value = selectedSeatCode;
+  }
+
   document.querySelectorAll(".timeline-block").forEach((b) => b.classList.remove("selected"));
   document.querySelectorAll("#episodes-table-body tr").forEach((tr) => tr.classList.remove("selected-row"));
 }
@@ -1542,6 +1548,82 @@ function renderEpisodesTable() {
   `
     )
     .join("");
+}
+
+function markStartTimestamp() {
+  const videoEl = document.getElementById("workbench-video-player");
+  if (!videoEl) return;
+
+  const curMs = Math.round(videoEl.currentTime * 1000);
+  const startIn = document.getElementById("ep-start-ms");
+  const peakIn = document.getElementById("ep-peak-ms");
+  const endIn = document.getElementById("ep-end-ms");
+
+  // If an episode was already selected, clicking Mark Start starts a NEW keyframe
+  // (Prevents overwriting the existing keyframe for this bbox/seat)
+  if (selectedEpisodeId) {
+    resetEpisodeForm();
+  }
+
+  if (startIn) startIn.value = curMs;
+  if (peakIn) peakIn.value = "";
+  if (endIn) endIn.value = "";
+
+  const seatCode = document.getElementById("ep-seat-code")?.value || selectedSeatCode || "SEAT";
+  showToast(`Drafting NEW keyframe for ${seatCode} at ${curMs}ms. Seek and click "Mark End ]" to save.`, "info");
+}
+
+function markPeakTimestamp() {
+  const videoEl = document.getElementById("workbench-video-player");
+  if (!videoEl) return;
+
+  const curMs = Math.round(videoEl.currentTime * 1000);
+  const peakIn = document.getElementById("ep-peak-ms");
+  if (peakIn) peakIn.value = curMs;
+
+  if (selectedEpisodeId) {
+    const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+    if (ep && !ep.is_ai_proposal) {
+      const startMs = Math.min(curMs, ep.start_ms);
+      const endMs = Math.max(curMs, ep.end_ms);
+      updateEpisodeTimestamps(selectedEpisodeId, startMs, curMs, endMs);
+      showToast(`Updated Peak for ${ep.seat_code || 'episode'} to ${curMs}ms`, "success");
+    }
+  } else {
+    showToast(`Marked Peak: ${curMs}ms`, "info");
+  }
+}
+
+async function markEndTimestamp() {
+  const videoEl = document.getElementById("workbench-video-player");
+  if (!videoEl) return;
+
+  const curMs = Math.round(videoEl.currentTime * 1000);
+  const startIn = document.getElementById("ep-start-ms");
+  const endIn = document.getElementById("ep-end-ms");
+
+  if (selectedEpisodeId) {
+    // If editing a selected episode
+    const ep = videoEpisodes.find((e) => e.id === selectedEpisodeId);
+    if (ep && !ep.is_ai_proposal) {
+      if (endIn) endIn.value = curMs;
+      const startMs = Math.min(Math.max(0, curMs - 100), ep.start_ms);
+      const peakMs = Math.min(curMs, ep.peak_ms || startMs);
+      await updateEpisodeTimestamps(selectedEpisodeId, startMs, peakMs, curMs);
+      showToast(`Updated End timestamp for ${ep.seat_code || 'episode'} to ${curMs}ms`, "success");
+    }
+  } else {
+    // We are drafting a new keyframe!
+    if (endIn) endIn.value = curMs;
+    const startMs = parseFloat(startIn?.value || "0");
+    if (curMs <= startMs) {
+      showToast(`End timestamp (${curMs}ms) must be greater than Start (${startMs}ms)`, "error");
+      return;
+    }
+
+    // Automatically create and commit the new ground-truth keyframe episode!
+    await createEpisode();
+  }
 }
 
 async function createEpisode() {

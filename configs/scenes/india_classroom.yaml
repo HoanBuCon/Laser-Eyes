@@ -1,0 +1,286 @@
+scene_id: "india_classroom"
+room_code: "ROOM-CALIB-01"
+room_name: "Phòng Thi Chuẩn A1 (India Perspective)"
+camera_id: "CAM-CALIB-01"
+video_file: "india_classroom.mp4"
+video_resolution:
+  width: 1280
+  height: 720
+  fps: 30.0
+
+calibration_version: "v2.0"
+coordinate_space: "pixel"
+
+seats:
+  - seat_code: "SEAT-ROOM-CALIB-01-01"
+    seat_label: "Bàn 1 Dãy Trái"
+    polygon: [[92.0, 390.0], [299.0, 390.0], [299.0, 568.0], [92.0, 568.0]]
+    desk_boundary_y: 480.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-02"
+    seat_label: "Bàn 1 Dãy Giữa"
+    polygon: [[484.0, 485.0], [702.0, 485.0], [702.0, 651.0], [484.0, 651.0]]
+    desk_boundary_y: 560.0
+    baseline_yaw: -5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-03"
+    seat_label: "Bàn 1 Dãy Phải"
+    polygon: [[978.0, 413.0], [1168.0, 413.0], [1168.0, 682.0], [978.0, 682.0]]
+    desk_boundary_y: 550.0
+    baseline_yaw: -10.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-04"
+    seat_label: "Bàn 2 Dãy Trái"
+    polygon: [[190.0, 283.0], [382.0, 283.0], [382.0, 418.0], [190.0, 418.0]]
+    desk_boundary_y: 350.0
+    baseline_yaw: 5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-05"
+    seat_label: "Bàn 2 Dãy Giữa"
+    polygon: [[470.0, 324.0], [650.0, 324.0], [650.0, 502.0], [470.0, 502.0]]
+    desk_boundary_y: 410.0
+    baseline_yaw: -2.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-06"
+    seat_label: "Bàn 2 Dãy Phải"
+    polygon: [[768.0, 334.0], [932.0, 334.0], [932.0, 484.0], [768.0, 484.0]]
+    desk_boundary_y: 410.0
+    baseline_yaw: -8.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-07"
+    seat_label: "Bàn 3 Dãy Trái"
+    polygon: [[262.0, 226.0], [409.0, 226.0], [409.0, 326.0], [262.0, 326.0]]
+    desk_boundary_y: 270.0
+    baseline_yaw: 8.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-08"
+    seat_label: "Bàn 3 Dãy Giữa"
+    polygon: [[472.0, 240.0], [626.0, 240.0], [626.0, 344.0], [472.0, 344.0]]
+    desk_boundary_y: 290.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-09"
+    seat_label: "Bàn 3 Dãy Phải"
+    polygon: [[688.0, 246.0], [832.0, 246.0], [832.0, 356.0], [688.0, 356.0]]
+    desk_boundary_y: 300.0
+    baseline_yaw: -6.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-10"
+    seat_label: "Bàn 4 Dãy Trái"
+    polygon: [[308.0, 184.0], [428.0, 184.0], [428.0, 256.0], [308.0, 256.0]]
+    desk_boundary_y: 220.0
+    baseline_yaw: 10.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-11"
+    seat_label: "Bàn 4 Dãy Giữa"
+    polygon: [[476.0, 192.0], [598.0, 192.0], [598.0, 268.0], [476.0, 268.0]]
+    desk_boundary_y: 230.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-12"
+    seat_label: "Bàn 4 Dãy Phải"
+    polygon: [[642.0, 198.0], [756.0, 198.0], [756.0, 276.0], [642.0, 276.0]]
+    desk_boundary_y: 235.0
+    baseline_yaw: -5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-13"
+    seat_label: "Bàn 5 Dãy Trái"
+    polygon: [[344.0, 150.0], [442.0, 150.0], [442.0, 206.0], [344.0, 206.0]]
+    desk_boundary_y: 180.0
+    baseline_yaw: 10.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-14"
+    seat_label: "Bàn 5 Dãy Giữa"
+    polygon: [[478.0, 156.0], [576.0, 156.0], [576.0, 214.0], [478.0, 214.0]]
+    desk_boundary_y: 185.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-15"
+    seat_label: "Bàn 5 Dãy Phải"
+    polygon: [[606.0, 160.0], [702.0, 160.0], [702.0, 220.0], [606.0, 220.0]]
+    desk_boundary_y: 190.0
+    baseline_yaw: -4.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-16"
+    seat_label: "Bàn 6 Dãy Trái"
+    polygon: [[372.0, 126.0], [452.0, 126.0], [452.0, 172.0], [372.0, 172.0]]
+    desk_boundary_y: 150.0
+    baseline_yaw: 8.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-17"
+    seat_label: "Bàn 6 Dãy Giữa"
+    polygon: [[480.0, 130.0], [560.0, 130.0], [560.0, 176.0], [480.0, 176.0]]
+    desk_boundary_y: 155.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-18"
+    seat_label: "Bàn 6 Dãy Phải"
+    polygon: [[580.0, 134.0], [658.0, 134.0], [658.0, 180.0], [580.0, 180.0]]
+    desk_boundary_y: 160.0
+    baseline_yaw: -3.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-19"
+    seat_label: "Bàn 7 Dãy Trái"
+    polygon: [[392.0, 108.0], [460.0, 108.0], [460.0, 146.0], [392.0, 146.0]]
+    desk_boundary_y: 125.0
+    baseline_yaw: 5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-20"
+    seat_label: "Bàn 7 Dãy Giữa"
+    polygon: [[482.0, 110.0], [548.0, 110.0], [548.0, 148.0], [482.0, 148.0]]
+    desk_boundary_y: 130.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-ROOM-CALIB-01-21"
+    seat_label: "Bàn 7 Dãy Phải"
+    polygon: [[562.0, 112.0], [626.0, 112.0], [626.0, 150.0], [562.0, 150.0]]
+    desk_boundary_y: 135.0
+    baseline_yaw: -2.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"

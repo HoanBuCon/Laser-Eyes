@@ -1,0 +1,169 @@
+scene_id: "student_classroom"
+room_code: "ROOM-STUDENT-01"
+room_name: "Phòng Thi Thực Nghiệm B2 (Student Perspective)"
+camera_id: "CAM-STUDENT-01"
+video_file: "student_classroom.mp4"
+video_resolution:
+  width: 640
+  height: 352
+  fps: 20.0
+
+calibration_version: "v2.0"
+coordinate_space: "pixel"
+
+seats:
+  - seat_code: "SEAT-STUDENT-01"
+    seat_label: "Bàn 1 Dãy Giữa"
+    polygon: [[194.0, 209.0], [283.0, 209.0], [283.0, 329.0], [194.0, 329.0]]
+    desk_boundary_y: 280.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-02"
+    seat_label: "Bàn 1 Dãy Trái"
+    polygon: [[28.0, 187.0], [100.0, 187.0], [100.0, 259.0], [28.0, 259.0]]
+    desk_boundary_y: 225.0
+    baseline_yaw: 6.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-03"
+    seat_label: "Bàn 1 Dãy Phải"
+    polygon: [[465.0, 200.0], [537.0, 200.0], [537.0, 263.0], [465.0, 263.0]]
+    desk_boundary_y: 235.0
+    baseline_yaw: -6.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-04"
+    seat_label: "Bàn 1 Góc Phải Xa"
+    polygon: [[503.0, 179.0], [579.0, 179.0], [579.0, 251.0], [503.0, 251.0]]
+    desk_boundary_y: 215.0
+    baseline_yaw: -8.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-05"
+    seat_label: "Bàn 2 Dãy Giữa"
+    polygon: [[232.0, 153.0], [310.0, 153.0], [310.0, 269.0], [232.0, 269.0]]
+    desk_boundary_y: 210.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-06"
+    seat_label: "Bàn 2 Dãy Trái"
+    polygon: [[80.0, 185.0], [132.0, 185.0], [132.0, 301.0], [80.0, 301.0]]
+    desk_boundary_y: 240.0
+    baseline_yaw: 5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-07"
+    seat_label: "Bàn 2 Dãy Phải"
+    polygon: [[432.0, 125.0], [525.0, 125.0], [525.0, 226.0], [432.0, 226.0]]
+    desk_boundary_y: 175.0
+    baseline_yaw: -5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-08"
+    seat_label: "Bàn 3 Dãy Giữa"
+    polygon: [[230.0, 112.0], [312.0, 112.0], [312.0, 202.0], [230.0, 202.0]]
+    desk_boundary_y: 160.0
+    baseline_yaw: 0.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-09"
+    seat_label: "Bàn 3 Dãy Phải"
+    polygon: [[291.0, 113.0], [353.0, 113.0], [353.0, 204.0], [291.0, 204.0]]
+    desk_boundary_y: 160.0
+    baseline_yaw: -3.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-10"
+    seat_label: "Bàn 3 Dãy Trái"
+    polygon: [[54.0, 140.0], [116.0, 140.0], [116.0, 213.0], [54.0, 213.0]]
+    desk_boundary_y: 180.0
+    baseline_yaw: 5.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-11"
+    seat_label: "Bàn 4 Dãy Trái"
+    polygon: [[97.0, 114.0], [184.0, 114.0], [184.0, 222.0], [97.0, 222.0]]
+    desk_boundary_y: 170.0
+    baseline_yaw: 4.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"
+
+  - seat_code: "SEAT-STUDENT-12"
+    seat_label: "Bàn 4 Dãy Phải"
+    polygon: [[469.0, 139.0], [526.0, 139.0], [526.0, 186.0], [469.0, 186.0]]
+    desk_boundary_y: 165.0
+    baseline_yaw: -4.0
+    baseline_pitch: 0.0
+    capabilities:
+      head_orientation: "ENABLED"
+      body_lean: "ENABLED"
+      desk_hand_interaction: "ENABLED"
+      seat_occupancy: "ENABLED"
+      pairwise_relation: "ENABLED"

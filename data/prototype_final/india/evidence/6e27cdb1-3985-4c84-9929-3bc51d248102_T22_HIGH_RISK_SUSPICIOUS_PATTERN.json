@@ -1,0 +1,11 @@
+{
+  "event_id": "6e27cdb1-3985-4c84-9929-3bc51d248102",
+  "track_id": 22,
+  "behavior": "HIGH_RISK_SUSPICIOUS_PATTERN",
+  "trigger_frame_idx": 696,
+  "trigger_timestamp_ms": 23200.0,
+  "video_file": "6e27cdb1-3985-4c84-9929-3bc51d248102_T22_HIGH_RISK_SUSPICIOUS_PATTERN.mp4",
+  "sha256_hash": "1ff48c488b787d65381e3d25ab2ccca30ff3686f98709df187cf461b605819cc",
+  "room_id": "ROOM-CALIB-01",
+  "camera_id": "CAM-01"
+}

@@ -12,7 +12,7 @@ Full compliance with SRS v1.0 specifications for:
 from __future__ import annotations
 
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -120,6 +120,7 @@ class SeatCreate(BaseModel):
     seat_code: str = Field(..., example="A101_S01")
     seat_label: Optional[str] = Field(None, example="Dãy 1 Bàn 1")
     polygon_json: List[List[float]] = Field(..., example=[[100, 100], [200, 100], [200, 200], [100, 200]])
+    context_json: Optional[Union[Dict[str, Any], str]] = None
     camera_id: Optional[str] = None
     enabled: bool = True
 
@@ -128,6 +129,7 @@ class SeatUpdate(BaseModel):
     seat_code: Optional[str] = None
     seat_label: Optional[str] = None
     polygon_json: Optional[List[List[float]] | str] = None
+    context_json: Optional[Union[Dict[str, Any], str]] = None
     enabled: Optional[bool] = None
 
 
@@ -146,8 +148,10 @@ class SeatResponse(BaseModel):
     seat_code: str
     seat_label: Optional[str]
     polygon_json: str
+    context_json: Optional[str] = None
     enabled: bool
     created_at: datetime.datetime
+
 
 
 # ---- Exam Session Schemas ----

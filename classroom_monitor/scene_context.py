@@ -14,10 +14,16 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 logger = logging.getLogger("SceneContext")
 
@@ -377,3 +383,87 @@ class SeatGraph:
             "room_id": self.room_id,
             "seats": {sid: ctx.to_dict() for sid, ctx in self.seats_context.items()},
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SeatGraph:
+        room_id = str(data.get("room_id") or data.get("room_code", ""))
+        graph = cls(room_id=room_id)
+        seats_data = data.get("seats", [])
+        if isinstance(seats_data, dict):
+            for sid, s_dict in seats_data.items():
+                if isinstance(s_dict, dict):
+                    ctx = SeatContext.from_dict(s_dict)
+                    graph.add_seat_context(ctx)
+        elif isinstance(seats_data, list):
+            for s_item in seats_data:
+                if isinstance(s_item, dict):
+                    ctx = SeatContext.from_dict(s_item)
+                    graph.add_seat_context(ctx)
+        return graph
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> SeatGraph:
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Scene configuration file not found: {p}")
+        text = p.read_text(encoding="utf-8")
+        if p.suffix.lower() in [".yaml", ".yml"]:
+            if yaml is None:
+                raise ImportError("PyYAML is required to parse YAML scene configs")
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+        return cls.from_dict(data)
+
+
+@dataclass
+class SceneProfile:
+    """Complete Scene Profile containing room metadata, resolution, and SeatGraph."""
+
+    scene_id: str
+    room_code: str
+    room_name: str
+    camera_id: str
+    video_file: str
+    video_resolution: Dict[str, Any]
+    seat_graph: SeatGraph
+    calibration_version: str = "v2.0"
+    raw_config: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> SceneProfile:
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Scene config file not found: {p}")
+        text = p.read_text(encoding="utf-8")
+        if p.suffix.lower() in [".yaml", ".yml"]:
+            if yaml is None:
+                raise ImportError("PyYAML is required to parse YAML scene configs")
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+
+        seat_graph = SeatGraph.from_dict(data)
+        # If neighbors are not manually populated, auto infer
+        seats_list = data.get("seats", [])
+        if isinstance(seats_list, list) and len(seats_list) > 0:
+            # Check if any neighbor is defined
+            has_neighbors = any(
+                isinstance(s, dict) and s.get("neighbors") and any(s["neighbors"].values())
+                for s in seats_list
+            )
+            if not has_neighbors:
+                seat_graph.auto_infer_neighbors_from_polygons(seats_list)
+
+        return cls(
+            scene_id=str(data.get("scene_id", p.stem)),
+            room_code=str(data.get("room_code", "")),
+            room_name=str(data.get("room_name", "")),
+            camera_id=str(data.get("camera_id", "")),
+            video_file=str(data.get("video_file", "")),
+            video_resolution=data.get("video_resolution", {"width": 1280, "height": 720, "fps": 30.0}),
+            seat_graph=seat_graph,
+            calibration_version=str(data.get("calibration_version", "v2.0")),
+            raw_config=data,
+        )
+

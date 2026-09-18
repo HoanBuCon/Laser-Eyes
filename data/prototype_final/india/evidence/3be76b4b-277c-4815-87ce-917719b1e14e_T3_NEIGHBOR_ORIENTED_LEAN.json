@@ -1,0 +1,11 @@
+{
+  "event_id": "3be76b4b-277c-4815-87ce-917719b1e14e",
+  "track_id": 3,
+  "behavior": "NEIGHBOR_ORIENTED_LEAN",
+  "trigger_frame_idx": 1882,
+  "trigger_timestamp_ms": 62733.333333333336,
+  "video_file": "3be76b4b-277c-4815-87ce-917719b1e14e_T3_NEIGHBOR_ORIENTED_LEAN.mp4",
+  "sha256_hash": "2f43c398b527e77c3b17a9a485936b49ea8a813b08e758d3a07cc11f8e5a513d",
+  "room_id": "ROOM-CALIB-01",
+  "camera_id": "CAM-01"
+}

@@ -46,7 +46,7 @@ from scripts.benchmark_temporal_ground_truth import (
     compute_temporal_overlap_ms,
     normalize_label,
 )
-from scripts.run_classroom_demo import run_classroom_demo, setup_database_seats
+from classroom_monitor.demo import run_classroom_demo, setup_database_seats
 
 logging.basicConfig(
     level=logging.INFO,

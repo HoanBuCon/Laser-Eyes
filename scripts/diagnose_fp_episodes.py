@@ -24,7 +24,7 @@ from classroom_monitor.config import ClassroomConfig
 from classroom_monitor.detector import PoseClassroomDetector
 from classroom_monitor.head_pose_provider import HeadCropExtractor, SixDRepNetHeadOrientationProvider
 from classroom_monitor.seat_manager import SeatManager
-from scripts.run_classroom_demo import setup_database_seats
+from classroom_monitor.demo import setup_database_seats
 from scripts.benchmark_temporal_ground_truth import compute_temporal_iou, compute_temporal_overlap_ms, normalize_label
 
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(levelname)s] %(message)s")

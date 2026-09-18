@@ -81,6 +81,7 @@ data/sessions/
 data/uploads/
 data/output_demo/
 data/output_demo_v2/
+data/demo_final/
 data/head_orientation_optimization/
 data/exported_datasets/
 data/settings.json

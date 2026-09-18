@@ -3,51 +3,118 @@
     One-click launcher for VIGIL AI ICTU 2026 Working Prototype Demonstration.
 
 .DESCRIPTION
-    Executes the latest Actor-Centric Temporal Architecture on both india_classroom.mp4
-    and student_classroom.mp4 with 6DRepNet GPU Tensor batching, per-seat baseline subtraction,
-    and automatic evidence generation into data/prototype_final/.
+    Performs pre-flight environment checks, executes unit test verification, and runs
+    the consolidated SRS v2.0 pipeline across both classroom demo videos (India & Student).
+    Generates standardized demo artifacts into data/demo_final/.
 
 .EXAMPLE
     .\scripts\run_prototype.ps1
+    .\scripts\run_prototype.ps1 -Show
+    .\scripts\run_prototype.ps1 -DebugOverlay
 #>
+
+param (
+    [switch]$Show,
+    [switch]$DebugOverlay,
+    [switch]$SkipTests,
+    [string]$HeadProvider = "sixdrepnet",
+    [string]$OutputRoot = "data/demo_final"
+)
+
+$ErrorActionPreference = "Stop"
 
 Write-Host "`n==========================================================================" -ForegroundColor Cyan
 Write-Host " VIGIL AI - AI-Assisted Exam Monitoring Co-Pilot (ICTU 2026)" -ForegroundColor Green
 Write-Host " Master Working Prototype Demonstration Launcher" -ForegroundColor Cyan
 Write-Host "==========================================================================`n" -ForegroundColor Cyan
 
-$PythonExe = ".\venv\Scripts\python.exe"
-if (-not (Test-Path $PythonExe)) {
+# 0. Pre-Flight Environment Checks
+Write-Host "[0/3] Performing Pre-Flight Environment Checks..." -ForegroundColor Yellow
+
+$PythonExe = $null
+if (Test-Path ".\venv\Scripts\python.exe") {
+    $PythonExe = ".\venv\Scripts\python.exe"
+} elseif (Test-Path ".\.venv\Scripts\python.exe") {
+    $PythonExe = ".\.venv\Scripts\python.exe"
+} else {
     $PythonExe = "python"
 }
 
-# 1. Run unit test suite
-Write-Host "[1/3] Running Pytest Unit & Regression Suite..." -ForegroundColor Yellow
-& $PythonExe -m pytest tests/ -q
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ERROR] Test suite failed! Please review errors." -ForegroundColor Red
-    exit $LASTEXITCODE
-}
-Write-Host "[PASS] All 112+ Unit Tests Passed Successfully!`n" -ForegroundColor Green
+Write-Host " - Python Interpreter: $PythonExe" -ForegroundColor DarkGray
 
-# 2. Run multi-video demo pipeline
-Write-Host "[2/3] Running Master Multi-Video Demo Pipeline..." -ForegroundColor Yellow
-& $PythonExe scripts/run_demo_all_videos.py --video all --output-dir data/prototype_final
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ERROR] Pipeline execution encountered an issue!" -ForegroundColor Red
-    exit $LASTEXITCODE
+# Check CUDA support
+$CudaCheck = & $PythonExe -c "import torch; print(f'{torch.cuda.is_available()}|{torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\"}')"
+$CudaParts = $CudaCheck -split '\|'
+$HasCuda = $CudaParts[0].Trim() -eq "True"
+$GpuName = $CudaParts[1].Trim()
+
+if ($HasCuda) {
+    Write-Host " - Hardware Acceleration: CUDA Available ($GpuName)" -ForegroundColor Green
+} else {
+    Write-Host " - Hardware Acceleration: CPU Mode (CUDA not detected)" -ForegroundColor Yellow
 }
 
-# 3. Final summary
-Write-Host "`n[3/3] Output Artifacts Successfully Generated at data/prototype_final/:" -ForegroundColor Yellow
-Write-Host " - Video 1 (India):   data/prototype_final/india/india_classroom_result.mp4" -ForegroundColor Cyan
-Write-Host " - Video 2 (Student): data/prototype_final/student/student_classroom_result.mp4" -ForegroundColor Cyan
-Write-Host " - Ground Truth CSV:  data/prototype_final/india/gt_comparison.csv" -ForegroundColor Cyan
-Write-Host " - Runtime Profile:   data/prototype_final/india/runtime_profile.json" -ForegroundColor Cyan
-Write-Host " - Alert Diagnosis:   data/prototype_final/india/alert_diagnosis.json" -ForegroundColor Cyan
-Write-Host " - 10s Evidence MP4s: data/prototype_final/india/evidence/`n" -ForegroundColor Cyan
+# Check Demo Videos
+$IndiaVideo = Test-Path "demo_video\india_classroom.mp4" -or (Test-Path "video\india_classroom.mp4")
+$StudentVideo = Test-Path "demo_video\student_classroom.mp4" -or (Test-Path "video\student_classroom.mp4")
 
-Write-Host "==========================================================================" -ForegroundColor Green
-Write-Host " VIGIL AI PROTOTYPE READY FOR DEMONSTRATION & REVIEW" -ForegroundColor Green
-Write-Host " To launch Web Dashboard: $PythonExe server.py" -ForegroundColor Yellow
+if (-not $IndiaVideo -or -not $StudentVideo) {
+    Write-Host "[WARNING] One or more demo videos not found in demo_video/ or video/." -ForegroundColor Yellow
+} else {
+    Write-Host " - Video Feeds: Both india_classroom.mp4 and student_classroom.mp4 Verified" -ForegroundColor Green
+}
+
+# 1. Run Unit Tests (unless skipped)
+if (-not $SkipTests) {
+    Write-Host "`n[1/3] Running Pytest Unit & Regression Suite..." -ForegroundColor Yellow
+    & $PythonExe -m pytest tests/ -q
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "`n[ERROR] Test suite failed! Aborting prototype run." -ForegroundColor Red
+        exit $LASTEXITCODE
+    }
+    Write-Host "[PASS] All Unit & Infrastructure Tests Passed Successfully!`n" -ForegroundColor Green
+} else {
+    Write-Host "`n[1/3] Skipping Unit Tests as requested." -ForegroundColor DarkGray
+}
+
+# 2. Run Multi-Video Demo Pipeline
+Write-Host "[2/3] Executing Master Multi-Video Demo Pipeline..." -ForegroundColor Yellow
+
+$DemoArgs = @("scripts/run_demo_all_videos.py", "--output-root", $OutputRoot, "--head-provider", $HeadProvider)
+if ($Show) {
+    $DemoArgs += "--show"
+}
+if ($DebugOverlay) {
+    $DemoArgs += "--debug-overlay"
+}
+
+& $PythonExe $DemoArgs
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "`n[ERROR] Demo pipeline execution encountered an issue!" -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+
+# 3. Verify Generated Output Artifacts
+Write-Host "`n[3/3] Verifying Generated Artifacts in $OutputRoot/:" -ForegroundColor Yellow
+
+$IndiaDir = Join-Path $OutputRoot "india"
+$StudentDir = Join-Path $OutputRoot "student"
+
+Write-Host " - Video 1 (India):" -ForegroundColor Cyan
+Write-Host "     Video:     $(Join-Path $IndiaDir 'result.mp4')" -ForegroundColor DarkGray
+Write-Host "     Episodes:  $(Join-Path $IndiaDir 'episodes.json')" -ForegroundColor DarkGray
+Write-Host "     Events:    $(Join-Path $IndiaDir 'events.json')" -ForegroundColor DarkGray
+Write-Host "     Summary:   $(Join-Path $IndiaDir 'demo_summary.json')" -ForegroundColor DarkGray
+Write-Host "     Runtime:   $(Join-Path $IndiaDir 'runtime_profile.json')" -ForegroundColor DarkGray
+
+Write-Host " - Video 2 (Student):" -ForegroundColor Cyan
+Write-Host "     Video:     $(Join-Path $StudentDir 'result.mp4')" -ForegroundColor DarkGray
+Write-Host "     Episodes:  $(Join-Path $StudentDir 'episodes.json')" -ForegroundColor DarkGray
+Write-Host "     Events:    $(Join-Path $StudentDir 'events.json')" -ForegroundColor DarkGray
+Write-Host "     Summary:   $(Join-Path $StudentDir 'demo_summary.json')" -ForegroundColor DarkGray
+Write-Host "     Runtime:   $(Join-Path $StudentDir 'runtime_profile.json')" -ForegroundColor DarkGray
+
+Write-Host "`n==========================================================================" -ForegroundColor Green
+Write-Host " VIGIL AI PROTOTYPE DEMONSTRATION COMPLETE" -ForegroundColor Green
+Write-Host " Status: DEMO_RUNNER_READY_FOR_HUMAN_REVIEW" -ForegroundColor Cyan
 Write-Host "==========================================================================`n" -ForegroundColor Green

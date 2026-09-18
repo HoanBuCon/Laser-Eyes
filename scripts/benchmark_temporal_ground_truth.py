@@ -28,7 +28,7 @@ import numpy as np
 # Ensure project root in sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from scripts.run_classroom_demo import run_classroom_demo
+from classroom_monitor.demo import run_classroom_demo
 
 logging.basicConfig(
     level=logging.INFO,

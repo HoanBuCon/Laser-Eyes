@@ -43,10 +43,18 @@ if (Test-Path ".\venv\Scripts\python.exe") {
 Write-Host " - Python Interpreter: $PythonExe" -ForegroundColor DarkGray
 
 # Check CUDA support
-$CudaCheck = & $PythonExe -c "import torch; print(f'{torch.cuda.is_available()}|{torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"CPU\"}')"
-$CudaParts = $CudaCheck -split '\|'
-$HasCuda = $CudaParts[0].Trim() -eq "True"
-$GpuName = $CudaParts[1].Trim()
+$CudaCheck = & $PythonExe -c "import torch; is_cuda = torch.cuda.is_available(); name = torch.cuda.get_device_name(0) if is_cuda else 'CPU'; print(str(is_cuda) + '|' + str(name))"
+
+$HasCuda = $false
+$GpuName = "CPU"
+
+if ($CudaCheck -and ($CudaCheck -match '\|')) {
+    $CudaParts = $CudaCheck -split '\|'
+    $HasCuda = ($CudaParts[0].Trim() -eq "True")
+    if ($CudaParts.Length -gt 1) {
+        $GpuName = $CudaParts[1].Trim()
+    }
+}
 
 if ($HasCuda) {
     Write-Host " - Hardware Acceleration: CUDA Available ($GpuName)" -ForegroundColor Green
@@ -55,8 +63,8 @@ if ($HasCuda) {
 }
 
 # Check Demo Videos
-$IndiaVideo = Test-Path "demo_video\india_classroom.mp4" -or (Test-Path "video\india_classroom.mp4")
-$StudentVideo = Test-Path "demo_video\student_classroom.mp4" -or (Test-Path "video\student_classroom.mp4")
+$IndiaVideo = (Test-Path "demo_video\india_classroom.mp4") -or (Test-Path "video\india_classroom.mp4")
+$StudentVideo = (Test-Path "demo_video\student_classroom.mp4") -or (Test-Path "video\student_classroom.mp4")
 
 if (-not $IndiaVideo -or -not $StudentVideo) {
     Write-Host "[WARNING] One or more demo videos not found in demo_video/ or video/." -ForegroundColor Yellow

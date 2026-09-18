@@ -4,13 +4,13 @@
   "resolution": "1280x720",
   "inference_imgsz": 1280,
   "video_fps": 30.0,
-  "total_frames_processed": 2150,
-  "elapsed_seconds": 53.07,
-  "average_fps": 40.5,
+  "total_frames_processed": 2145,
+  "elapsed_seconds": 91.02,
+  "average_fps": 23.6,
   "latency_metrics": {
-    "mean_pose_inference_latency_ms": 22.42,
-    "mean_vector_geometry_latency_ms": 4.54,
-    "mean_effective_frame_latency_ms": 12.02
+    "mean_pose_inference_latency_ms": 20.81,
+    "mean_vector_geometry_latency_ms": 4.56,
+    "mean_effective_frame_latency_ms": 11.5
   },
   "coverage_metrics": {
     "students_tracked_per_frame": 22,

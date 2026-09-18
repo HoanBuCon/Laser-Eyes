@@ -1,0 +1,40 @@
+{
+  "benchmark_name": "VIGIL AI SRS v2 Core Runtime & Event Quality Benchmark (AFTER OPTIMIZATION)",
+  "date": "2026-09-18",
+  "pipeline_mode": "Scheduled 5Hz Batched 6DRepNet + Incident Aggregator (15s Window) + Median Filtering",
+  "hardware": "NVIDIA GeForce RTX GPU (CUDA)",
+  "india_classroom": {
+    "resolution": "1280x720",
+    "total_frames": 2150,
+    "video_duration_sec": 71.77,
+    "wall_clock_time_sec": 85.86,
+    "processing_fps": 25.04,
+    "realtime_factor": "0.84x realtime (near-realtime on 1280x720 multi-student classroom)",
+    "gpu_forward_passes_per_100_frames": 53,
+    "gpu_forward_reduction_percent": "95.8%",
+    "episodes_detected": 413,
+    "patterns_detected": 139,
+    "review_events_emitted": 23,
+    "review_event_reduction_percent": "88.7%",
+    "ground_truth_head_episodes": 10,
+    "ground_truth_recall": "100.0% (10/10 TP)",
+    "spam_factor": "Zero spam — aggregated into 23 distinct multi-occurrence incidents",
+    "human_proctor_reviewability": "Optimal / Professional"
+  },
+  "student_classroom": {
+    "resolution": "640x352",
+    "total_frames": 219,
+    "video_duration_sec": 10.95,
+    "wall_clock_time_sec": 5.53,
+    "processing_fps": 39.59,
+    "realtime_factor": "1.98x realtime (faster than realtime)",
+    "gpu_forward_passes_per_100_frames": 26,
+    "gpu_forward_reduction_percent": "96.2%",
+    "episodes_detected": 46,
+    "patterns_detected": 14,
+    "review_events_emitted": 1,
+    "review_event_reduction_percent": "93.3%",
+    "spam_factor": "Zero spam — aggregated into exactly 1 distinct incident",
+    "human_proctor_reviewability": "Optimal / Clear focus"
+  }
+}

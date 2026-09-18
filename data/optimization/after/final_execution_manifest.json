@@ -1,0 +1,65 @@
+{
+  "timestamp": "2026-09-18 16:49:26",
+  "total_wall_time_sec": 93.73,
+  "head_provider": "sixdrepnet",
+  "hpe_hz": 5.0,
+  "results": {
+    "india": {
+      "status": "SUCCESS",
+      "data": {
+        "name": "india",
+        "video_path": "demo_video\\india_classroom.mp4",
+        "result_video": "data\\optimization\\after\\india\\result.mp4",
+        "total_frames": 2150,
+        "duration_sec": 71.76666666666667,
+        "wall_time_sec": 85.85977554321289,
+        "overall_fps": 25.040829496670572,
+        "realtime_factor": 0.835859006299717,
+        "total_episodes": 413,
+        "total_events": 23,
+        "total_patterns": 139,
+        "exported_files": {
+          "episodes": "data\\optimization\\after\\india\\episodes.json",
+          "events": "data\\optimization\\after\\india\\events.json",
+          "patterns": "data\\optimization\\after\\india\\patterns.json",
+          "summary": "data\\optimization\\after\\india\\demo_summary.json",
+          "runtime": "data\\optimization\\after\\india\\runtime_profile.json"
+        },
+        "benchmark": {
+          "ground_truth_file": "data\\ground_truth\\india_classroom_gt.json",
+          "total_gt_head_episodes": 10,
+          "ai_head_episodes": 197,
+          "true_positives": 10,
+          "false_positives": 187,
+          "false_negatives": 0,
+          "precision": 5.1,
+          "recall": 100.0
+        }
+      }
+    },
+    "student": {
+      "status": "SUCCESS",
+      "data": {
+        "name": "student",
+        "video_path": "demo_video\\student_classroom.mp4",
+        "result_video": "data\\optimization\\after\\student\\result.mp4",
+        "total_frames": 219,
+        "duration_sec": 10.95,
+        "wall_time_sec": 5.531310796737671,
+        "overall_fps": 39.59278515486143,
+        "realtime_factor": 1.9796392577430713,
+        "total_episodes": 46,
+        "total_events": 1,
+        "total_patterns": 14,
+        "exported_files": {
+          "episodes": "data\\optimization\\after\\student\\episodes.json",
+          "events": "data\\optimization\\after\\student\\events.json",
+          "patterns": "data\\optimization\\after\\student\\patterns.json",
+          "summary": "data\\optimization\\after\\student\\demo_summary.json",
+          "runtime": "data\\optimization\\after\\student\\runtime_profile.json"
+        },
+        "benchmark": null
+      }
+    }
+  }
+}

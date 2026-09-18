@@ -1,0 +1,20 @@
+{
+  "overall_fps": 25.04,
+  "total_wall_time_sec": 85.86,
+  "total_video_time_sec": 71.77,
+  "realtime_factor": 0.84,
+  "hardware": {
+    "device": "cuda",
+    "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "torch_version": "2.6.0+cu124"
+  },
+  "stage_latency_averages_ms": {
+    "perception_yolo_pose": 16.78,
+    "observation_6drepnet": 9.94,
+    "temporal_episode_engine": 1.64,
+    "behavior_pattern_engine": 0.39,
+    "seat_risk_tracker": 0.41,
+    "rendering_hud": 3.19,
+    "video_writer_io": 3.31
+  }
+}

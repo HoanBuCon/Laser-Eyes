@@ -91,6 +91,7 @@ class ObservationExtractor:
         nearby_person_count: Optional[int] = None,
         occupancy_state: Optional[str] = None,
         frame: Optional[np.ndarray] = None,
+        precomputed_head_estimate: Optional[HeadOrientationEstimate] = None,
     ) -> List[RawObservation]:
         """Extract all valid observations for the candidate person in the given seat context."""
         observations: List[RawObservation] = []
@@ -164,13 +165,16 @@ class ObservationExtractor:
 
         # 2. Head Orientation Observations
         if seat_context.capabilities.head_orientation != CapabilityStatus.DISABLED:
-            head_est = self.head_pose_provider.estimate(
-                keypoints=keypoints,
-                bbox=detection.bbox,
-                seat_baseline_yaw=seat_context.reference_directions.baseline_yaw,
-                seat_baseline_pitch=seat_context.reference_directions.baseline_pitch,
-                frame=frame,
-            )
+            if precomputed_head_estimate is not None:
+                head_est = precomputed_head_estimate
+            else:
+                head_est = self.head_pose_provider.estimate(
+                    keypoints=keypoints,
+                    bbox=detection.bbox,
+                    seat_baseline_yaw=seat_context.reference_directions.baseline_yaw,
+                    seat_baseline_pitch=seat_context.reference_directions.baseline_pitch,
+                    frame=frame,
+                )
 
             if head_est.yaw is not None:
                 observations.append(

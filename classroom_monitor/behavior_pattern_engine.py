@@ -190,9 +190,13 @@ class BehaviorPatternEngine:
             return None
 
         seat_id = seat_context.seat_id
-        all_recent = self._episode_history.get(seat_id, []) + [
-            ep for ep in active_episodes if ep.seat_id == seat_id and ep.state in (EpisodeState.ACTIVE, EpisodeState.ENDING)
-        ]
+        ep_dict: Dict[str, TemporalEpisode] = {}
+        for ep in self._episode_history.get(seat_id, []):
+            ep_dict[ep.episode_id] = ep
+        for ep in active_episodes:
+            if ep.seat_id == seat_id and ep.state in (EpisodeState.ACTIVE, EpisodeState.ENDING):
+                ep_dict[ep.episode_id] = ep
+        all_recent = list(ep_dict.values())
 
         # Check Left glances (strictly requires configured left neighbor)
         left_neighbor = seat_context.neighbors.left_neighbor_id

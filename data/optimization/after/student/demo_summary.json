@@ -1,0 +1,126 @@
+{
+  "scene_id": "student",
+  "room_code": "ROOM-STUDENT-01",
+  "camera_id": "CAM-STUDENT-01",
+  "video_file": "demo_video\\student_classroom.mp4",
+  "duration_sec": 10.95,
+  "total_frames_processed": 219,
+  "fps": 20.0,
+  "total_calibrated_seats": 12,
+  "active_occupied_seats": 4,
+  "total_canonical_episodes": 46,
+  "episodes_by_type": {
+    "MULTI_PERSON_NEAR_SEAT": 10,
+    "HEAD_TURN_LEFT": 15,
+    "HEAD_TURN_RIGHT": 8,
+    "TORSO_LEAN_LEFT": 1,
+    "SEAT_EMPTY": 4,
+    "HEAD_PITCH_DOWN": 8
+  },
+  "total_review_events": 1,
+  "events_by_severity": {
+    "MEDIUM": 1
+  },
+  "total_detected_patterns": 14,
+  "evidence_clips_saved": 1,
+  "evidence_snapshots_saved": 1,
+  "seat_risk_rankings": [
+    {
+      "seat_code": "SEAT-STUDENT-05",
+      "peak_risk": 84.1,
+      "current_risk": 57.8,
+      "state": "COOLDOWN",
+      "total_episodes_assigned": 5,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-02",
+      "peak_risk": 77.6,
+      "current_risk": 67.0,
+      "state": "SUSPICIOUS",
+      "total_episodes_assigned": 6,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-07",
+      "peak_risk": 69.8,
+      "current_risk": 57.6,
+      "state": "OBSERVE",
+      "total_episodes_assigned": 4,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-11",
+      "peak_risk": 67.2,
+      "current_risk": 63.1,
+      "state": "SUSPICIOUS",
+      "total_episodes_assigned": 5,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-06",
+      "peak_risk": 58.2,
+      "current_risk": 50.6,
+      "state": "OBSERVE",
+      "total_episodes_assigned": 4,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-04",
+      "peak_risk": 56.3,
+      "current_risk": 56.3,
+      "state": "OBSERVE",
+      "total_episodes_assigned": 9,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-01",
+      "peak_risk": 54.8,
+      "current_risk": 33.8,
+      "state": "OBSERVE",
+      "total_episodes_assigned": 2,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-09",
+      "peak_risk": 54.8,
+      "current_risk": 33.8,
+      "state": "OBSERVE",
+      "total_episodes_assigned": 1,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-03",
+      "peak_risk": 19.3,
+      "current_risk": 15.2,
+      "state": "NORMAL",
+      "total_episodes_assigned": 6,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-08",
+      "peak_risk": 0.0,
+      "current_risk": 0.0,
+      "state": "NORMAL",
+      "total_episodes_assigned": 1,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-10",
+      "peak_risk": 0.0,
+      "current_risk": 0.0,
+      "state": "NORMAL",
+      "total_episodes_assigned": 2,
+      "last_active_ms": 10900.0
+    },
+    {
+      "seat_code": "SEAT-STUDENT-12",
+      "peak_risk": 0.0,
+      "current_risk": 0.0,
+      "state": "NORMAL",
+      "total_episodes_assigned": 1,
+      "last_active_ms": 10900.0
+    }
+  ],
+  "benchmark_ground_truth": null
+}

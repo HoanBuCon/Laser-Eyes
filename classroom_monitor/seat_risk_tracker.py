@@ -51,7 +51,7 @@ EPISODE_PRIORITY_WEIGHTS: Dict[str, float] = {
     EpisodeType.TORSO_LEAN_RIGHT.value: 14.0,
     EpisodeType.WRIST_BELOW_DESK.value: 18.0,
     EpisodeType.WRIST_WRITING.value: 0.0,
-    EpisodeType.SEAT_EMPTY.value: 15.0,
+    EpisodeType.SEAT_EMPTY.value: 0.0,            # Passive empty state does not contribute risk; prolonged absence handled by SEAT_LEFT
     EpisodeType.MULTI_PERSON_NEAR_SEAT.value: 20.0,
 }
 
@@ -67,7 +67,7 @@ PATTERN_PRIORITY_WEIGHTS: Dict[str, float] = {
 
 @dataclass
 class SeatRiskProfile:
-    """Per-seat state machine and episodic risk accumulation profile."""
+    """Per-seat state machine, episodic risk accumulation, and active incident profile."""
 
     seat_id: str
     room_id: str = ""
@@ -82,6 +82,7 @@ class SeatRiskProfile:
     cooldown_enter_timestamp_ms: float = 0.0
 
     processed_episode_ids: set[str] = field(default_factory=set)
+    processed_pattern_ids: set[str] = field(default_factory=set)
     pattern_history_counts: Dict[str, int] = field(default_factory=dict)
     recent_patterns: deque[BehaviorPattern] = field(default_factory=lambda: deque(maxlen=10))
 
@@ -90,30 +91,37 @@ class SeatRiskProfile:
     peak_pattern: Optional[BehaviorPattern] = None
 
     total_event_count: int = 0
+    total_incidents_count: int = 0
     last_event_timestamp_ms: float = 0.0
     is_recidivist: bool = False
 
+    active_incident: Optional[Dict[str, Any]] = None
+
 
 class SeatRiskTracker:
-    """Manages Review Priority Scores across all monitored seats."""
+    """Manages Review Priority Scores and Human-Reviewable Incidents across all monitored seats."""
 
     def __init__(
         self,
         room_id: str = "",
-        decay_rate_per_sec: float = 1.8,
+        decay_rate_per_sec: float = 2.5,
         cooldown_duration_ms: float = 5000.0,
-        recidivism_window_ms: float = 60000.0,
+        recidivism_window_ms: float = 15000.0,
+        incident_merge_window_ms: float = 0.0,
         observe_threshold: float = 30.0,
         suspicious_threshold: float = 60.0,
         flagged_threshold: float = 80.0,
+        post_event_reset_score: float = 45.0,
     ):
         self.room_id = room_id
         self.decay_rate_per_sec = decay_rate_per_sec
         self.cooldown_duration_ms = cooldown_duration_ms
         self.recidivism_window_ms = recidivism_window_ms
+        self.incident_merge_window_ms = incident_merge_window_ms
         self.observe_threshold = observe_threshold
         self.suspicious_threshold = suspicious_threshold
         self.flagged_threshold = flagged_threshold
+        self.post_event_reset_score = post_event_reset_score
 
         self.profiles: Dict[str, SeatRiskProfile] = {}
 
@@ -135,7 +143,7 @@ class SeatRiskTracker:
         detection: Optional[Detection] = None,
         frame_image: Optional[np.ndarray] = None,
     ) -> Optional[ClassroomEvent]:
-        """Update seat risk using temporal decay, episode increments, and pattern bonuses."""
+        """Update seat risk using temporal decay, episode increments, pattern bonuses, and incident aggregation."""
         profile = self.get_or_create_profile(seat_id)
 
         dt_sec = max(0.0, (timestamp_ms - profile.last_update_timestamp_ms) / 1000.0) if profile.last_update_timestamp_ms > 0 else 0.1
@@ -147,12 +155,18 @@ class SeatRiskTracker:
             and (timestamp_ms - profile.cooldown_enter_timestamp_ms) < self.cooldown_duration_ms
         )
 
-        # 2. Apply Time Decay
+        # 2. Check Active Incident Expiration (Merge Window)
+        if profile.active_incident is not None:
+            if (timestamp_ms - profile.active_incident["last_seen_timestamp_ms"]) > self.incident_merge_window_ms:
+                profile.active_incident = None
+                profile.pattern_history_counts.clear()
+
+        # 3. Apply Time Decay
         if dt_sec > 0:
             decay_amount = self.decay_rate_per_sec * dt_sec
             profile.risk_score = max(0.0, profile.risk_score - decay_amount)
 
-        # 3. Ingest New Episode Contributions
+        # 4. Ingest New Episode Contributions
         for ep in active_episodes:
             if ep.seat_id == seat_id and ep.episode_id not in profile.processed_episode_ids:
                 base_w = EPISODE_PRIORITY_WEIGHTS.get(ep.episode_type, 0.0)
@@ -160,29 +174,40 @@ class SeatRiskTracker:
                     profile.risk_score = min(100.0, profile.risk_score + (base_w * ep.quality))
                 profile.processed_episode_ids.add(ep.episode_id)
 
-        # 4. Ingest Composite Pattern Contributions (with Diminishing Returns)
+        # 5. Ingest Composite Pattern Contributions (with Diminishing Returns and Pattern Deduplication)
         for pat in detected_patterns:
-            if pat.seat_id == seat_id:
+            if pat.seat_id == seat_id and pat.pattern_id not in profile.processed_pattern_ids:
                 base_pw = PATTERN_PRIORITY_WEIGHTS.get(pat.pattern_type, 30.0)
                 history_count = profile.pattern_history_counts.get(pat.pattern_type, 0)
                 # Diminishing return factor: 1.0, 0.68, 0.52, 0.43...
-                diminishing_factor = 1.0 / (1.0 + 0.45 * history_count)
+                diminishing_factor = 1.0 / (1.0 + 0.35 * history_count)
                 increment = base_pw * diminishing_factor * pat.quality * pat.confidence
                 profile.risk_score = min(100.0, profile.risk_score + increment)
                 profile.pattern_history_counts[pat.pattern_type] = history_count + 1
+                profile.processed_pattern_ids.add(pat.pattern_id)
                 profile.recent_patterns.append(pat)
 
                 if pat.pattern_type in PATTERN_PRIORITY_WEIGHTS:
                     profile.peak_pattern = pat
 
-        # 5. Check Evidence Diversity / Correlation Bonus
+                # Update ongoing active incident if present
+                if profile.active_incident is not None:
+                    profile.active_incident["occurrence_count"] = profile.active_incident.get("occurrence_count", 1) + 1
+                    profile.active_incident["last_seen_timestamp_ms"] = timestamp_ms
+                    profile.active_incident["peak_risk_score"] = max(profile.active_incident.get("peak_risk_score", profile.risk_score), profile.risk_score)
+                    if pat.component_episode_ids:
+                        for ep_id in pat.component_episode_ids:
+                            if ep_id not in profile.active_incident["component_episode_ids"]:
+                                profile.active_incident["component_episode_ids"].append(ep_id)
+
+        # 6. Check Evidence Diversity / Correlation Bonus
         active_types = {ep.episode_type for ep in active_episodes if ep.seat_id == seat_id and ep.state == EpisodeState.ACTIVE}
         if (
             (EpisodeType.HEAD_TURN_LEFT.value in active_types or EpisodeType.HEAD_TURN_RIGHT.value in active_types)
             and (EpisodeType.TORSO_LEAN_LEFT.value in active_types or EpisodeType.TORSO_LEAN_RIGHT.value in active_types)
         ):
             # Correlated head + torso movement bonus
-            profile.risk_score = min(100.0, profile.risk_score + (4.0 * dt_sec))
+            profile.risk_score = min(100.0, profile.risk_score + (3.0 * dt_sec))
 
         # Track Peak values
         if profile.risk_score > profile.peak_risk_score:
@@ -192,17 +217,17 @@ class SeatRiskTracker:
             if frame_image is not None:
                 profile.peak_frame_image = frame_image.copy()
 
-        # 6. Recidivism Check
+        # 7. Recidivism Check (Measured escalation only when not in ongoing incident)
         is_recidivist = (
             profile.total_event_count > 0
+            and profile.active_incident is None
             and (timestamp_ms - profile.last_event_timestamp_ms) < self.recidivism_window_ms
         )
         profile.is_recidivist = is_recidivist
         if is_recidivist and profile.risk_score >= self.suspicious_threshold:
-            # Rapid Recidivism Escalation
-            profile.risk_score = max(profile.risk_score, self.flagged_threshold)
+            profile.risk_score = min(100.0, profile.risk_score + 10.0)
 
-        # 7. State Machine Evaluation
+        # 8. State Machine Evaluation
         previous_state = profile.current_state
         new_state = previous_state
 
@@ -219,20 +244,59 @@ class SeatRiskTracker:
 
         event_to_emit: Optional[ClassroomEvent] = None
 
-        # State Transition Handlers
-        if new_state != previous_state:
+        # State Transition & Incident Aggregation Handlers
+        if new_state == RiskState.FLAGGED_FOR_REVIEW.value and not in_cooldown:
             profile.current_state = new_state
             profile.state_enter_timestamp_ms = timestamp_ms
 
-            if new_state == RiskState.FLAGGED_FOR_REVIEW.value:
-                # Trigger Review Event
-                primary_pattern_name = profile.peak_pattern.pattern_type if profile.peak_pattern else "HIGH_RISK_SUSPICIOUS_PATTERN"
-                supporting_cues = profile.peak_pattern.supporting_cues if profile.peak_pattern else []
+            primary_pattern_name = profile.peak_pattern.pattern_type if profile.peak_pattern else "SUSPICIOUS_POSTURE"
+            supporting_cues = profile.peak_pattern.supporting_cues if profile.peak_pattern else []
+
+            # Check for existing active incident of the same behavior to MERGE
+            active_inc = profile.active_incident
+            can_merge = (
+                self.incident_merge_window_ms > 0
+                and active_inc is not None
+                and active_inc.get("behavior") == primary_pattern_name
+                and (timestamp_ms - active_inc.get("last_seen_timestamp_ms", 0.0)) <= self.incident_merge_window_ms
+            )
+
+            if can_merge:
+                # Merge into ongoing incident: update occurrence_count, peak risk, last seen
+                active_inc["occurrence_count"] = active_inc.get("occurrence_count", 1) + 1
+                active_inc["last_seen_timestamp_ms"] = timestamp_ms
+                active_inc["peak_risk_score"] = max(active_inc.get("peak_risk_score", profile.risk_score), profile.risk_score)
+                if profile.peak_pattern:
+                    for ep_id in profile.peak_pattern.component_episode_ids:
+                        if ep_id not in active_inc["component_episode_ids"]:
+                            active_inc["component_episode_ids"].append(ep_id)
+
+                # Enter Cooldown without emitting a duplicate event
+                profile.current_state = RiskState.COOLDOWN.value
+                profile.cooldown_enter_timestamp_ms = timestamp_ms
+                profile.risk_score = self.post_event_reset_score
+
+            else:
+                # Emit a DISTINCT new human incident event
+                new_inc_id = str(uuid.uuid4())
+                profile.active_incident = {
+                    "incident_id": new_inc_id,
+                    "seat_id": seat_id,
+                    "behavior": primary_pattern_name,
+                    "start_timestamp_ms": timestamp_ms,
+                    "last_seen_timestamp_ms": timestamp_ms,
+                    "occurrence_count": 1,
+                    "peak_risk_score": profile.risk_score,
+                    "component_episode_ids": list(profile.peak_pattern.component_episode_ids) if profile.peak_pattern else [],
+                }
+                profile.total_incidents_count += 1
+                profile.total_event_count += 1
+                profile.last_event_timestamp_ms = timestamp_ms
 
                 severity = SeverityLevel.HIGH.value if (profile.risk_score >= 85.0 or is_recidivist) else SeverityLevel.MEDIUM.value
 
                 event_to_emit = ClassroomEvent(
-                    event_id=str(uuid.uuid4()),
+                    event_id=new_inc_id,
                     track_id=int(seat_id.replace("SEAT-", "").replace("ROOM-CALIB-01-", "").replace("-", "") if seat_id.replace("SEAT-", "").replace("ROOM-CALIB-01-", "").replace("-", "").isdigit() else 1),
                     behavior=primary_pattern_name,
                     confidence=float(profile.peak_pattern.confidence if profile.peak_pattern else 0.85),
@@ -252,15 +316,18 @@ class SeatRiskTracker:
                         "supporting_cues": supporting_cues,
                         "observation_quality": round(profile.peak_pattern.quality if profile.peak_pattern else 0.85, 3),
                         "component_episode_ids": profile.peak_pattern.component_episode_ids if profile.peak_pattern else [],
+                        "incident_id": new_inc_id,
+                        "occurrence_count": 1,
                     },
                 )
 
-                profile.total_event_count += 1
-                profile.last_event_timestamp_ms = timestamp_ms
-
-                # Enter Cooldown to prevent spamming
+                # Enter Cooldown
                 profile.current_state = RiskState.COOLDOWN.value
                 profile.cooldown_enter_timestamp_ms = timestamp_ms
-                profile.risk_score = 45.0  # Reset below suspicious threshold
+                profile.risk_score = self.post_event_reset_score
+
+        elif new_state != previous_state:
+            profile.current_state = new_state
+            profile.state_enter_timestamp_ms = timestamp_ms
 
         return event_to_emit

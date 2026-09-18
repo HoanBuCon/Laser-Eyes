@@ -1,0 +1,40 @@
+{
+  "investigation_target": "Review Event Spam Root Cause Analysis",
+  "sprint": "VIGIL AI Core Logic Verification & Optimization Sprint",
+  "root_causes": [
+    {
+      "id": "RC-1",
+      "name": "Frame-Accumulated Pattern Re-Ingestion",
+      "severity": "CRITICAL",
+      "mechanism": "The demo runner was passing the growing list of all historical patterns accumulated across the entire session to `risk_tracker.update_seat()` on every frame. Without pattern ID tracking, the risk tracker treated every historical pattern as a new event on every frame, causing risk scores to instantly pin to 100.",
+      "fix": "Added `new_patterns` filtering per frame and `processed_pattern_ids: set[str]` deduplication in `SeatRiskProfile`."
+    },
+    {
+      "id": "RC-2",
+      "name": "Rapid Cooldown Oscillation & Aggressive Recidivism",
+      "severity": "HIGH",
+      "mechanism": "After an event fired, a 5-second cooldown was triggered. Upon cooldown expiry, if the student remained in the same sustained posture, the recidivism bonus (+10 pts) immediately reactivated and forced another FLAGGED_FOR_REVIEW event every 5.0 seconds.",
+      "fix": "Integrated an Incident Aggregator with a 15.0-second merge window. Repeated patterns during an ongoing incident update the existing incident's occurrence count and peak risk score rather than generating duplicate event cards."
+    },
+    {
+      "id": "RC-3",
+      "name": "Duplicate Per-Seat Sequential 6DRepNet Inferences",
+      "severity": "CRITICAL",
+      "mechanism": "ObservationExtractor was calling `head_pose_provider.estimate(head_crop)` for every student on every frame individually, causing 12.76 separate GPU forward passes per frame (over 1,200 forwards per 100 frames), degrading throughput to ~7.5 FPS.",
+      "fix": "Implemented scheduled 5 Hz batched tensor inference (`estimate_batch`) in `demo/runner.py` for all occupied seats simultaneously, reducing model forwards by 95.8% and boosting FPS to ~25-31 FPS."
+    },
+    {
+      "id": "RC-4",
+      "name": "Single-Frame Keypoint Flutter & Head Jitter",
+      "severity": "MEDIUM",
+      "mechanism": "Single-frame YOLO-Pose jitter caused temporary yaw spikes exceeding 22 degrees for 1 frame, creating short false candidate episodes.",
+      "fix": "Implemented a 3-sample median smoothing filter on relative yaw/pitch/torso angles in `TemporalEpisodeEngine` with stale observation reset (> 1500 ms gap)."
+    }
+  ],
+  "resolution_status": "ALL_RESOLVED",
+  "verified_test_suites": [
+    "tests/test_hpe_pipeline_hardening.py",
+    "tests/test_pattern_correctness.py",
+    "tests/test_incident_risk_hardening.py"
+  ]
+}

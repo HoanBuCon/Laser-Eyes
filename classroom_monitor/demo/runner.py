@@ -229,7 +229,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     obs_extractor = ObservationExtractor(head_pose_provider=head_provider_inst)
     episode_engine = TemporalEpisodeEngine()
     pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph)
-    risk_tracker = SeatRiskTracker(room_id=config.room_code)
+    risk_tracker = SeatRiskTracker(room_id=config.room_code, incident_merge_window_ms=15000.0)
 
     evidence_buffer = EvidenceVideoBuffer(
         pre_event_seconds=5.0,
@@ -248,6 +248,12 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     all_episodes: List[TemporalEpisode] = []
     all_events: List[ClassroomEvent] = []
     all_patterns: List[BehaviorPattern] = []
+
+    # Head Pose Estimation Scheduler & Per-Seat Cache
+    hpe_interval_ms = (1000.0 / config.hpe_hz) if config.hpe_hz > 0 else 200.0
+    hpe_max_age_ms = 600.0
+    seat_hpe_cache: Dict[str, Tuple[HeadOrientationEstimate, float]] = {}
+    last_hpe_time: Dict[str, float] = {}
 
     # Timing metrics accumulators
     t_det_list: List[float] = []
@@ -294,8 +300,29 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 frame_idx=frame_idx,
             )
 
-            # Stage 3 & 4: Observation Extraction for each Seat Context
+            # Stage 3: Scheduled Batched Head Orientation Estimation (GPU Tensor Batch)
             t0 = time.perf_counter()
+            hpe_batch_requests: List[Dict[str, Any]] = []
+            for seat_code, occ in seat_mgr.occupancies.items():
+                if occ.state == SeatState.OCCUPIED and occ.assigned_detection is not None:
+                    s_ctx = seat_graph.get_context(seat_code)
+                    if s_ctx and s_ctx.capabilities.head_orientation != CapabilityStatus.DISABLED:
+                        if (timestamp_ms - last_hpe_time.get(seat_code, -100000.0)) >= hpe_interval_ms:
+                            hpe_batch_requests.append({
+                                "seat_id": seat_code,
+                                "keypoints": occ.assigned_detection.keypoints,
+                                "bbox": occ.assigned_detection.bbox,
+                                "seat_baseline_yaw": s_ctx.reference_directions.baseline_yaw,
+                                "seat_baseline_pitch": s_ctx.reference_directions.baseline_pitch,
+                            })
+                            last_hpe_time[seat_code] = timestamp_ms
+
+            if hpe_batch_requests:
+                batch_estimates = head_provider_inst.estimate_batch(requests=hpe_batch_requests, frame=frame)
+                for s_id, est in batch_estimates.items():
+                    seat_hpe_cache[s_id] = (est, timestamp_ms)
+
+            # Stage 4: Observation Extraction for each Seat Context (Consuming Cached HPE)
             seat_observations: Dict[str, List[RawObservation]] = {}
             for seat_code, occ in seat_mgr.occupancies.items():
                 s_ctx = seat_graph.get_context(seat_code)
@@ -303,13 +330,23 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                     continue
 
                 det = occ.assigned_detection
+                precomputed_est: Optional[HeadOrientationEstimate] = None
+                if seat_code in seat_hpe_cache:
+                    cached_est, cached_ts = seat_hpe_cache[seat_code]
+                    if (timestamp_ms - cached_ts) <= hpe_max_age_ms:
+                        precomputed_est = cached_est
+                    else:
+                        precomputed_est = HeadOrientationEstimate(source="cache_expired", quality=0.0, yaw=None, pitch=None)
+                else:
+                    precomputed_est = HeadOrientationEstimate(source="not_scheduled", quality=0.0, yaw=None, pitch=None)
+
                 obs_list = obs_extractor.extract(
                     detection=det,
                     seat_context=s_ctx,
                     timestamp_ms=timestamp_ms,
                     occupancy_state=occ.state,
                     nearby_person_count=len(occ.candidate_detections),
-                    frame=frame,
+                    precomputed_head_estimate=precomputed_est,
                 )
                 seat_observations[seat_code] = obs_list
             t_hpe = (time.perf_counter() - t0) * 1000.0
@@ -341,13 +378,13 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
             t_pat = (time.perf_counter() - t0) * 1000.0
             t_pat_list.append(t_pat)
 
-            # Stage 7: Seat Risk Prioritization Tracker & Event Generation
+            # Stage 7: Seat Risk Prioritization Tracker & Incident Event Generation
             t0 = time.perf_counter()
             for seat_code, occ in seat_mgr.occupancies.items():
                 evt = risk_tracker.update_seat(
                     seat_id=seat_code,
                     active_episodes=active_this_frame,
-                    detected_patterns=all_patterns,
+                    detected_patterns=new_patterns,
                     timestamp_ms=timestamp_ms,
                     detection=occ.assigned_detection,
                     frame_image=frame,

@@ -88,7 +88,7 @@ class DemoHUDOverlayRenderer:
         if show_debug:
             # === DEVELOPER DEBUG MODE ===
             self._render_debug_detections(canvas, det_list, obs_dict)
-            self._render_debug_seats(canvas, seat_mgr, risk_tracker)
+            self._render_debug_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list)
             self._render_debug_roaming(canvas, roam_list)
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
             self._render_bottom_ticker(canvas, events_list, timestamp_ms)
@@ -286,11 +286,49 @@ class DemoHUDOverlayRenderer:
         canvas: np.ndarray,
         seat_mgr: SeatManager,
         risk_tracker: SeatRiskTracker,
+        active_episodes: Optional[List[TemporalEpisode]] = None,
+        recent_events: Optional[List[ClassroomEvent]] = None,
     ) -> None:
-        """Draw full seat polygon boundaries, desk boundaries, and debug labels."""
+        """Draw full seat polygon boundaries, desk boundaries, and alert badges for suspicious/flagged seats."""
+        ep_list = active_episodes or []
+        evt_list = recent_events or []
         for seat_id, s_def in seat_mgr.seats.items():
             poly = s_def.polygon.astype(np.int32)
-            cv2.polylines(canvas, [poly], isClosed=True, color=(100, 255, 100), thickness=1, lineType=cv2.LINE_AA)
+            if len(poly) == 0:
+                continue
+
+            cx = int(np.mean(poly[:, 0]))
+            cy = int(np.mean(poly[:, 1]))
+            top_y = int(np.min(poly[:, 1]))
+            short_lbl = get_short_seat_label(seat_id, s_def.seat_label)
+            profile = risk_tracker.profiles.get(seat_id)
+            score = profile.risk_score if profile else 0.0
+            state = profile.current_state if profile else RiskState.NORMAL.value
+
+            occ = seat_mgr.occupancies.get(seat_id)
+            is_occupied = occ is not None and occ.state == SeatState.OCCUPIED
+            has_active_ep = any(getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id for ep in ep_list)
+
+            is_flagged = (
+                (state in (RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value) or score >= 75.0)
+                and (is_occupied or has_active_ep)
+            )
+            is_suspicious = (
+                (state == RiskState.SUSPICIOUS.value or (score >= 50.0 and not is_flagged))
+                and (is_occupied or has_active_ep)
+            )
+
+            if is_flagged:
+                poly_col = (30, 30, 235)
+                thick = 2
+            elif is_suspicious:
+                poly_col = (0, 165, 255)
+                thick = 2
+            else:
+                poly_col = (100, 255, 100)
+                thick = 1
+
+            cv2.polylines(canvas, [poly], isClosed=True, color=poly_col, thickness=thick, lineType=cv2.LINE_AA)
 
             if s_def.desk_y is not None:
                 min_x = int(np.min(poly[:, 0]))
@@ -298,16 +336,44 @@ class DemoHUDOverlayRenderer:
                 d_y = int(s_def.desk_y)
                 cv2.line(canvas, (min_x, d_y), (max_x, d_y), (100, 180, 255), 1, cv2.LINE_AA)
 
-            cx = int(np.mean(poly[:, 0]))
-            cy = int(np.mean(poly[:, 1]))
-            short_lbl = get_short_seat_label(seat_id, s_def.seat_label)
-            profile = risk_tracker.profiles.get(seat_id)
-            score = profile.risk_score if profile else 0.0
+            if is_flagged or is_suspicious:
+                seat_act_eps = [
+                    ep for ep in ep_list
+                    if getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id
+                ]
+                recent_evt = next((e for e in reversed(evt_list) if getattr(e, "seat_id", getattr(e, "seat_code", "")) == seat_id), None)
+                if seat_act_eps:
+                    raw_type = seat_act_eps[0].episode_type
+                    beh_str = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
+                    beh_str = beh_str.replace("_", " ").title()
+                elif recent_evt:
+                    beh_str = recent_evt.behavior.replace("_", " ").title()
+                else:
+                    beh_str = "Suspicious"
 
-            dbg_txt = f"{short_lbl}:{score:.0f}"
-            (tw, th), _ = cv2.getTextSize(dbg_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1)
-            cv2.rectangle(canvas, (cx - tw // 2 - 2, cy - th - 2), (cx + tw // 2 + 2, cy + 2), (10, 10, 10), -1)
-            cv2.putText(canvas, dbg_txt, (cx - tw // 2, cy - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 255, 200), 1, cv2.LINE_AA)
+                badge_header = f"{short_lbl}: REVIEW" if is_flagged else f"{short_lbl}: SUSPICIOUS"
+                badge_sub = f"{beh_str} ({score:.0f})"
+                f_title = 0.38 if canvas.shape[1] < 800 else 0.44
+                f_sub = 0.32 if canvas.shape[1] < 800 else 0.36
+                (w1, h1), _ = cv2.getTextSize(badge_header, cv2.FONT_HERSHEY_SIMPLEX, f_title, 1)
+                (w2, h2), _ = cv2.getTextSize(badge_sub, cv2.FONT_HERSHEY_SIMPLEX, f_sub, 1)
+                card_w = max(w1, w2) + 12
+                card_h = h1 + h2 + 8
+
+                bx1 = max(4, min(canvas.shape[1] - card_w - 4, cx - card_w // 2))
+                by1 = max(34, top_y - card_h - 4)
+                bx2 = bx1 + card_w
+                by2 = by1 + card_h
+
+                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (18, 18, 24), -1)
+                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (40, 40, 240) if is_flagged else (0, 165, 255), 1, cv2.LINE_AA)
+                cv2.putText(canvas, badge_header, (bx1 + 5, by1 + h1 + 2), cv2.FONT_HERSHEY_SIMPLEX, f_title, (60, 80, 255) if is_flagged else (0, 190, 255), 1, cv2.LINE_AA)
+                cv2.putText(canvas, badge_sub, (bx1 + 5, by2 - 3), cv2.FONT_HERSHEY_SIMPLEX, f_sub, (230, 230, 230), 1, cv2.LINE_AA)
+            else:
+                dbg_txt = f"{short_lbl}:{score:.0f}"
+                (tw, th), _ = cv2.getTextSize(dbg_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1)
+                cv2.rectangle(canvas, (cx - tw // 2 - 2, cy - th - 2), (cx + tw // 2 + 2, cy + 2), (10, 10, 10), -1)
+                cv2.putText(canvas, dbg_txt, (cx - tw // 2, cy - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 255, 200), 1, cv2.LINE_AA)
 
     def _render_debug_roaming(self, canvas: np.ndarray, roaming_detections: List[Detection]) -> None:
         for det in roaming_detections:

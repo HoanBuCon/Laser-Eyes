@@ -438,7 +438,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 seat_graph=seat_graph,
                 risk_tracker=risk_tracker,
                 active_episodes=active_this_frame,
-                all_events=all_events,
+                recent_events=all_events,
+                raw_observations=seat_observations,
+                detections=detections,
+                roaming_detections=unmapped_dets,
                 runtime_metrics=runtime_metrics,
             )
             t_ren = (time.perf_counter() - t0) * 1000.0
@@ -452,9 +455,19 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
             if config.show_window:
                 cv2.imshow("VIGIL AI SRS v2.0 Demonstration", annotated_frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
+                key = cv2.waitKey(1) & 0xFF
+                if key == ord("q") or key == 27:
                     logger.info("Demo interrupted by user keypress 'q'")
                     break
+                elif key == ord("d") or key == ord("D"):
+                    renderer.debug_overlay = not renderer.debug_overlay
+                    logger.info("Toggled debug overlay: %s", renderer.debug_overlay)
+                elif key == ord(" "):
+                    logger.info("Demo paused (press Space to resume)...")
+                    while True:
+                        k2 = cv2.waitKey(50) & 0xFF
+                        if k2 == ord(" ") or k2 == ord("q") or k2 == 27:
+                            break
 
             if processed_count % 100 == 0 or processed_count == total_frames:
                 pct = (processed_count / max(1, total_frames)) * 100.0

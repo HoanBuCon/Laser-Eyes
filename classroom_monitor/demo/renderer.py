@@ -67,32 +67,38 @@ class DemoHUDOverlayRenderer:
         seat_mgr: SeatManager,
         seat_graph: Optional[SeatGraph],
         risk_tracker: SeatRiskTracker,
-        active_episodes: List[TemporalEpisode],
-        recent_events: List[ClassroomEvent],
-        raw_observations: Dict[str, List[RawObservation]],
-        detections: List[Detection],
-        roaming_detections: List[Detection],
+        active_episodes: Optional[List[TemporalEpisode]] = None,
+        recent_events: Optional[List[ClassroomEvent]] = None,
+        raw_observations: Optional[Dict[str, List[RawObservation]]] = None,
+        detections: Optional[List[Detection]] = None,
+        roaming_detections: Optional[List[Detection]] = None,
         runtime_metrics: Optional[Dict[str, float]] = None,
         debug_overlay: Optional[bool] = None,
+        all_events: Optional[List[ClassroomEvent]] = None,
     ) -> np.ndarray:
         """Render HUD overlay according to active display mode."""
         show_debug = self.debug_overlay if debug_overlay is None else debug_overlay
+        events_list = recent_events if recent_events is not None else (all_events or [])
+        episodes_list = active_episodes or []
+        obs_dict = raw_observations or {}
+        det_list = detections or []
+        roam_list = roaming_detections or []
         canvas = frame.copy()
 
         if show_debug:
             # === DEVELOPER DEBUG MODE ===
-            self._render_debug_detections(canvas, detections, raw_observations)
+            self._render_debug_detections(canvas, det_list, obs_dict)
             self._render_debug_seats(canvas, seat_mgr, risk_tracker)
-            self._render_debug_roaming(canvas, roaming_detections)
-            self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, recent_events)
-            self._render_bottom_ticker(canvas, recent_events, timestamp_ms)
-            self._render_debug_panel(canvas, runtime_metrics or {}, active_episodes, raw_observations)
+            self._render_debug_roaming(canvas, roam_list)
+            self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
+            self._render_bottom_ticker(canvas, events_list, timestamp_ms)
+            self._render_debug_panel(canvas, runtime_metrics or {}, episodes_list, obs_dict)
         else:
             # === CLEAN PROCTOR MODE (DEFAULT PRESENTATION) ===
-            self._render_proctor_seats(canvas, seat_mgr, risk_tracker, active_episodes, recent_events)
-            self._render_proctor_roaming(canvas, roaming_detections)
-            self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, recent_events)
-            self._render_bottom_ticker(canvas, recent_events, timestamp_ms)
+            self._render_proctor_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list)
+            self._render_proctor_roaming(canvas, roam_list)
+            self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
+            self._render_bottom_ticker(canvas, events_list, timestamp_ms)
 
         return canvas
 

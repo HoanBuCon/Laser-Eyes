@@ -1,32 +1,47 @@
 [
   {
-    "event_id": "edcf5825-1bf8-491f-b671-a66efbb93196",
+    "event_id": "cd957c0f-b6e2-4e39-ba17-d2410636fb62",
     "room_id": "ROOM-STUDENT-01",
-    "camera_id": null,
+    "camera_id": "CAM-STUDENT-01",
     "seat_code": "SEAT-STUDENT-05",
-    "actor_track_id": 1,
-    "timestamp_ms": 9700.0,
-    "severity": "MEDIUM",
+    "actor_track_id": null,
+    "timestamp_ms": 9150.0,
+    "first_seen_ms": 9150.0,
+    "last_seen_ms": 9150.0,
+    "occurrence_count": 1,
+    "peak_risk_score": 99.1,
+    "component_episode_ids": [
+      "feb5c7af-7e46-4cc9-a4c7-74fd505503f3"
+    ],
+    "supporting_pattern_ids": [
+      "676e4830-bc94-4b82-9376-cba25151db64"
+    ],
+    "severity": "HIGH",
     "status": "FLAGGED_FOR_REVIEW",
     "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
     "description": "",
-    "evidence_clip_path": "data\\optimization\\after\\student\\evidence\\edcf5825-1bf8-491f-b671-a66efbb93196_T1_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
-    "evidence_snapshot_path": "data\\optimization\\after\\student\\evidence\\edcf5825-1bf8-491f-b671-a66efbb93196_snapshot.jpg",
-    "sha256_hash": "03fa55aa57588a1f73f64ec52e5300120604976198239f03528da5cc2f3fc166",
+    "evidence_clip_path": "data\\optimization\\after\\student\\evidence\\cd957c0f-b6e2-4e39-ba17-d2410636fb62_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\student\\evidence\\cd957c0f-b6e2-4e39-ba17-d2410636fb62_snapshot.jpg",
+    "sha256_hash": "b1b32b01f881ee742adceab74a6af8a5070e5e1e64f5d1420503c9d1f3687183",
     "metadata": {
-      "risk_score": 84.1,
-      "peak_risk_score": 84.1,
+      "risk_score": 99.1,
+      "peak_risk_score": 99.1,
       "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
       "supporting_cues": [
         "Dwell duration: 2.5s"
       ],
       "observation_quality": 1.0,
       "component_episode_ids": [
-        "191071c8-d329-49db-bbec-b3f461e655da"
+        "feb5c7af-7e46-4cc9-a4c7-74fd505503f3"
       ],
-      "incident_id": "edcf5825-1bf8-491f-b671-a66efbb93196",
+      "supporting_pattern_ids": [
+        "676e4830-bc94-4b82-9376-cba25151db64"
+      ],
+      "incident_id": "cd957c0f-b6e2-4e39-ba17-d2410636fb62",
+      "first_seen_ms": 9150.0,
+      "last_seen_ms": 9150.0,
       "occurrence_count": 1,
-      "sha256_hash": "03fa55aa57588a1f73f64ec52e5300120604976198239f03528da5cc2f3fc166"
+      "sha256_hash": "b1b32b01f881ee742adceab74a6af8a5070e5e1e64f5d1420503c9d1f3687183"
     }
   }
 ]

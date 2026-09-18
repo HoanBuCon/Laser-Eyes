@@ -1,0 +1,195 @@
+{
+  "scene_id": "india_classroom",
+  "room_code": "ROOM-CALIB-01",
+  "seats": {
+    "SEAT-ROOM-CALIB-01-01": {
+      "seat_code": "SEAT-ROOM-CALIB-01-01",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-02": {
+      "seat_code": "SEAT-ROOM-CALIB-01-02",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-03": {
+      "seat_code": "SEAT-ROOM-CALIB-01-03",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-04": {
+      "seat_code": "SEAT-ROOM-CALIB-01-04",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-05": {
+      "seat_code": "SEAT-ROOM-CALIB-01-05",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-06": {
+      "seat_code": "SEAT-ROOM-CALIB-01-06",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-07": {
+      "seat_code": "SEAT-ROOM-CALIB-01-07",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-08": {
+      "seat_code": "SEAT-ROOM-CALIB-01-08",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-09": {
+      "seat_code": "SEAT-ROOM-CALIB-01-09",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-10": {
+      "seat_code": "SEAT-ROOM-CALIB-01-10",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-11": {
+      "seat_code": "SEAT-ROOM-CALIB-01-11",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-12": {
+      "seat_code": "SEAT-ROOM-CALIB-01-12",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-13": {
+      "seat_code": "SEAT-ROOM-CALIB-01-13",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-14": {
+      "seat_code": "SEAT-ROOM-CALIB-01-14",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-15": {
+      "seat_code": "SEAT-ROOM-CALIB-01-15",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-16": {
+      "seat_code": "SEAT-ROOM-CALIB-01-16",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-17": {
+      "seat_code": "SEAT-ROOM-CALIB-01-17",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-18": {
+      "seat_code": "SEAT-ROOM-CALIB-01-18",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-19": {
+      "seat_code": "SEAT-ROOM-CALIB-01-19",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-20": {
+      "seat_code": "SEAT-ROOM-CALIB-01-20",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-ROOM-CALIB-01-21": {
+      "seat_code": "SEAT-ROOM-CALIB-01-21",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    }
+  }
+}

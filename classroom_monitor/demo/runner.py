@@ -33,7 +33,7 @@ import torch
 
 from classroom_monitor.async_evidence_writer import AsyncEvidenceWriter, compute_file_sha256
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine, PatternType
-from classroom_monitor.config import ClassroomConfig, DEFAULT_CONFIG
+from classroom_monitor.config import ClassroomConfig, DEFAULT_CONFIG, resolve_runtime_config
 from classroom_monitor.demo.config import (
     DEMO_PRESETS,
     DemoVideoConfig,
@@ -220,16 +220,22 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                     else:
                         ctx.desk_geometry.desk_boundary_y = s.get("desk_y")
 
-    # 3. Initialize Pipeline Components
+    # 3. Resolve Effective Runtime Configuration
+    runtime_cfg = resolve_runtime_config(scene_profile=scene_profile, demo_config=config)
+    eff_cfg_path = out_p / "effective_runtime_config.json"
+    with open(eff_cfg_path, "w", encoding="utf-8") as f:
+        json.dump(runtime_cfg, f, indent=2)
+
+    # 4. Initialize Pipeline Components
     detector = PoseClassroomDetector(
         confidence_threshold=config.pose_conf,
     )
 
     head_provider_inst = create_head_pose_provider(config.head_provider)
     obs_extractor = ObservationExtractor(head_pose_provider=head_provider_inst)
-    episode_engine = TemporalEpisodeEngine()
-    pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph)
-    risk_tracker = SeatRiskTracker(room_id=config.room_code, incident_merge_window_ms=15000.0)
+    episode_engine = TemporalEpisodeEngine(**runtime_cfg["temporal"])
+    pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph, **runtime_cfg["patterns"])
+    risk_tracker = SeatRiskTracker(room_id=config.room_code, camera_id=config.camera_id, **runtime_cfg["risk"])
 
     evidence_buffer = EvidenceVideoBuffer(
         pre_event_seconds=5.0,
@@ -251,7 +257,8 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     # Head Pose Estimation Scheduler & Per-Seat Cache
     hpe_interval_ms = (1000.0 / config.hpe_hz) if config.hpe_hz > 0 else 200.0
-    hpe_max_age_ms = 600.0
+    hpe_max_age_ms = runtime_cfg["head_pose"]["cache_max_age_ms"]
+    scheduled_hpe_cycles = 0
     seat_hpe_cache: Dict[str, Tuple[HeadOrientationEstimate, float]] = {}
     last_hpe_time: Dict[str, float] = {}
 
@@ -318,6 +325,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                             last_hpe_time[seat_code] = timestamp_ms
 
             if hpe_batch_requests:
+                scheduled_hpe_cycles += 1
                 batch_estimates = head_provider_inst.estimate_batch(requests=hpe_batch_requests, frame=frame)
                 for s_id, est in batch_estimates.items():
                     seat_hpe_cache[s_id] = (est, timestamp_ms)
@@ -388,6 +396,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                     timestamp_ms=timestamp_ms,
                     detection=occ.assigned_detection,
                     frame_image=frame,
+                    camera_id=config.camera_id,
                 )
                 if evt is not None:
                     all_events.append(evt)
@@ -429,40 +438,33 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 seat_graph=seat_graph,
                 risk_tracker=risk_tracker,
                 active_episodes=active_this_frame,
-                recent_events=all_events[-5:],
-                raw_observations=seat_observations,
-                detections=detections,
-                roaming_detections=unmapped_dets,
+                all_events=all_events,
                 runtime_metrics=runtime_metrics,
             )
             t_ren = (time.perf_counter() - t0) * 1000.0
             t_ren_list.append(t_ren)
 
-            # Stage 9: Video File Writing
+            # Stage 9: Video Writer Output & Display Window
             t0 = time.perf_counter()
             out_writer.write(annotated_frame)
             t_write = (time.perf_counter() - t0) * 1000.0
             t_write_list.append(t_write)
 
-            # Interactive GUI Window
             if config.show_window:
-                cv2.imshow("VIGIL AI SRS v2.0 - Live Proctoring Demo", annotated_frame)
-                key = cv2.waitKey(1) & 0xFF
-                if key in (27, ord("q")):
-                    logger.info("Demo stopped early by user (ESC/Q)")
+                cv2.imshow("VIGIL AI SRS v2.0 Demonstration", annotated_frame)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    logger.info("Demo interrupted by user keypress 'q'")
                     break
-                elif key == ord(" "):
-                    cv2.waitKey(0)  # Pause
-                elif key == ord("d"):
-                    renderer.debug_overlay = not renderer.debug_overlay
 
-            if frame_idx % 100 == 0 or frame_idx == total_frames:
+            if processed_count % 100 == 0 or processed_count == total_frames:
+                pct = (processed_count / max(1, total_frames)) * 100.0
+                elapsed_w = time.time() - start_wall_time
                 logger.info(
                     "Frame %d/%d (%.1f%%) | Time: %.1fs | FPS: %.1f | Completed EPs: %d | Events: %d",
                     frame_idx,
                     total_frames,
-                    (frame_idx / total_frames) * 100.0 if total_frames > 0 else 0.0,
-                    timestamp_ms / 1000.0,
+                    pct,
+                    elapsed_w,
                     current_fps,
                     len(episode_engine.completed_episodes),
                     len(all_events),
@@ -494,75 +496,83 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     overall_fps = processed_count / max(0.001, total_wall_time)
     realtime_factor = (duration_sec / max(0.001, total_wall_time))
 
-    # 5. Optional Human Ground Truth Benchmark Comparison
+    # 5. Strict Canonical Ground Truth Benchmark Comparison (Actor-Centric)
     benchmark_summary: Optional[Dict[str, Any]] = None
     if config.gt_path and Path(config.gt_path).exists():
         try:
-            from scripts.benchmark_temporal_ground_truth import compute_temporal_iou, normalize_label
+            import csv
+            from classroom_monitor.evaluation.temporal_matcher import match_temporal_episodes
             with open(config.gt_path, "r", encoding="utf-8") as f:
                 gt_data = json.load(f)
 
             gt_episodes = gt_data.get("episodes", [])
-            head_gt = [h for h in gt_episodes if "HEAD_TURN" in h.get("episode_type", "")]
+            eval_res = match_temporal_episodes(
+                gt_episodes=gt_episodes,
+                ai_episodes=all_episodes,
+                iou_threshold=0.30,
+                require_same_seat=True,
+                require_same_label=True,
+                exclude_malformed_gt=True,
+                filter_label_substring="HEAD_TURN",
+            )
+            benchmark_summary = eval_res.to_dict()
 
-            tp = 0
-            fp = 0
-            matched_gt: Set[int] = set()
+            # Export gt_comparison_strict.csv
+            gt_csv_p = out_p / "gt_comparison_strict.csv"
+            with open(gt_csv_p, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    "gt_id", "gt_seat", "gt_label", "gt_start_ms", "gt_end_ms",
+                    "ai_episode_id", "ai_seat", "ai_label", "ai_start_ms", "ai_end_ms",
+                    "temporal_iou", "match_status"
+                ])
+                for pair in eval_res.matched_pairs:
+                    writer.writerow([
+                        pair["gt_id"], pair["gt_seat"], pair["gt_label"], pair["gt_start_ms"], pair["gt_end_ms"],
+                        pair["ai_id"], pair["ai_seat"], pair["ai_label"], pair["ai_start_ms"], pair["ai_end_ms"],
+                        pair["temporal_iou"], "TP"
+                    ])
+                for un_gt in eval_res.unmatched_gt:
+                    writer.writerow([
+                        un_gt["id"], un_gt["seat_code"], un_gt["label"], un_gt["start_ms"], un_gt["end_ms"],
+                        "", "", "", "", "",
+                        0.0, "FN"
+                    ])
 
-            for ai_ep in all_episodes:
-                ai_type = ai_ep.episode_type.value if hasattr(ai_ep.episode_type, "value") else str(ai_ep.episode_type)
-                if "HEAD_TURN" not in ai_type:
-                    continue
+            # Export ai_unmatched_head_episodes.csv
+            ai_fp_p = out_p / "ai_unmatched_head_episodes.csv"
+            with open(ai_fp_p, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["ai_episode_id", "ai_seat", "ai_label", "ai_start_ms", "ai_end_ms", "match_status"])
+                for un_ai in eval_res.unmatched_ai:
+                    writer.writerow([
+                        un_ai["id"], un_ai["seat_code"], un_ai["label"], un_ai["start_ms"], un_ai["end_ms"], "FP"
+                    ])
 
-                best_match_idx = -1
-                best_iou = 0.0
-
-                for idx, h_gt in enumerate(head_gt):
-                    if idx in matched_gt:
-                        continue
-                    if normalize_label(h_gt.get("episode_type", "")) == normalize_label(ai_type):
-                        iou = compute_temporal_iou(
-                            h_gt["start_ms"], h_gt["end_ms"], ai_ep.start_timestamp_ms, ai_ep.end_timestamp_ms or ai_ep.start_timestamp_ms + ai_ep.duration_ms
-                        )
-                        if iou >= 0.20 and iou > best_iou:
-                            best_iou = iou
-                            best_match_idx = idx
-
-                if best_match_idx >= 0:
-                    tp += 1
-                    matched_gt.add(best_match_idx)
-                else:
-                    fp += 1
-
-            fn = len(head_gt) - len(matched_gt)
-            prec = tp / max(1, (tp + fp))
-            rec = tp / max(1, (tp + fn))
-
-            benchmark_summary = {
-                "ground_truth_file": str(config.gt_path),
-                "total_gt_head_episodes": len(head_gt),
-                "ai_head_episodes": tp + fp,
-                "true_positives": tp,
-                "false_positives": fp,
-                "false_negatives": fn,
-                "precision": round(prec * 100.0, 1),
-                "recall": round(rec * 100.0, 1),
-            }
             logger.info(
-                "Ground Truth Benchmark [%s]: GT=%d, AI=%d, TP=%d, FP=%d, FN=%d, Prec=%.1f%%, Rec=%.1f%%",
+                "Ground Truth Benchmark [%s] (Strict: Same Seat + Label + IoU>=0.30): Valid GT=%d, AI=%d, TP=%d, FP=%d, FN=%d, Prec=%.1f%%, Rec=%.1f%%, Avg IoU=%.3f",
                 config.name,
-                len(head_gt),
-                tp + fp,
-                tp,
-                fp,
-                fn,
-                prec * 100.0,
-                rec * 100.0,
+                eval_res.valid_gt_episodes,
+                eval_res.ai_episodes_evaluated,
+                eval_res.tp,
+                eval_res.fp,
+                eval_res.fn,
+                eval_res.precision,
+                eval_res.recall,
+                eval_res.avg_tp_iou,
             )
         except Exception as e:
-            logger.warning("Failed to evaluate ground truth benchmark: %s", e)
+            logger.warning("Failed to evaluate ground truth benchmark: %s", e, exc_info=True)
 
-    # 6. Export All Standardized Demo Artifacts
+    # 6. Collect HPE Telemetry
+    hpe_telemetry = head_provider_inst.get_telemetry()
+    hpe_telemetry["target_hz"] = config.hpe_hz
+    hpe_telemetry["scheduled_cycles"] = scheduled_hpe_cycles
+    hpe_telemetry["effective_hpe_hz"] = round(hpe_telemetry["estimate_batch_calls"] / max(0.01, duration_sec), 2)
+    occ_seats_count = max(1, sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED))
+    hpe_telemetry["effective_hpe_hz_per_seat"] = round((hpe_telemetry["valid_head_crops"] / occ_seats_count) / max(0.01, duration_sec), 2)
+
+    # 7. Export All Standardized Demo Artifacts
     scene_meta = {
         "scene_id": config.name,
         "room_code": config.room_code,
@@ -579,6 +589,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "wall_time_sec": total_wall_time,
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,
+        "head_pose_runtime": hpe_telemetry,
         "lat_perception_avg_ms": float(np.mean(t_det_list)) if t_det_list else 0.0,
         "lat_6drepnet_avg_ms": float(np.mean(t_hpe_list)) if t_hpe_list else 0.0,
         "lat_temporal_avg_ms": float(np.mean(t_temp_list)) if t_temp_list else 0.0,

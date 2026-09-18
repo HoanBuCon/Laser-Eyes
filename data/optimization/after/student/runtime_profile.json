@@ -1,20 +1,35 @@
 {
-  "overall_fps": 39.59,
-  "total_wall_time_sec": 5.53,
+  "overall_fps": 30.45,
+  "total_wall_time_sec": 7.19,
   "total_video_time_sec": 10.95,
-  "realtime_factor": 1.98,
+  "realtime_factor": 1.52,
   "hardware": {
     "device": "cuda",
     "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
     "torch_version": "2.6.0+cu124"
   },
+  "head_pose_runtime": {
+    "estimate_single_calls": 0,
+    "estimate_batch_calls": 134,
+    "model_forward_calls": 134,
+    "total_head_crops": 213,
+    "valid_head_crops": 213,
+    "rejected_head_crops": 0,
+    "average_batch_size": 1.59,
+    "max_batch_size": 4,
+    "average_forward_ms": 11.6,
+    "target_hz": 5.0,
+    "scheduled_cycles": 134,
+    "effective_hpe_hz": 12.24,
+    "effective_hpe_hz_per_seat": 4.86
+  },
   "stage_latency_averages_ms": {
-    "perception_yolo_pose": 16.36,
-    "observation_6drepnet": 5.08,
-    "temporal_episode_engine": 0.67,
-    "behavior_pattern_engine": 0.11,
-    "seat_risk_tracker": 0.09,
-    "rendering_hud": 0.79,
-    "video_writer_io": 0.86
+    "perception_yolo_pose": 20.61,
+    "observation_6drepnet": 7.54,
+    "temporal_episode_engine": 0.9,
+    "behavior_pattern_engine": 0.14,
+    "seat_risk_tracker": 0.08,
+    "rendering_hud": 0.98,
+    "video_writer_io": 1.05
   }
 }

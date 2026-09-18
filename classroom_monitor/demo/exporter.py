@@ -82,7 +82,7 @@ def export_demo_artifacts(
     with open(episodes_file, "w", encoding="utf-8") as f:
         json.dump(canonical_episodes, f, indent=2, ensure_ascii=False)
 
-    # 2. Events (FLAGGED_FOR_REVIEW canonical statuses)
+    # 2. Events (FLAGGED_FOR_REVIEW canonical statuses and synchronized incident fields)
     canonical_events: List[Dict[str, Any]] = []
     for evt in events:
         sev_val = evt.severity.value if hasattr(evt.severity, "value") else str(evt.severity)
@@ -93,13 +93,26 @@ def export_demo_artifacts(
         if ts_ms is None:
             ts_ms = (getattr(evt, "timestamp", 0.0) or 0.0) * 1000.0
 
+        first_seen_ms = meta.get("first_seen_ms", round(float(ts_ms), 1))
+        last_seen_ms = meta.get("last_seen_ms", meta.get("last_seen_timestamp_ms", round(float(ts_ms), 1)))
+        occ_count = meta.get("occurrence_count", 1)
+        peak_risk = meta.get("peak_risk_score", meta.get("risk_score", 0.0))
+        comp_episodes = meta.get("component_episode_ids", [])
+        supp_patterns = meta.get("supporting_pattern_ids", [])
+
         canonical_events.append({
             "event_id": getattr(evt, "event_id", getattr(evt, "id", "")),
-            "room_id": getattr(evt, "room_id", ""),
-            "camera_id": getattr(evt, "camera_id", ""),
+            "room_id": getattr(evt, "room_id", "") or scene_metadata.get("room_code", ""),
+            "camera_id": getattr(evt, "camera_id", "") or scene_metadata.get("camera_id", ""),
             "seat_code": getattr(evt, "seat_id", getattr(evt, "seat_code", "")),
-            "actor_track_id": getattr(evt, "track_id", None),
+            "actor_track_id": getattr(evt, "track_id", None) if getattr(evt, "track_id", None) != 0 else None,
             "timestamp_ms": round(float(ts_ms), 1),
+            "first_seen_ms": round(float(first_seen_ms), 1),
+            "last_seen_ms": round(float(last_seen_ms), 1),
+            "occurrence_count": int(occ_count),
+            "peak_risk_score": round(float(peak_risk), 1),
+            "component_episode_ids": comp_episodes,
+            "supporting_pattern_ids": supp_patterns,
             "severity": sev_val,
             "status": stat_val,
             "title": getattr(evt, "behavior", getattr(evt, "title", "REVIEW_TRIGGER")),
@@ -171,22 +184,35 @@ def export_demo_artifacts(
     evidence_clips = list(evidence_dir.glob("*.mp4"))
     evidence_snapshots = list(evidence_dir.glob("*.jpg"))
 
+    duration_sec = float(scene_metadata.get("duration_sec", 0.0))
+    duration_min = max(0.01, duration_sec / 60.0)
+    occupied_seats_count = int(scene_metadata.get("occupied_seats", len(seat_rankings)))
+    unique_flagged_seats = len(set(evt["seat_code"] for evt in canonical_events if evt.get("seat_code")))
+
     # 5. Demo Summary JSON
     summary_data = {
         "scene_id": scene_metadata.get("scene_id", "demo"),
         "room_code": scene_metadata.get("room_code", "ROOM-01"),
         "camera_id": scene_metadata.get("camera_id", "CAM-01"),
         "video_file": scene_metadata.get("video_file", ""),
-        "duration_sec": round(float(scene_metadata.get("duration_sec", 0.0)), 2),
+        "duration_sec": round(duration_sec, 2),
         "total_frames_processed": runtime_stats.get("total_frames", 0),
         "fps": round(float(scene_metadata.get("fps", 30.0)), 2),
         "total_calibrated_seats": scene_metadata.get("total_seats", len(seat_rankings)),
-        "active_occupied_seats": scene_metadata.get("occupied_seats", 0),
+        "active_occupied_seats": occupied_seats_count,
         "total_canonical_episodes": len(canonical_episodes),
         "episodes_by_type": ep_counts,
         "total_review_events": len(canonical_events),
         "events_by_severity": evt_counts,
         "total_detected_patterns": len(canonical_patterns),
+        "product_attention_metrics": {
+            "review_events_per_video_minute": round(len(canonical_events) / duration_min, 2),
+            "review_events_per_seat_minute": round((len(canonical_events) / duration_min) / max(1, occupied_seats_count), 2),
+            "patterns_per_review_event": round(len(canonical_patterns) / max(1, len(canonical_events)), 2),
+            "episodes_per_review_event": round(len(canonical_episodes) / max(1, len(canonical_events)), 2),
+            "unique_flagged_seats": unique_flagged_seats,
+            "human_review_status": "PENDING",
+        },
         "evidence_clips_saved": len(evidence_clips),
         "evidence_snapshots_saved": len(evidence_snapshots),
         "seat_risk_rankings": seat_rankings,
@@ -209,6 +235,7 @@ def export_demo_artifacts(
             "gpu_name": gpu_name,
             "torch_version": torch.__version__,
         },
+        "head_pose_runtime": runtime_stats.get("head_pose_runtime", {}),
         "stage_latency_averages_ms": {
             "perception_yolo_pose": round(float(runtime_stats.get("lat_perception_avg_ms", 0.0)), 2),
             "observation_6drepnet": round(float(runtime_stats.get("lat_6drepnet_avg_ms", 0.0)), 2),
@@ -232,3 +259,4 @@ def export_demo_artifacts(
         "summary": summary_file,
         "runtime": runtime_file,
     }
+

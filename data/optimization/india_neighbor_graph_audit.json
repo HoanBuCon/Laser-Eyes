@@ -1,0 +1,175 @@
+{
+  "scene_id": "india_classroom",
+  "room_code": "ROOM-CALIB-01",
+  "calibration_status": "AUTO_INFERRED_REQUIRING_HUMAN_VERIFICATION",
+  "seats": {
+    "SEAT-ROOM-CALIB-01-01": {
+      "seat_code": "SEAT-ROOM-CALIB-01-01",
+      "left_neighbor": null,
+      "right_neighbor": null,
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-02": {
+      "seat_code": "SEAT-ROOM-CALIB-01-02",
+      "left_neighbor": null,
+      "right_neighbor": null,
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-03": {
+      "seat_code": "SEAT-ROOM-CALIB-01-03",
+      "left_neighbor": null,
+      "right_neighbor": null,
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-04": {
+      "seat_code": "SEAT-ROOM-CALIB-01-04",
+      "left_neighbor": null,
+      "right_neighbor": "SEAT-ROOM-CALIB-01-07",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-01",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-05": {
+      "seat_code": "SEAT-ROOM-CALIB-01-05",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-04",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-06",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-02",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-06": {
+      "seat_code": "SEAT-ROOM-CALIB-01-06",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-05",
+      "right_neighbor": null,
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-07": {
+      "seat_code": "SEAT-ROOM-CALIB-01-07",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-04",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-10",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-04",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-08": {
+      "seat_code": "SEAT-ROOM-CALIB-01-08",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-11",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-12",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-05",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-09": {
+      "seat_code": "SEAT-ROOM-CALIB-01-09",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-12",
+      "right_neighbor": null,
+      "front_neighbor": "SEAT-ROOM-CALIB-01-06",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-10": {
+      "seat_code": "SEAT-ROOM-CALIB-01-10",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-07",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-13",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-07",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-11": {
+      "seat_code": "SEAT-ROOM-CALIB-01-11",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-14",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-08",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-08",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-12": {
+      "seat_code": "SEAT-ROOM-CALIB-01-12",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-15",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-09",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-09",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-13": {
+      "seat_code": "SEAT-ROOM-CALIB-01-13",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-10",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-16",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-07",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-14": {
+      "seat_code": "SEAT-ROOM-CALIB-01-14",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-17",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-11",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-08",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-15": {
+      "seat_code": "SEAT-ROOM-CALIB-01-15",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-18",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-12",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-08",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-16": {
+      "seat_code": "SEAT-ROOM-CALIB-01-16",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-13",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-19",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-10",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-17": {
+      "seat_code": "SEAT-ROOM-CALIB-01-17",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-20",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-14",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-11",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-18": {
+      "seat_code": "SEAT-ROOM-CALIB-01-18",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-21",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-15",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-11",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-19": {
+      "seat_code": "SEAT-ROOM-CALIB-01-19",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-16",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-20",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-13",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-20": {
+      "seat_code": "SEAT-ROOM-CALIB-01-20",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-19",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-17",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-14",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-ROOM-CALIB-01-21": {
+      "seat_code": "SEAT-ROOM-CALIB-01-21",
+      "left_neighbor": "SEAT-ROOM-CALIB-01-11",
+      "right_neighbor": "SEAT-ROOM-CALIB-01-18",
+      "front_neighbor": "SEAT-ROOM-CALIB-01-14",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    }
+  }
+}

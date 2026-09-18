@@ -96,6 +96,7 @@ class SeatRiskProfile:
     is_recidivist: bool = False
 
     active_incident: Optional[Dict[str, Any]] = None
+    active_event: Optional[ClassroomEvent] = None
 
 
 class SeatRiskTracker:
@@ -104,6 +105,7 @@ class SeatRiskTracker:
     def __init__(
         self,
         room_id: str = "",
+        camera_id: Optional[str] = None,
         decay_rate_per_sec: float = 2.5,
         cooldown_duration_ms: float = 5000.0,
         recidivism_window_ms: float = 15000.0,
@@ -114,6 +116,7 @@ class SeatRiskTracker:
         post_event_reset_score: float = 45.0,
     ):
         self.room_id = room_id
+        self.camera_id = camera_id
         self.decay_rate_per_sec = decay_rate_per_sec
         self.cooldown_duration_ms = cooldown_duration_ms
         self.recidivism_window_ms = recidivism_window_ms
@@ -130,8 +133,10 @@ class SeatRiskTracker:
             self.profiles[seat_id] = SeatRiskProfile(
                 seat_id=seat_id,
                 room_id=self.room_id,
-                camera_id=camera_id,
+                camera_id=camera_id or self.camera_id,
             )
+        elif camera_id and not self.profiles[seat_id].camera_id:
+            self.profiles[seat_id].camera_id = camera_id
         return self.profiles[seat_id]
 
     def update_seat(
@@ -142,9 +147,10 @@ class SeatRiskTracker:
         timestamp_ms: float,
         detection: Optional[Detection] = None,
         frame_image: Optional[np.ndarray] = None,
+        camera_id: Optional[str] = None,
     ) -> Optional[ClassroomEvent]:
         """Update seat risk using temporal decay, episode increments, pattern bonuses, and incident aggregation."""
-        profile = self.get_or_create_profile(seat_id)
+        profile = self.get_or_create_profile(seat_id, camera_id=camera_id)
 
         dt_sec = max(0.0, (timestamp_ms - profile.last_update_timestamp_ms) / 1000.0) if profile.last_update_timestamp_ms > 0 else 0.1
         profile.last_update_timestamp_ms = timestamp_ms
@@ -159,6 +165,7 @@ class SeatRiskTracker:
         if profile.active_incident is not None:
             if (timestamp_ms - profile.active_incident["last_seen_timestamp_ms"]) > self.incident_merge_window_ms:
                 profile.active_incident = None
+                profile.active_event = None
                 profile.pattern_history_counts.clear()
 
         # 3. Apply Time Decay
@@ -179,7 +186,7 @@ class SeatRiskTracker:
             if pat.seat_id == seat_id and pat.pattern_id not in profile.processed_pattern_ids:
                 base_pw = PATTERN_PRIORITY_WEIGHTS.get(pat.pattern_type, 30.0)
                 history_count = profile.pattern_history_counts.get(pat.pattern_type, 0)
-                # Diminishing return factor: 1.0, 0.68, 0.52, 0.43...
+                # Diminishing return factor: 1.0, 0.74, 0.58, 0.49...
                 diminishing_factor = 1.0 / (1.0 + 0.35 * history_count)
                 increment = base_pw * diminishing_factor * pat.quality * pat.confidence
                 profile.risk_score = min(100.0, profile.risk_score + increment)
@@ -195,10 +202,21 @@ class SeatRiskTracker:
                     profile.active_incident["occurrence_count"] = profile.active_incident.get("occurrence_count", 1) + 1
                     profile.active_incident["last_seen_timestamp_ms"] = timestamp_ms
                     profile.active_incident["peak_risk_score"] = max(profile.active_incident.get("peak_risk_score", profile.risk_score), profile.risk_score)
+                    if pat.pattern_id not in profile.active_incident.setdefault("supporting_pattern_ids", []):
+                        profile.active_incident["supporting_pattern_ids"].append(pat.pattern_id)
                     if pat.component_episode_ids:
                         for ep_id in pat.component_episode_ids:
                             if ep_id not in profile.active_incident["component_episode_ids"]:
                                 profile.active_incident["component_episode_ids"].append(ep_id)
+
+                    # Synchronize active ClassroomEvent in-place so exported events match final incident state
+                    if profile.active_event is not None:
+                        profile.active_event.metadata["occurrence_count"] = profile.active_incident["occurrence_count"]
+                        profile.active_event.metadata["last_seen_ms"] = timestamp_ms
+                        profile.active_event.metadata["last_seen_timestamp_ms"] = timestamp_ms
+                        profile.active_event.metadata["peak_risk_score"] = round(profile.active_incident["peak_risk_score"], 1)
+                        profile.active_event.metadata["component_episode_ids"] = list(profile.active_incident["component_episode_ids"])
+                        profile.active_event.metadata["supporting_pattern_ids"] = list(profile.active_incident["supporting_pattern_ids"])
 
         # 6. Check Evidence Diversity / Correlation Bonus
         active_types = {ep.episode_type for ep in active_episodes if ep.seat_id == seat_id and ep.state == EpisodeState.ACTIVE}
@@ -251,6 +269,7 @@ class SeatRiskTracker:
 
             primary_pattern_name = profile.peak_pattern.pattern_type if profile.peak_pattern else "SUSPICIOUS_POSTURE"
             supporting_cues = profile.peak_pattern.supporting_cues if profile.peak_pattern else []
+            pat_id = profile.peak_pattern.pattern_id if profile.peak_pattern else ""
 
             # Check for existing active incident of the same behavior to MERGE
             active_inc = profile.active_incident
@@ -266,10 +285,21 @@ class SeatRiskTracker:
                 active_inc["occurrence_count"] = active_inc.get("occurrence_count", 1) + 1
                 active_inc["last_seen_timestamp_ms"] = timestamp_ms
                 active_inc["peak_risk_score"] = max(active_inc.get("peak_risk_score", profile.risk_score), profile.risk_score)
+                if pat_id and pat_id not in active_inc.setdefault("supporting_pattern_ids", []):
+                    active_inc["supporting_pattern_ids"].append(pat_id)
                 if profile.peak_pattern:
                     for ep_id in profile.peak_pattern.component_episode_ids:
                         if ep_id not in active_inc["component_episode_ids"]:
                             active_inc["component_episode_ids"].append(ep_id)
+
+                # Synchronize existing active event metadata
+                if profile.active_event is not None:
+                    profile.active_event.metadata["occurrence_count"] = active_inc["occurrence_count"]
+                    profile.active_event.metadata["last_seen_ms"] = timestamp_ms
+                    profile.active_event.metadata["last_seen_timestamp_ms"] = timestamp_ms
+                    profile.active_event.metadata["peak_risk_score"] = round(active_inc["peak_risk_score"], 1)
+                    profile.active_event.metadata["component_episode_ids"] = list(active_inc["component_episode_ids"])
+                    profile.active_event.metadata["supporting_pattern_ids"] = list(active_inc.get("supporting_pattern_ids", []))
 
                 # Enter Cooldown without emitting a duplicate event
                 profile.current_state = RiskState.COOLDOWN.value
@@ -279,6 +309,20 @@ class SeatRiskTracker:
             else:
                 # Emit a DISTINCT new human incident event
                 new_inc_id = str(uuid.uuid4())
+                initial_pattern_ids = [p.pattern_id for p in detected_patterns if p.seat_id == seat_id]
+                if pat_id and pat_id not in initial_pattern_ids:
+                    initial_pattern_ids.append(pat_id)
+                initial_ep_ids = []
+                for p in detected_patterns:
+                    if p.seat_id == seat_id and p.component_episode_ids:
+                        for ep_id in p.component_episode_ids:
+                            if ep_id not in initial_ep_ids:
+                                initial_ep_ids.append(ep_id)
+                if profile.peak_pattern:
+                    for ep_id in profile.peak_pattern.component_episode_ids:
+                        if ep_id not in initial_ep_ids:
+                            initial_ep_ids.append(ep_id)
+
                 profile.active_incident = {
                     "incident_id": new_inc_id,
                     "seat_id": seat_id,
@@ -287,7 +331,8 @@ class SeatRiskTracker:
                     "last_seen_timestamp_ms": timestamp_ms,
                     "occurrence_count": 1,
                     "peak_risk_score": profile.risk_score,
-                    "component_episode_ids": list(profile.peak_pattern.component_episode_ids) if profile.peak_pattern else [],
+                    "component_episode_ids": initial_ep_ids,
+                    "supporting_pattern_ids": initial_pattern_ids,
                 }
                 profile.total_incidents_count += 1
                 profile.total_event_count += 1
@@ -295,13 +340,22 @@ class SeatRiskTracker:
 
                 severity = SeverityLevel.HIGH.value if (profile.risk_score >= 85.0 or is_recidivist) else SeverityLevel.MEDIUM.value
 
+                # Extract genuine actor track ID if available from detector tracking
+                actual_track_id = None
+                if detection is not None and hasattr(detection, "track_id") and detection.track_id is not None:
+                    try:
+                        actual_track_id = int(detection.track_id)
+                    except (ValueError, TypeError):
+                        actual_track_id = None
+
                 event_to_emit = ClassroomEvent(
                     event_id=new_inc_id,
-                    track_id=int(seat_id.replace("SEAT-", "").replace("ROOM-CALIB-01-", "").replace("-", "") if seat_id.replace("SEAT-", "").replace("ROOM-CALIB-01-", "").replace("-", "").isdigit() else 1),
+                    track_id=actual_track_id or 0,
                     behavior=primary_pattern_name,
                     confidence=float(profile.peak_pattern.confidence if profile.peak_pattern else 0.85),
                     severity=severity,
                     timestamp=timestamp_ms / 1000.0,
+                    timestamp_ms=timestamp_ms,
                     bbox=profile.peak_detection.bbox if profile.peak_detection else (0.0, 0.0, 0.0, 0.0),
                     frame_index=int(timestamp_ms / 33.33),
                     evidence_frame=profile.peak_frame_image if profile.peak_frame_image is not None else frame_image,
@@ -315,11 +369,15 @@ class SeatRiskTracker:
                         "primary_pattern": primary_pattern_name,
                         "supporting_cues": supporting_cues,
                         "observation_quality": round(profile.peak_pattern.quality if profile.peak_pattern else 0.85, 3),
-                        "component_episode_ids": profile.peak_pattern.component_episode_ids if profile.peak_pattern else [],
+                        "component_episode_ids": list(profile.active_incident["component_episode_ids"]),
+                        "supporting_pattern_ids": list(profile.active_incident["supporting_pattern_ids"]),
                         "incident_id": new_inc_id,
+                        "first_seen_ms": round(timestamp_ms, 1),
+                        "last_seen_ms": round(timestamp_ms, 1),
                         "occurrence_count": 1,
                     },
                 )
+                profile.active_event = event_to_emit
 
                 # Enter Cooldown
                 profile.current_state = RiskState.COOLDOWN.value
@@ -331,3 +389,4 @@ class SeatRiskTracker:
             profile.state_enter_timestamp_ms = timestamp_ms
 
         return event_to_emit
+

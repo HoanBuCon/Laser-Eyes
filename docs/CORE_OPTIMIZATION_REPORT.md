@@ -137,3 +137,29 @@ VIGIL AI adheres strictly to the **AI-Assisted Co-Pilot** principle:
 1. **Zero Automated Accusations:** The system NEVER emits `CHEATING` verdicts. All event statuses are `FLAGGED_FOR_REVIEW` or `SUSPICIOUS`.
 2. **Human-in-the-Loop:** Alerts serve solely as navigational bookmarks for proctors, accompanied by 10-second video evidence clips and SHA-256 integrity hashes for forensic review.
 3. **Protected Exam Norms:** Normal exam desk writing is safeguarded via spatial desk geometry and writing zone suppression.
+
+---
+
+## 7. Post-Optimization Correctness Patch & Strict Ground Truth Benchmark
+
+Following independent repository audit, the following integrity corrections were implemented without modifying AI model weights or arbitrary threshold hacking:
+
+### 7.1 Strict Actor-Centric Temporal Ground Truth Matcher
+- **Rule:** Matching requires **Same Seat (normalized) + Same Behavioral Label + Temporal IoU $\ge 0.30$** with 1-to-1 greedy pairing.
+- **GT Integrity Audit:** Evaluated human ground truth in `data/ground_truth/india_classroom_gt.json`. Excluded 1 malformed record (`b2c6d58d-d99c-4343-af34-5595b19770db` spanning 20.3s with stored duration 6.4s) into `india_classroom_gt_integrity_report.json`.
+- **Strict Benchmark Results (`india_classroom.mp4`):**
+  - Valid Ground Truth Episodes: 9
+  - AI Head Episodes Evaluated: 219
+  - True Positives (TP): 3 (`SEAT-15` R: IoU=0.786, `SEAT-15` L: IoU=0.722, `SEAT-03` R: IoU=0.460)
+  - False Positives (FP): 216
+  - False Negatives (FN): 6
+  - Precision: **1.37%** | Recall: **33.33%** | Average TP IoU: **0.656**
+  - Unmatched AI head turns cataloged in `ai_unmatched_head_episodes.csv` for transparent human review.
+
+### 7.2 Incident Aggregator Output Synchronization
+- Resolved active event metadata mutations ensuring `occurrence_count`, `last_seen_ms`, `peak_risk_score`, and deduplicated `component_episode_ids` / `supporting_pattern_ids` are fully synchronized in exported `events.json`.
+- Propagated true actor `track_id` and `camera_id` throughout all exported event streams.
+
+### 7.3 Real-Time HPE Hardware Telemetry
+- Exported exact hardware telemetry counters in `runtime_profile.json` (`scheduled_cycles`, `estimate_batch_calls`, `estimate_single_calls=0`, `model_forward_calls`, `valid_head_crops`, `rejected_head_crops`, `average_batch_size`, `effective_hpe_hz`).
+

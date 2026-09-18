@@ -1,0 +1,114 @@
+{
+  "scene_id": "student_classroom",
+  "room_code": "ROOM-STUDENT-01",
+  "seats": {
+    "SEAT-STUDENT-01": {
+      "seat_code": "SEAT-STUDENT-01",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-02": {
+      "seat_code": "SEAT-STUDENT-02",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-03": {
+      "seat_code": "SEAT-STUDENT-03",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-04": {
+      "seat_code": "SEAT-STUDENT-04",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-05": {
+      "seat_code": "SEAT-STUDENT-05",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-06": {
+      "seat_code": "SEAT-STUDENT-06",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-07": {
+      "seat_code": "SEAT-STUDENT-07",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-08": {
+      "seat_code": "SEAT-STUDENT-08",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-09": {
+      "seat_code": "SEAT-STUDENT-09",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-10": {
+      "seat_code": "SEAT-STUDENT-10",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-11": {
+      "seat_code": "SEAT-STUDENT-11",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    },
+    "SEAT-STUDENT-12": {
+      "seat_code": "SEAT-STUDENT-12",
+      "writing_polygon": false,
+      "under_desk_polygon": false,
+      "desk_boundary_y": null,
+      "capability_quality": "UNAVAILABLE",
+      "desk_hand_interaction": "DISABLED",
+      "status_note": "CALIBRATED"
+    }
+  }
+}

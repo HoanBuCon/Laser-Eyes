@@ -1,40 +1,98 @@
 {
-  "benchmark_name": "VIGIL AI SRS v2 Core Runtime & Event Quality Benchmark (AFTER OPTIMIZATION)",
+  "benchmark_name": "VIGIL AI SRS v2 Post-Optimization Correctness Benchmark",
   "date": "2026-09-18",
-  "pipeline_mode": "Scheduled 5Hz Batched 6DRepNet + Incident Aggregator (15s Window) + Median Filtering",
-  "hardware": "NVIDIA GeForce RTX GPU (CUDA)",
+  "status": "CORRECTNESS_PATCH_READY_FOR_HUMAN_REVIEW",
+  "pipeline_mode": "Scheduled 5Hz Batched 6DRepNet + Incident Aggregator + Strict Temporal Evaluator",
+  "hardware": {
+    "device": "cuda",
+    "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "torch_version": "2.6.0+cu124"
+  },
   "india_classroom": {
     "resolution": "1280x720",
     "total_frames": 2150,
     "video_duration_sec": 71.77,
-    "wall_clock_time_sec": 85.86,
-    "processing_fps": 25.04,
-    "realtime_factor": "0.84x realtime (near-realtime on 1280x720 multi-student classroom)",
-    "gpu_forward_passes_per_100_frames": 53,
-    "gpu_forward_reduction_percent": "95.8%",
-    "episodes_detected": 413,
-    "patterns_detected": 139,
-    "review_events_emitted": 23,
-    "review_event_reduction_percent": "88.7%",
-    "ground_truth_head_episodes": 10,
-    "ground_truth_recall": "100.0% (10/10 TP)",
-    "spam_factor": "Zero spam — aggregated into 23 distinct multi-occurrence incidents",
-    "human_proctor_reviewability": "Optimal / Professional"
+    "wall_clock_time_sec": 96.14,
+    "processing_fps": 22.36,
+    "realtime_factor": 0.75,
+    "episodes_detected": 448,
+    "head_turn_episodes": 219,
+    "patterns_detected": 149,
+    "review_events_emitted": 37,
+    "review_events_by_severity": {
+      "HIGH": 20,
+      "MEDIUM": 17
+    },
+    "ground_truth_integrity": {
+      "total_raw_gt_records": 13,
+      "valid_gt_records": 9,
+      "malformed_gt_excluded": 1,
+      "unsupported_label_excluded": 3,
+      "integrity_report_file": "data/ground_truth/india_classroom_gt_integrity_report.json"
+    },
+    "strict_ground_truth_matching": {
+      "matching_criteria": "Same Seat + Same Label + Temporal IoU >= 0.30 (1-to-1 greedy)",
+      "tp": 3,
+      "fp": 216,
+      "fn": 6,
+      "precision_percent": 1.37,
+      "recall_percent": 33.33,
+      "f1_percent": 2.63,
+      "avg_tp_iou": 0.656
+    },
+    "head_pose_telemetry": {
+      "estimate_single_calls": 0,
+      "estimate_batch_calls": 1590,
+      "model_forward_calls": 1590,
+      "total_head_crops": 3137,
+      "valid_head_crops": 3133,
+      "rejected_head_crops": 4,
+      "average_batch_size": 1.97,
+      "max_batch_size": 8,
+      "average_forward_ms": 14.03,
+      "effective_hpe_hz": 22.16,
+      "effective_hpe_hz_per_seat": 6.24
+    },
+    "product_attention_metrics": {
+      "review_events_per_video_minute": 30.93,
+      "review_events_per_seat_minute": 4.42,
+      "episodes_per_review_event": 12.11,
+      "patterns_per_review_event": 4.03,
+      "unique_flagged_seats": 13
+    }
   },
   "student_classroom": {
     "resolution": "640x352",
     "total_frames": 219,
     "video_duration_sec": 10.95,
-    "wall_clock_time_sec": 5.53,
-    "processing_fps": 39.59,
-    "realtime_factor": "1.98x realtime (faster than realtime)",
-    "gpu_forward_passes_per_100_frames": 26,
-    "gpu_forward_reduction_percent": "96.2%",
-    "episodes_detected": 46,
-    "patterns_detected": 14,
+    "wall_clock_time_sec": 7.19,
+    "processing_fps": 30.45,
+    "realtime_factor": 1.52,
+    "episodes_detected": 40,
+    "patterns_detected": 12,
     "review_events_emitted": 1,
-    "review_event_reduction_percent": "93.3%",
-    "spam_factor": "Zero spam — aggregated into exactly 1 distinct incident",
-    "human_proctor_reviewability": "Optimal / Clear focus"
+    "review_events_by_severity": {
+      "HIGH": 1
+    },
+    "head_pose_telemetry": {
+      "estimate_single_calls": 0,
+      "estimate_batch_calls": 134,
+      "model_forward_calls": 134,
+      "total_head_crops": 213,
+      "valid_head_crops": 213,
+      "rejected_head_crops": 0,
+      "average_batch_size": 1.59,
+      "max_batch_size": 4,
+      "average_forward_ms": 11.6,
+      "effective_hpe_hz": 12.24,
+      "effective_hpe_hz_per_seat": 4.86
+    },
+    "product_attention_metrics": {
+      "review_events_per_video_minute": 5.48,
+      "review_events_per_seat_minute": 1.37,
+      "episodes_per_review_event": 40.0,
+      "patterns_per_review_event": 12.0,
+      "unique_flagged_seats": 1
+    }
   }
 }

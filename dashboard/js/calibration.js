@@ -23,7 +23,9 @@ let seats = [];
 let currentPolygon = [];
 let mousePos = { x: 0, y: 0 };
 let selectedSeatIndex = null;
+let hoveredSeatIndex = null;
 let isDrawing = false;
+let editorMode = 'SELECT'; // 'SELECT' (default cursor/select) or 'DRAW' (polygon vertex pinning)
 
 const canvas = document.getElementById('calibrationCanvas');
 const ctx = canvas.getContext('2d');
@@ -32,6 +34,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initCanvasEvents();
     loadRooms();
     window.addEventListener('keydown', handleGlobalKeydown);
+    setEditorMode('SELECT');
 });
 
 // ==============================================================================
@@ -191,12 +194,62 @@ async function handleFileUpload(event) {
 }
 
 // ==============================================================================
-// 3. Canvas Mouse Events & Interactive Polygon Drawing
+// 3. Canvas Mouse Events, Editor Modes & Interactive Drawing
 // ==============================================================================
 function initCanvasEvents() {
     canvas.addEventListener('mousedown', handleCanvasMouseDown);
     canvas.addEventListener('mousemove', handleCanvasMouseMove);
     canvas.addEventListener('dblclick', handleCanvasDblClick);
+}
+
+function setEditorMode(mode) {
+    editorMode = mode;
+    const btnSelect = document.getElementById('btnModeSelect');
+    const btnDraw = document.getElementById('btnModeDraw');
+
+    if (btnSelect && btnDraw) {
+        if (mode === 'SELECT') {
+            btnSelect.className = 'px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow';
+            btnDraw.className = 'px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-1.5';
+            canvas.style.cursor = hoveredSeatIndex !== null ? 'pointer' : 'default';
+            if (currentPolygon.length > 0) {
+                currentPolygon = [];
+                isDrawing = false;
+            }
+            if (selectedSeatIndex !== null && selectedSeatIndex >= 0 && selectedSeatIndex < seats.length) {
+                setDrawingStatus(`SELECTED ${seats[selectedSeatIndex].seat_code} (PRESS DEL TO DELETE)`, 'text-cyan-400');
+            } else {
+                setDrawingStatus('SELECT MODE (CLICK SEAT)', 'text-cyan-400');
+            }
+        } else { // DRAW
+            btnDraw.className = 'px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-amber-600 text-white shadow';
+            btnSelect.className = 'px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-1.5';
+            canvas.style.cursor = 'crosshair';
+            selectedSeatIndex = null;
+            hoveredSeatIndex = null;
+            updateDeleteSelectedButton();
+            renderSeatList();
+            setDrawingStatus('DRAW MODE (CLICK TO PIN POINTS)', 'text-amber-400');
+        }
+    }
+    redrawCanvas();
+}
+
+function updateDeleteSelectedButton() {
+    const btn = document.getElementById('btnDeleteSelectedSeat');
+    if (!btn) return;
+    if (selectedSeatIndex !== null && selectedSeatIndex >= 0 && selectedSeatIndex < seats.length) {
+        btn.classList.remove('hidden');
+        btn.innerHTML = `<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg><span>Delete ${seats[selectedSeatIndex].seat_code} (Del)</span>`;
+    } else {
+        btn.classList.add('hidden');
+    }
+}
+
+function deleteSelectedSeatFromButton() {
+    if (selectedSeatIndex !== null && selectedSeatIndex >= 0 && selectedSeatIndex < seats.length) {
+        deleteSeat(selectedSeatIndex);
+    }
 }
 
 function getCanvasCoordinates(event) {
@@ -209,12 +262,41 @@ function getCanvasCoordinates(event) {
     return { x: Math.max(0, Math.min(refWidth, x)), y: Math.max(0, Math.min(refHeight, y)) };
 }
 
+function isPointInPolygon(point, polygon) {
+    if (!polygon || polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i][0], yi = polygon[i][1];
+        const xj = polygon[j][0], yj = polygon[j][1];
+        const intersect = ((yi > point.y) !== (yj > point.y)) &&
+            (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
 function handleCanvasMouseMove(event) {
     mousePos = getCanvasCoordinates(event);
     document.getElementById('mouseCoordsLabel').innerText = `X: ${mousePos.x} | Y: ${mousePos.y}`;
 
-    if (currentPolygon.length > 0) {
-        redrawCanvas();
+    if (editorMode === 'SELECT') {
+        let prevHover = hoveredSeatIndex;
+        hoveredSeatIndex = null;
+        for (let i = seats.length - 1; i >= 0; i--) {
+            if (isPointInPolygon(mousePos, seats[i].polygon)) {
+                hoveredSeatIndex = i;
+                break;
+            }
+        }
+        canvas.style.cursor = hoveredSeatIndex !== null ? 'pointer' : 'default';
+        if (prevHover !== hoveredSeatIndex) {
+            redrawCanvas();
+        }
+    } else {
+        canvas.style.cursor = 'crosshair';
+        if (currentPolygon.length > 0) {
+            redrawCanvas();
+        }
     }
 }
 
@@ -222,7 +304,20 @@ function handleCanvasMouseDown(event) {
     if (event.button !== 0) return; // Left click only
     const pt = getCanvasCoordinates(event);
 
-    // If clicking close to start point and length >= 4, auto complete polygon
+    if (editorMode === 'SELECT') {
+        let clickedSeatIdx = null;
+        for (let i = seats.length - 1; i >= 0; i--) {
+            if (isPointInPolygon(pt, seats[i].polygon)) {
+                clickedSeatIdx = i;
+                break;
+            }
+        }
+        selectSeatIndex(clickedSeatIdx);
+        return;
+    }
+
+    // DRAW MODE:
+    // If clicking close to start point and length >= 3, auto complete polygon
     if (currentPolygon.length >= 3) {
         const start = currentPolygon[0];
         const dist = Math.hypot(pt.x - start[0], pt.y - start[1]);
@@ -234,24 +329,60 @@ function handleCanvasMouseDown(event) {
 
     currentPolygon.push([pt.x, pt.y]);
     isDrawing = true;
-    setDrawingStatus(`DRAWING (${currentPolygon.length} PTS)`, 'text-cyan-400');
+    setDrawingStatus(`DRAWING (${currentPolygon.length} PTS)`, 'text-amber-400');
     redrawCanvas();
 }
 
 function handleCanvasDblClick(event) {
-    if (currentPolygon.length >= 3) {
+    if (editorMode === 'DRAW' && currentPolygon.length >= 3) {
         completeCurrentPolygon();
     }
 }
 
 function handleGlobalKeydown(event) {
-    if ((event.ctrlKey || event.metaKey) && event.key === 'z') {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.tagName === 'SELECT') {
+        return;
+    }
+
+    const key = event.key;
+
+    if ((event.ctrlKey || event.metaKey) && (key === 'z' || key === 'Z')) {
         event.preventDefault();
         undoLastPoint();
-    } else if (event.key === 'Escape') {
-        clearCurrentPolygon();
-    } else if (event.key === 'Enter' && currentPolygon.length >= 3) {
+        return;
+    }
+
+    if (key === 'v' || key === 'V') {
+        event.preventDefault();
+        setEditorMode('SELECT');
+        return;
+    }
+
+    if (key === 'd' || key === 'D' || key === 'p' || key === 'P') {
+        event.preventDefault();
+        setEditorMode('DRAW');
+        return;
+    }
+
+    if (key === 'Escape') {
+        if (currentPolygon.length > 0) {
+            clearCurrentPolygon();
+        } else {
+            selectSeatIndex(null);
+        }
+        return;
+    }
+
+    if (key === 'Enter' && currentPolygon.length >= 3) {
         completeCurrentPolygon();
+        return;
+    }
+
+    if (key === 'Delete' || key === 'Backspace') {
+        if (selectedSeatIndex !== null && selectedSeatIndex >= 0 && selectedSeatIndex < seats.length) {
+            event.preventDefault();
+            deleteSeat(selectedSeatIndex);
+        }
     }
 }
 
@@ -260,9 +391,9 @@ function undoLastPoint() {
         currentPolygon.pop();
         if (currentPolygon.length === 0) {
             isDrawing = false;
-            setDrawingStatus('READY', 'text-gray-400');
+            setDrawingStatus(editorMode === 'DRAW' ? 'DRAW MODE (CLICK TO PIN POINTS)' : 'READY', editorMode === 'DRAW' ? 'text-amber-400' : 'text-gray-400');
         } else {
-            setDrawingStatus(`DRAWING (${currentPolygon.length} PTS)`, 'text-cyan-400');
+            setDrawingStatus(`DRAWING (${currentPolygon.length} PTS)`, 'text-amber-400');
         }
         redrawCanvas();
     }
@@ -271,7 +402,7 @@ function undoLastPoint() {
 function clearCurrentPolygon() {
     currentPolygon = [];
     isDrawing = false;
-    setDrawingStatus('READY', 'text-gray-400');
+    setDrawingStatus(editorMode === 'DRAW' ? 'DRAW MODE (CLICK TO PIN POINTS)' : 'READY', editorMode === 'DRAW' ? 'text-amber-400' : 'text-gray-400');
     redrawCanvas();
 }
 
@@ -280,7 +411,7 @@ function completeCurrentPolygon() {
         if (seats.length > 0) {
             alert(`Bạn đã tạo xong ${seats.length} chỗ ngồi trong danh sách.\n\n👉 Để lưu tất cả vào Hệ thống & Database, hãy nhấn nút màu xanh lá "Save All Seats to DB" ở góc trên bên phải màn hình!`);
         } else {
-            alert('Vui lòng click chuột lên ảnh để vẽ các đỉnh đa giác cho bàn thi (tối thiểu 3 điểm).');
+            alert('Vui lòng chuyển sang Draw Mode (phím D) và click chuột lên ảnh để vẽ các đỉnh đa giác cho bàn thi (tối thiểu 3 điểm).');
         }
         return;
     }
@@ -338,6 +469,7 @@ function confirmSeatDetails() {
 
     closeSeatModal(true);
     setDrawingStatus('SEAT ADDED (UNSAVED)', 'text-amber-400');
+    updateDeleteSelectedButton();
     renderSeatList();
     redrawCanvas();
 }
@@ -359,6 +491,7 @@ function redrawCanvas() {
     // 2. Draw Configured Seats
     seats.forEach((seat, idx) => {
         const isSelected = selectedSeatIndex === idx;
+        const isHovered = (editorMode === 'SELECT' && hoveredSeatIndex === idx && !isSelected);
         const poly = seat.polygon;
         if (!poly || poly.length < 3) return;
 
@@ -380,6 +513,11 @@ function redrawCanvas() {
             ctx.strokeStyle = '#22d3ee';
             ctx.lineWidth = 3;
             ctx.setLineDash([]);
+        } else if (isHovered) {
+            ctx.fillStyle = 'rgba(34, 211, 238, 0.22)';
+            ctx.strokeStyle = '#38bdf8';
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
         } else {
             ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
             ctx.strokeStyle = '#10b981';
@@ -394,8 +532,8 @@ function redrawCanvas() {
         // Draw point handles
         poly.forEach(([px, py]) => {
             ctx.beginPath();
-            ctx.arc(px, py, isSelected ? 4 : 3, 0, Math.PI * 2);
-            ctx.fillStyle = isSelected ? '#38bdf8' : '#34d399';
+            ctx.arc(px, py, isSelected ? 4.5 : (isHovered ? 4 : 3), 0, Math.PI * 2);
+            ctx.fillStyle = isSelected ? '#38bdf8' : (isHovered ? '#67e8f9' : '#34d399');
             ctx.fill();
             ctx.strokeStyle = '#ffffff';
             ctx.lineWidth = 1;
@@ -406,7 +544,7 @@ function redrawCanvas() {
         const cx = poly.reduce((acc, p) => acc + p[0], 0) / poly.length;
         const cy = poly.reduce((acc, p) => acc + p[1], 0) / poly.length;
 
-        drawSeatBadge(seat.seat_code, cx, cy, isSelected, seat.enabled);
+        drawSeatBadge(seat.seat_code, cx, cy, isSelected, seat.enabled, isHovered);
     });
 
     // 3. Draw Active In-Progress Polygon
@@ -441,7 +579,7 @@ function redrawCanvas() {
     }
 }
 
-function drawSeatBadge(text, x, y, isSelected, isEnabled) {
+function drawSeatBadge(text, x, y, isSelected, isEnabled, isHovered = false) {
     ctx.font = 'bold 12px "JetBrains Mono", monospace';
     const textWidth = ctx.measureText(text).width;
     const pad = 6;
@@ -451,8 +589,8 @@ function drawSeatBadge(text, x, y, isSelected, isEnabled) {
     const bx = x - boxW / 2;
     const by = y - boxH / 2;
 
-    ctx.fillStyle = !isEnabled ? 'rgba(30, 41, 59, 0.9)' : (isSelected ? 'rgba(6, 182, 212, 0.95)' : 'rgba(15, 23, 42, 0.85)');
-    ctx.strokeStyle = isSelected ? '#ffffff' : (isEnabled ? '#10b981' : '#64748b');
+    ctx.fillStyle = !isEnabled ? 'rgba(30, 41, 59, 0.9)' : (isSelected ? 'rgba(6, 182, 212, 0.95)' : (isHovered ? 'rgba(14, 116, 144, 0.9)' : 'rgba(15, 23, 42, 0.85)'));
+    ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#67e8f9' : (isEnabled ? '#10b981' : '#64748b'));
     ctx.lineWidth = 1.5;
 
     // Rounded rectangle
@@ -499,7 +637,7 @@ function renderSeatList() {
     badge.innerText = `${seats.length} Seats`;
 
     if (seats.length === 0) {
-        container.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">No seats configured. Click on canvas to draw.</div>`;
+        container.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">No seats configured. Switch to Draw Mode (D) to draw.</div>`;
         return;
     }
 
@@ -510,7 +648,7 @@ function renderSeatList() {
         const enabledBadgeCls = s.enabled ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-gray-800 text-gray-400 border-gray-700';
 
         return `
-        <div onclick="selectSeatIndex(${idx})" class="p-3 rounded-xl bg-gray-900/80 border border-gray-800 seat-item ${activeClass} transition cursor-pointer flex items-center justify-between gap-2">
+        <div id="seat-item-${idx}" onclick="selectSeatIndex(${idx})" class="p-3 rounded-xl bg-gray-900/80 border border-gray-800 seat-item ${activeClass} transition cursor-pointer flex items-center justify-between gap-2">
             <div>
                 <div class="flex items-center gap-2">
                     <span class="font-bold text-xs font-mono text-white">${s.seat_code}</span>
@@ -524,7 +662,7 @@ function renderSeatList() {
                 <button onclick="toggleSeatEnabled(${idx})" class="p-1.5 rounded hover:bg-gray-800 text-gray-400 hover:text-cyan-300 transition" title="Toggle Enable/Disable">
                     ${s.enabled ? '🟢' : '⚪'}
                 </button>
-                <button onclick="deleteSeat(${idx})" class="p-1.5 rounded hover:bg-red-950 text-gray-400 hover:text-red-400 transition" title="Delete Seat">
+                <button onclick="deleteSeat(${idx})" class="p-1.5 rounded hover:bg-red-950 text-gray-400 hover:text-red-400 transition" title="Delete Seat (Del)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>
@@ -534,9 +672,28 @@ function renderSeatList() {
 }
 
 function selectSeatIndex(idx) {
-    selectedSeatIndex = selectedSeatIndex === idx ? null : idx;
+    if (idx === null) {
+        selectedSeatIndex = null;
+    } else if (selectedSeatIndex === idx) {
+        selectedSeatIndex = null; // Toggle off
+    } else {
+        selectedSeatIndex = idx;
+    }
+    updateDeleteSelectedButton();
     renderSeatList();
     redrawCanvas();
+
+    if (selectedSeatIndex !== null) {
+        const item = document.getElementById(`seat-item-${selectedSeatIndex}`);
+        if (item) item.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setDrawingStatus(`SELECTED ${seats[selectedSeatIndex].seat_code} (PRESS DEL TO DELETE)`, 'text-cyan-400');
+    } else {
+        if (editorMode === 'SELECT') {
+            setDrawingStatus('SELECT MODE (CLICK SEAT)', 'text-cyan-400');
+        } else {
+            setDrawingStatus('DRAW MODE (CLICK TO PIN POINTS)', 'text-amber-400');
+        }
+    }
 }
 
 function toggleSeatEnabled(idx) {
@@ -545,23 +702,67 @@ function toggleSeatEnabled(idx) {
     redrawCanvas();
 }
 
-function deleteSeat(idx) {
-    if (confirm(`Delete Seat ${seats[idx].seat_code}?`)) {
-        seats.splice(idx, 1);
-        if (selectedSeatIndex === idx) selectedSeatIndex = null;
-        renderSeatList();
-        redrawCanvas();
+async function deleteSeat(idx) {
+    if (idx < 0 || idx >= seats.length) return;
+    const seatToDelete = seats[idx];
+
+    if (!confirm(`Are you sure you want to delete Seat ${seatToDelete.seat_code}?`)) {
+        return;
     }
+
+    // If seat was loaded from database, delete from database immediately
+    if (seatToDelete.id && !seatToDelete.id.startsWith('temp_')) {
+        try {
+            const res = await fetch(`/api/v1/seats/${seatToDelete.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                // Fallback delete by code
+                await fetch(`/api/v1/data/seats/by-code/${encodeURIComponent(seatToDelete.seat_code)}`, { method: 'DELETE' });
+            }
+        } catch (e) {
+            console.warn('Failed to delete seat from DB:', e);
+        }
+    } else if (seatToDelete.seat_code) {
+        // Fallback delete by code
+        try {
+            await fetch(`/api/v1/data/seats/by-code/${encodeURIComponent(seatToDelete.seat_code)}`, { method: 'DELETE' });
+        } catch (e) {
+            console.warn('Failed to delete seat by code:', e);
+        }
+    }
+
+    seats.splice(idx, 1);
+    if (selectedSeatIndex === idx) {
+        selectedSeatIndex = null;
+    } else if (selectedSeatIndex > idx) {
+        selectedSeatIndex--;
+    }
+
+    updateDeleteSelectedButton();
+    renderSeatList();
+    redrawCanvas();
+    setDrawingStatus(`DELETED ${seatToDelete.seat_code}`, 'text-rose-400');
 }
 
-function clearAllSeats() {
+async function clearAllSeats() {
     if (seats.length === 0) return;
-    if (confirm(`Are you sure you want to remove all ${seats.length} seats from the current view?`)) {
-        seats = [];
-        selectedSeatIndex = null;
-        renderSeatList();
-        redrawCanvas();
+    if (!confirm(`Are you sure you want to remove all ${seats.length} seats from the current view and database?`)) {
+        return;
     }
+
+    for (const s of seats) {
+        if (s.id && !s.id.startsWith('temp_')) {
+            try {
+                await fetch(`/api/v1/seats/${s.id}`, { method: 'DELETE' });
+            } catch (e) {}
+        }
+    }
+
+    seats = [];
+    selectedSeatIndex = null;
+    updateDeleteSelectedButton();
+    renderSeatList();
+    redrawCanvas();
+    setDrawingStatus('ALL SEATS CLEARED', 'text-amber-400');
 }
 
 // ==============================================================================

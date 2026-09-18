@@ -117,6 +117,7 @@ class SeatROI(Base):
     seat_code = Column(String(50), nullable=False, index=True)  # e.g., "A101_S01"
     seat_label = Column(String(100), nullable=True)             # e.g., "Row 1 Desk 1"
     polygon_json = Column(Text, nullable=False)                 # JSON array of points [[x, y], ...]
+    context_json = Column(Text, nullable=True)                  # Scene/Seat context & neighbor graph
     enabled = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
@@ -125,6 +126,54 @@ class SeatROI(Base):
     room = relationship("ExamRoom", back_populates="seats")
     camera = relationship("Camera", back_populates="seats")
     events = relationship("DetectionEvent", back_populates="seat", cascade="all, delete-orphan")
+    episodes = relationship("BehaviorEpisodeDB", back_populates="seat", cascade="all, delete-orphan")
+    patterns = relationship("BehaviorPatternDB", back_populates="seat", cascade="all, delete-orphan")
+    temporal_episodes = relationship("TemporalEpisodeAnnotation", back_populates="seat", cascade="all, delete-orphan")
+
+
+class BehaviorEpisodeDB(Base):
+    """Time-bounded atomic behavior episode recorded per seat."""
+
+    __tablename__ = "behavior_episodes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=True)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=False)
+    episode_type = Column(String(50), nullable=False)  # e.g., "HEAD_TURN_LEFT", "TORSO_LEAN_RIGHT"
+    start_timestamp_ms = Column(Float, nullable=False)
+    peak_timestamp_ms = Column(Float, nullable=False)
+    end_timestamp_ms = Column(Float, nullable=True)
+    duration_ms = Column(Float, default=0.0)
+    confidence = Column(Float, default=1.0)
+    quality = Column(Float, default=1.0)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    seat = relationship("SeatROI", back_populates="episodes")
+
+
+class BehaviorPatternDB(Base):
+    """Synthesized review-worthy behavioral pattern recorded per seat."""
+
+    __tablename__ = "behavior_patterns"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=True)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=False)
+    pattern_type = Column(String(50), nullable=False)  # e.g., "REPEATED_NEIGHBOR_GLANCE"
+    start_timestamp_ms = Column(Float, nullable=False)
+    end_timestamp_ms = Column(Float, nullable=False)
+    confidence = Column(Float, default=1.0)
+    quality = Column(Float, default=1.0)
+    primary_direction = Column(String(20), nullable=True)
+    target_neighbor_id = Column(String(50), nullable=True)
+    component_episode_ids_json = Column(Text, nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    seat = relationship("SeatROI", back_populates="patterns")
 
 
 class ExamSession(Base):
@@ -169,6 +218,9 @@ class DetectionEvent(Base):
     event_type = Column(String(50), default="SUSPICIOUS_BEHAVIOR")
     primary_signal = Column(String(50), default="PROLONGED_HEAD_TURN")
     behavior = Column(String(50), nullable=False)  # Legacy alias matching primary_signal
+    primary_pattern = Column(String(50), nullable=True)  # SRS v2: e.g. "REPEATED_NEIGHBOR_GLANCE"
+    supporting_patterns_json = Column(Text, nullable=True)  # SRS v2: list of supporting pattern cues
+    observation_quality = Column(Float, default=1.0)        # SRS v2: quality metric
     severity = Column(String(10), default="MEDIUM")  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
     risk_score = Column(Integer, default=50)  # 0 to 100 normalized score
     confidence_avg = Column(Float, default=0.0)
@@ -271,3 +323,188 @@ class AuditLog(Base):
     resource_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# ==============================================================================
+# HUMAN DATA OPERATIONS WORKBENCH SCHEMA (Sprint 2 - Observation Quality)
+# ==============================================================================
+
+class MediaAsset(Base):
+    """Raw media item (image/video/audio) tracked non-destructively for audit & annotation."""
+
+    __tablename__ = "media_assets"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    asset_type = Column(String(20), default="IMAGE")  # "IMAGE", "VIDEO", "AUDIO"
+    file_path = Column(String(500), nullable=False)
+    relative_path = Column(String(500), nullable=False)
+    file_name = Column(String(255), nullable=False)
+    original_split = Column(String(20), nullable=True)  # "train", "val", "test", "demo", "staged"
+    width = Column(Integer, default=0)
+    height = Column(Integer, default=0)
+    fps = Column(Float, default=0.0)
+    total_frames = Column(Integer, default=0)
+    duration_seconds = Column(Float, default=0.0)
+    sha256_hash = Column(String(64), nullable=True)
+    audit_status = Column(String(30), default="UNAUDITED")  # "UNAUDITED", "AUDITED", "FLAGGED", "REJECTED"
+    annotations_count = Column(Integer, default=0)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Relationships
+    image_revisions = relationship("ImageAnnotationRevision", back_populates="asset", cascade="all, delete-orphan")
+    temporal_episodes = relationship("TemporalEpisodeAnnotation", back_populates="asset", cascade="all, delete-orphan")
+    dataset_items = relationship("DatasetItem", back_populates="asset", cascade="all, delete-orphan")
+
+
+class ImageAnnotationRevision(Base):
+    """Non-destructive human review or correction of an image bounding box / actor crop."""
+
+    __tablename__ = "image_annotation_revisions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    asset_id = Column(String(36), ForeignKey("media_assets.id"), nullable=False)
+    bbox_index = Column(Integer, default=0)
+    original_class = Column(String(50), nullable=False)
+    reviewed_class = Column(String(50), nullable=False)
+    bbox_json = Column(Text, nullable=False)  # Normalized [x_center, y_center, width, height]
+    is_ambiguous = Column(Boolean, default=False)
+    is_rejected = Column(Boolean, default=False)
+    posture_tags_json = Column(Text, nullable=True)  # e.g., ["LOOK_LEFT", "HAND_ON_DESK"]
+    audit_notes = Column(Text, nullable=True)
+    reviewer_id = Column(String(100), default="annotator")
+    reviewed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    asset = relationship("MediaAsset", back_populates="image_revisions")
+
+
+class TemporalEpisodeAnnotation(Base):
+    """Ground-truth millisecond-level temporal episode annotated by human or proposed by AI."""
+
+    __tablename__ = "temporal_episode_annotations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    asset_id = Column(String(36), ForeignKey("media_assets.id"), nullable=False)
+    seat_id = Column(String(36), ForeignKey("seats.id"), nullable=True)
+    seat_code = Column(String(50), nullable=True)
+    episode_type = Column(String(50), nullable=False)  # e.g. "HEAD_TURN_LEFT", "TORSO_LEAN_RIGHT"
+    start_ms = Column(Float, nullable=False)
+    peak_ms = Column(Float, nullable=False)
+    end_ms = Column(Float, nullable=False)
+    duration_ms = Column(Float, default=0.0)
+    target_neighbor_id = Column(String(50), nullable=True)
+    confidence = Column(Float, default=1.0)
+    is_ai_proposal = Column(Boolean, default=False)
+    ai_match_iou = Column(Float, default=0.0)
+    reviewer_id = Column(String(100), default="annotator")
+    review_status = Column(String(30), default="ACCEPTED")  # "ACCEPTED", "MODIFIED", "REJECTED", "AI_PROPOSED", "HUMAN_ONLY"
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    # Relationships
+    asset = relationship("MediaAsset", back_populates="temporal_episodes")
+    seat = relationship("SeatROI", back_populates="temporal_episodes")
+
+
+class DatasetCollection(Base):
+    """Logical grouping of ML training/validation datasets (e.g. Actor Crops, Episodes)."""
+
+    __tablename__ = "dataset_collections"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    name = Column(String(255), nullable=False)
+    task_type = Column(String(50), default="ACTOR_CLASSIFICATION")  # "ACTOR_CLASSIFICATION", "TEMPORAL_EPISODE", "YOLO_BBOX"
+    description = Column(Text, nullable=True)
+    created_by = Column(String(100), default="engineer")
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    versions = relationship("DatasetVersion", back_populates="collection", cascade="all, delete-orphan")
+
+
+class DatasetVersion(Base):
+    """Specific released or draft version of a curated dataset with manifest and group splits."""
+
+    __tablename__ = "dataset_versions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    collection_id = Column(String(36), ForeignKey("dataset_collections.id"), nullable=False)
+    version_tag = Column(String(50), nullable=False)  # e.g., "v1.0.0"
+    split_strategy = Column(String(50), default="GROUP_BY_SESSION")  # "GROUP_BY_SESSION", "STRATIFIED", "RANDOM"
+    train_ratio = Column(Float, default=0.70)
+    val_ratio = Column(Float, default=0.15)
+    test_ratio = Column(Float, default=0.15)
+    export_format = Column(String(50), default="CLASSIFICATION_CROPS")  # "CLASSIFICATION_CROPS", "YOLO_DIR", "EPISODE_JSON"
+    export_path = Column(String(500), nullable=True)
+    manifest_json = Column(Text, nullable=True)
+    total_items = Column(Integer, default=0)
+    status = Column(String(30), default="READY")  # "DRAFT", "EXPORTING", "READY", "FAILED"
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    collection = relationship("DatasetCollection", back_populates="versions")
+    items = relationship("DatasetItem", back_populates="version", cascade="all, delete-orphan")
+
+
+class DatasetItem(Base):
+    """An individual sample associated with a curated dataset version."""
+
+    __tablename__ = "dataset_items"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    version_id = Column(String(36), ForeignKey("dataset_versions.id"), nullable=False)
+    asset_id = Column(String(36), ForeignKey("media_assets.id"), nullable=True)
+    split = Column(String(20), nullable=False)  # "train", "val", "test"
+    label = Column(String(100), nullable=False)
+    relative_path = Column(String(500), nullable=True)
+    metadata_json = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relationships
+    version = relationship("DatasetVersion", back_populates="items")
+    asset = relationship("MediaAsset", back_populates="dataset_items")
+
+
+class StagedRecordingSession(Base):
+    """Structured mock/staged exam recording session following an actor protocol."""
+
+    __tablename__ = "staged_recording_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_code = Column(String(50), nullable=False, index=True)  # e.g., "STAGE-2026-09-01"
+    room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=True)
+    script_name = Column(String(255), nullable=False)
+    actor_names_json = Column(Text, nullable=True)
+    target_video_path = Column(String(500), nullable=True)
+    recorded_at = Column(DateTime, default=datetime.datetime.utcnow)
+    status = Column(String(30), default="PLANNED")  # "PLANNED", "RECORDED", "ANNOTATED", "VERIFIED"
+    notes = Column(Text, nullable=True)
+
+    # Relationships
+    scenarios = relationship("StagedScenarioChecklist", back_populates="session", cascade="all, delete-orphan")
+
+
+class StagedScenarioChecklist(Base):
+    """Scenario execution item within a staged recording session."""
+
+    __tablename__ = "staged_scenario_checklists"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("staged_recording_sessions.id"), nullable=False)
+    scenario_code = Column(String(50), nullable=False)  # e.g., "SCEN-01-LEFT-PEEK"
+    title = Column(String(255), nullable=False)
+    expected_behavior = Column(String(100), nullable=False)
+    seat_code = Column(String(50), nullable=True)
+    target_start_ms = Column(Float, default=0.0)
+    target_end_ms = Column(Float, default=0.0)
+    actual_start_ms = Column(Float, nullable=True)
+    actual_end_ms = Column(Float, nullable=True)
+    status = Column(String(30), default="PENDING")  # "PENDING", "PASS", "FAIL", "RE_RECORD"
+    notes = Column(Text, nullable=True)
+
+    # Relationships
+    session = relationship("StagedRecordingSession", back_populates="scenarios")
+

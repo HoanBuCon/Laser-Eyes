@@ -1,0 +1,185 @@
+[
+  {
+    "pattern_id": "2e202726-682e-4206-b38a-52984b249838",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "78941ea0-cc6a-45c4-84f1-4f730b9430bb"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "ec37b423-4700-4cc3-b00a-7509a38bfc76",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 17566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "78941ea0-cc6a-45c4-84f1-4f730b9430bb"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "7f4f8b67-3f6f-4586-9512-1c9c79872a0f",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 21866.7,
+    "end_timestamp_ms": 24366.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "55f4876f-aaed-4b69-987b-9bce98d5e9a8"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "fc88c51f-f608-4dd6-af7f-306b72fcf838",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 31333.3,
+    "end_timestamp_ms": 33833.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "8e4e8baf-5ea6-4ee1-8fd7-de2da6eec087"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9f40a98c-24ef-421c-b64b-5e425b326fc0",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 35733.3,
+    "end_timestamp_ms": 39400.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "ee6986a8-2cde-4505-8957-679fd14198c8"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 3.7s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2b39cb4a-d830-4670-8573-9680ef29ad1c",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 23366.7,
+    "end_timestamp_ms": 43466.7,
+    "confidence": 0.804,
+    "quality": 0.801,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "eb8cda24-b92b-4dc6-b9ab-3bad6fed240b",
+      "a63d532e-f6c3-42fb-b097-ddcb35d5a84c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "1abb0e92-f890-4f8b-afc4-967d7b0c32d9",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 48300.0,
+    "end_timestamp_ms": 50800.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "9a5818df-e851-4e7b-b29c-a883142b7b29"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c6ca8769-8db0-472c-adee-073935ee9ee4",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 43066.7,
+    "end_timestamp_ms": 53466.7,
+    "confidence": 0.827,
+    "quality": 0.8,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "a63d532e-f6c3-42fb-b097-ddcb35d5a84c",
+      "3a868f2b-ac71-4557-8011-8d36e94018cf"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3ed07445-3a11-42f1-b078-a23425ab5d24",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 43066.7,
+    "end_timestamp_ms": 63466.7,
+    "confidence": 0.825,
+    "quality": 0.795,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "a63d532e-f6c3-42fb-b097-ddcb35d5a84c",
+      "3a868f2b-ac71-4557-8011-8d36e94018cf"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c529c4f0-39ec-4ec0-878a-0a0099d089de",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 48300.0,
+    "end_timestamp_ms": 65800.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "9a5818df-e851-4e7b-b29c-a883142b7b29"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  }
+]

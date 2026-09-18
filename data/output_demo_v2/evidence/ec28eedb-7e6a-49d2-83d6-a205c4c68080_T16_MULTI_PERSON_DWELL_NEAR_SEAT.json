@@ -1,0 +1,11 @@
+{
+  "event_id": "ec28eedb-7e6a-49d2-83d6-a205c4c68080",
+  "track_id": 16,
+  "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+  "trigger_frame_idx": 1542,
+  "trigger_timestamp_ms": 51400.0,
+  "video_file": "ec28eedb-7e6a-49d2-83d6-a205c4c68080_T16_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+  "sha256_hash": "5ae2bdba62251a5a364077cb66497fca598824d970566cbd5562eb86ff6b3519",
+  "room_id": "ROOM-CALIB-01",
+  "camera_id": "CAM-01"
+}

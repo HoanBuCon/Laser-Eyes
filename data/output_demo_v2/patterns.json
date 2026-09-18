@@ -1,0 +1,20 @@
+[
+  {
+    "pattern_id": "0cade90a-61f0-4290-8279-bfa3bcde1145",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "3c14751c-1563-4b05-9251-dc42205e680c"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  }
+]

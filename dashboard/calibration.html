@@ -61,6 +61,10 @@
                     <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
                     Proctor Dashboard
                 </a>
+                <a href="/data-workbench" class="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition flex items-center gap-1.5 shadow">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                    Data Workbench
+                </a>
                 <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
             </div>
         </div>
@@ -122,15 +126,32 @@
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-semibold text-white">Drawing Canvas</span>
                         <span id="canvasResLabel" class="text-[11px] font-mono text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">1280 × 720</span>
+                        
+                        <!-- Mode Switcher: Select (V) vs Draw (D) -->
+                        <div class="flex items-center bg-gray-900 p-0.5 rounded-lg border border-gray-700 shadow-inner ml-2">
+                            <button id="btnModeSelect" onclick="setEditorMode('SELECT')" class="px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow" title="Select / Inspect Tool (Hotkey: V)">
+                                <span>👆</span>
+                                <span>Select (V)</span>
+                            </button>
+                            <button id="btnModeDraw" onclick="setEditorMode('DRAW')" class="px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-1.5" title="Draw Polygon ROI (Hotkey: D)">
+                                <span>✍️</span>
+                                <span>Draw (D)</span>
+                            </button>
+                        </div>
+
                         <span id="drawingStatusBadge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">READY</span>
                     </div>
 
                     <!-- Polygon Tool Buttons -->
                     <div class="flex items-center gap-1.5">
+                        <button id="btnDeleteSelectedSeat" onclick="deleteSelectedSeatFromButton()" class="hidden px-2.5 py-1 rounded bg-rose-900/60 hover:bg-rose-800 text-xs font-medium text-rose-200 border border-rose-700/60 transition flex items-center gap-1" title="Delete selected seat (Del)">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            <span>Delete (Del)</span>
+                        </button>
                         <button onclick="undoLastPoint()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-gray-300 hover:text-white border border-gray-700 transition" title="Undo Last Point (Ctrl+Z)">
                             Undo Point
                         </button>
-                        <button onclick="clearCurrentPolygon()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-amber-400 border border-gray-700 transition" title="Discard current polygon in progress">
+                        <button onclick="clearCurrentPolygon()" class="px-2.5 py-1 rounded bg-gray-800 hover:bg-gray-700 text-xs font-medium text-amber-400 border border-gray-700 transition" title="Discard current polygon in progress (Esc)">
                             Clear Current
                         </button>
                         <button onclick="completeCurrentPolygon()" class="px-3 py-1 rounded bg-cyan-600 hover:bg-cyan-500 text-xs font-bold text-white shadow transition" title="Finish polygon (Requires >= 3 points)">
@@ -150,7 +171,7 @@
 
                 <!-- Canvas Footer Help Text -->
                 <div class="pt-2 flex items-center justify-between text-[11px] text-gray-500">
-                    <span>Instructions: <strong>Click 3+ points</strong> clockwise around the desk/seat ROI. Click "Complete Polygon" to name the seat.</span>
+                    <span><strong>Tool Mode:</strong> Press <kbd class="px-1 py-0.5 rounded bg-gray-800 text-cyan-400 font-mono">V</kbd> for Select/Inspect &bull; <kbd class="px-1 py-0.5 rounded bg-gray-800 text-amber-400 font-mono">D</kbd> for Draw Polygon &bull; <kbd class="px-1 py-0.5 rounded bg-gray-800 text-rose-400 font-mono">Del</kbd> to delete seat &bull; <kbd class="px-1 py-0.5 rounded bg-gray-800 text-gray-300 font-mono">Ctrl+Z</kbd> Undo point.</span>
                     <span id="mouseCoordsLabel" class="font-mono text-cyan-400">X: 0 | Y: 0</span>
                 </div>
             </div>

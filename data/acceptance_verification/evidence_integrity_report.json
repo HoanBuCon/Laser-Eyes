@@ -1,0 +1,74 @@
+[
+  {
+    "event_id": "b0c716dd-7a80-489f-a451-d1d397e68e5d",
+    "seat_id": "SEAT-101-03",
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "timestamp_ms": 58900.0,
+    "time_str": "00:58.9",
+    "risk_score": 81.7,
+    "severity": "MEDIUM",
+    "is_recidivist": false,
+    "video_file": "b0c716dd-7a80-489f-a451-d1d397e68e5d_T10103_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "video_exists": true,
+    "video_playable": true,
+    "video_frames": 300,
+    "video_fps": 30.0,
+    "actual_duration_sec": 10.0,
+    "requested_duration_sec": 10.0,
+    "is_eof_truncated": false,
+    "sha256_hash": "9a437467b2722f77eb403fa1d438f1dd5dd371ea3af4e5876893ff5663fedfad",
+    "hash_verified": true,
+    "component_episode_ids": [
+      "7889e675-d363-472e-8101-afca7b3b4fba",
+      "35357dfe-b3b9-4d2a-8d6c-5b7166f1b395"
+    ]
+  },
+  {
+    "event_id": "7468678c-40bd-4660-a248-9d62cf487fa0",
+    "seat_id": "SEAT-101-02",
+    "behavior": "NEIGHBOR_ORIENTED_LEAN",
+    "timestamp_ms": 66366.66666666666,
+    "time_str": "01:06.4",
+    "risk_score": 84.9,
+    "severity": "MEDIUM",
+    "is_recidivist": false,
+    "video_file": "7468678c-40bd-4660-a248-9d62cf487fa0_T10102_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "video_exists": true,
+    "video_playable": true,
+    "video_frames": 300,
+    "video_fps": 30.0,
+    "actual_duration_sec": 10.0,
+    "requested_duration_sec": 10.0,
+    "is_eof_truncated": false,
+    "sha256_hash": "3ce78d5a596a77194800f1ef47148e6066443e75173247c4367ab195d9e6bf9f",
+    "hash_verified": true,
+    "component_episode_ids": [
+      "58906e58-8d9b-43b8-a6c4-eb1904bdef61"
+    ]
+  },
+  {
+    "event_id": "99023a22-6f97-4901-8bcf-f36165b23302",
+    "seat_id": "SEAT-101-03",
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "timestamp_ms": 70600.0,
+    "time_str": "01:10.6",
+    "risk_score": 80.0,
+    "severity": "HIGH",
+    "is_recidivist": true,
+    "video_file": "99023a22-6f97-4901-8bcf-f36165b23302_T10103_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "video_exists": true,
+    "video_playable": true,
+    "video_frames": 182,
+    "video_fps": 30.0,
+    "actual_duration_sec": 6.07,
+    "requested_duration_sec": 10.0,
+    "is_eof_truncated": true,
+    "sha256_hash": "357914584a579dc3c0fd404d9416da7ad3fa3df64cbbc2d2207988abca24f1ad",
+    "hash_verified": true,
+    "component_episode_ids": [
+      "7889e675-d363-472e-8101-afca7b3b4fba",
+      "35357dfe-b3b9-4d2a-8d6c-5b7166f1b395",
+      "7a9b9b63-4e04-40a3-95ea-39da2a22ed02"
+    ]
+  }
+]

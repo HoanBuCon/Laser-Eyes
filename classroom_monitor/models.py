@@ -53,7 +53,7 @@ class Detection:
     class_name: str
     confidence: float
     bbox: Tuple[int, int, int, int]  # (x1, y1, x2, y2) in absolute pixel coordinates
-    frame_index: int
+    frame_index: int = 0
     keypoints: Optional[np.ndarray] = None
     timestamp: float = field(default_factory=time.time)
 
@@ -114,14 +114,14 @@ class ClassroomEvent:
     track_id: int
     behavior: str
     severity: str  # "HIGH", "MEDIUM", "LOW"
-    confidence_avg: float
-    confidence_peak: float
-    start_frame: int
-    end_frame: int
-    duration_seconds: float
+    confidence_avg: float = 0.85
+    confidence_peak: float = 0.85
+    start_frame: int = 0
+    end_frame: int = 0
+    duration_seconds: float = 0.0
     status: str = EventStatus.SUSPICIOUS.value
     peak_frame_idx: int = 0
-    bbox: Optional[Tuple[int, int, int, int]] = None
+    bbox: Optional[Tuple[float, float, float, float] | Tuple[int, int, int, int]] = None
     evidence_path: Optional[str] = None
     evidence_video_path: Optional[str] = None
     evidence_frame: Optional[np.ndarray] = None
@@ -130,6 +130,16 @@ class ClassroomEvent:
     is_recidivist: bool = False
     requires_human_review: bool = True
     timestamp_ms: Optional[float] = None
+    timestamp: Optional[float] = None
+    frame_index: Optional[int] = None
+    confidence: Optional[float] = None
+    seat_id: Optional[str] = None
+    room_id: Optional[str] = None
+    camera_id: Optional[str] = None
+    primary_pattern: Optional[str] = None
+    supporting_patterns: List[str] = field(default_factory=list)
+    observation_quality: float = 1.0
+    metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self, include_frame: bool = False) -> Dict[str, Any]:
@@ -137,10 +147,16 @@ class ClassroomEvent:
         data = {
             "event_id": self.event_id,
             "track_id": self.track_id,
+            "seat_id": self.seat_id,
+            "room_id": self.room_id,
+            "camera_id": self.camera_id,
             "behavior": self.behavior,
+            "primary_pattern": self.primary_pattern or self.behavior,
+            "supporting_patterns": self.supporting_patterns,
+            "observation_quality": round(self.observation_quality, 3),
             "severity": self.severity,
-            "confidence_avg": round(self.confidence_avg, 4),
-            "confidence_peak": round(self.confidence_peak, 4),
+            "confidence_avg": round(self.confidence_avg if self.confidence_avg is not None else (self.confidence or 0.85), 4),
+            "confidence_peak": round(self.confidence_peak if self.confidence_peak is not None else (self.confidence or 0.85), 4),
             "start_frame": self.start_frame,
             "end_frame": self.end_frame,
             "duration_seconds": round(self.duration_seconds, 2),
@@ -153,7 +169,8 @@ class ClassroomEvent:
             "reviewer_note": self.reviewer_note,
             "is_recidivist": self.is_recidivist,
             "requires_human_review": self.requires_human_review,
-            "timestamp_ms": self.timestamp_ms,
+            "timestamp_ms": self.timestamp_ms or (self.timestamp * 1000.0 if self.timestamp else None),
+            "metadata": self.metadata,
             "created_at": self.created_at,
         }
         if include_frame and self.evidence_frame is not None:

@@ -30,6 +30,16 @@ class ClassroomConfig:
     pose_input_resolution: int = 1280
     pose_ai_fps_target: int = 10
     phone_wrist_ratio_threshold: float = 0.28
+    head_provider: str = "pose_heuristic"  # "pose_heuristic" (default) or "sixdrepnet"
+    head_hpe_hz: float = 5.0              # Scheduled HPE update frequency (Hz)
+    head_estimate_max_age_ms: float = 600.0 # Maximum age before cached estimate expires to UNKNOWN
+    head_min_crop_size: int = 24          # Minimum crop width/height in pixels
+    head_min_quality: float = 0.35        # Quality threshold below which head pose is marked UNKNOWN
+    head_median_window: int = 3           # Temporal median filter window size (samples)
+    head_merge_gap_ms: float = 500.0      # Maximum gap in ms to merge noise-induced fragmented episodes
+    head_yaw_activation_deg: float = 32.0 # Minimum relative yaw to activate head turn episode
+    head_yaw_release_deg: float = 16.0    # Release threshold for head turn episode
+    head_min_persistence_ms: float = 500.0 # Minimum persistence before candidate becomes active episode
 
     # ---- High-Resolution Slicing (SAHI / Dynamic Tiling) ----
     enable_sahi_tiling: bool = False

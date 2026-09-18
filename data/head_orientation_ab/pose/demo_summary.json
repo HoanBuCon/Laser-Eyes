@@ -1,0 +1,125 @@
+{
+  "srs_version": "2.0.0",
+  "input_video": "demo_video\\india_classroom.mp4",
+  "resolution": "1280x720",
+  "video_fps": 30.0,
+  "duration_seconds": 71.77,
+  "total_frames_read": 2150,
+  "inference_frames": 2150,
+  "average_inference_time_ms": 21.18,
+  "average_processing_fps": 28.33,
+  "maximum_persons_detected": 32,
+  "configured_seats_count": 21,
+  "total_episodes_extracted": 204,
+  "total_patterns_detected": 85,
+  "events_generated_count": 37,
+  "state_transitions_count": 150,
+  "peak_risk_per_seat": {
+    "SEAT-ROOM-CALIB-01-02": {
+      "peak_risk_score": 80.58372761663182,
+      "final_risk_score": 43.62000000000005,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-ROOM-CALIB-01-03": {
+      "peak_risk_score": 76.31493887984607,
+      "final_risk_score": 67.79493887984643,
+      "final_state": "SUSPICIOUS"
+    },
+    "SEAT-ROOM-CALIB-01-04": {
+      "peak_risk_score": 85.10007619253209,
+      "final_risk_score": 38.88000000000025,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-ROOM-CALIB-01-05": {
+      "peak_risk_score": 77.9368371990426,
+      "final_risk_score": 76.37017053237592,
+      "final_state": "SUSPICIOUS"
+    },
+    "SEAT-ROOM-CALIB-01-06": {
+      "peak_risk_score": 86.39888067457167,
+      "final_risk_score": 45.73000863893652,
+      "final_state": "OBSERVE"
+    },
+    "SEAT-ROOM-CALIB-01-07": {
+      "peak_risk_score": 96.60000000000022,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-08": {
+      "peak_risk_score": 82.6566026878356,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-09": {
+      "peak_risk_score": 100.0,
+      "final_risk_score": 80.0,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-ROOM-CALIB-01-10": {
+      "peak_risk_score": 45.22076720467024,
+      "final_risk_score": 39.52076720467046,
+      "final_state": "OBSERVE"
+    },
+    "SEAT-ROOM-CALIB-01-11": {
+      "peak_risk_score": 45.0,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-12": {
+      "peak_risk_score": 0.0,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-13": {
+      "peak_risk_score": 31.40969447979556,
+      "final_risk_score": 3.418048165446762,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-14": {
+      "peak_risk_score": 73.84489323944791,
+      "final_risk_score": 67.48489323944818,
+      "final_state": "SUSPICIOUS"
+    },
+    "SEAT-ROOM-CALIB-01-15": {
+      "peak_risk_score": 75.53046117580872,
+      "final_risk_score": 48.35046117580984,
+      "final_state": "OBSERVE"
+    },
+    "SEAT-ROOM-CALIB-01-16": {
+      "peak_risk_score": 88.09883847550005,
+      "final_risk_score": 43.26000000000006,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-ROOM-CALIB-01-17": {
+      "peak_risk_score": 15.0,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-18": {
+      "peak_risk_score": 89.07999999999971,
+      "final_risk_score": 80.0,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-ROOM-CALIB-01-19": {
+      "peak_risk_score": 45.0,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-20": {
+      "peak_risk_score": 63.24802760784448,
+      "final_risk_score": 6.647425112855938,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-21": {
+      "peak_risk_score": 0.0,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-ROOM-CALIB-01-22": {
+      "peak_risk_score": 91.9215979407384,
+      "final_risk_score": 35.38816163857904,
+      "final_state": "OBSERVE"
+    }
+  },
+  "output_video": "data\\head_orientation_ab\\pose\\india_classroom_pose.mp4"
+}

@@ -55,51 +55,9 @@ if (-not (Test-Path $VideoPath)) {
     exit 1
 }
 
-# 4. Initialize Database Schema
-Write-Host "[*] Initializing SQLite database schema..." -ForegroundColor Yellow
-& $PythonExe -c "from storage.database import init_db; init_db(); print('Database schema ready.')"
-
-# 5. Start FastAPI / Uvicorn Server in Background Job or Process
-$NormalizedMode = $Mode.ToUpper()
-Write-Host "[*] Starting VIGIL AI Server on http://localhost:$Port ..." -ForegroundColor Yellow
-
-$ServerProc = Start-Process -FilePath $PythonExe -ArgumentList "-m uvicorn api.main:app --host 0.0.0.0 --port $Port" -PassThru -NoNewWindow
-
-# Wait for server readiness
-$Ready = $false
-for ($i = 0; $i -lt 30; $i++) {
-    Start-Sleep -Milliseconds 500
-    try {
-        $resp = Invoke-RestMethod -Uri "http://localhost:$Port/ready" -Method Get -TimeoutSec 2 -ErrorAction SilentlyContinue
-        if ($resp.status -eq "ready") {
-            $Ready = $true
-            break
-        }
-    } catch {}
-}
-
-if (-not $Ready) {
-    Write-Host "[-] Server failed to respond on http://localhost:$Port/ready" -ForegroundColor Red
-    Stop-Process -Id $ServerProc.Id -Force -ErrorAction SilentlyContinue
-    exit 1
-}
-
-Write-Host "[+] Server is ONLINE & READY." -ForegroundColor Green
-
-# 6. Auto-start chosen Preset & Mode
-Write-Host "[*] Initializing Demo Preset: $Preset ($NormalizedMode mode, Debug: $DebugOverlay)..." -ForegroundColor Yellow
-$StartBody = @{
-    preset = $Preset
-    mode = $NormalizedMode
-    debug_overlay = [bool]$DebugOverlay
-} | ConvertTo-Json
-
-try {
-    $startResp = Invoke-RestMethod -Uri "http://localhost:$Port/api/v1/demo/start" -Method Post -Body $StartBody -ContentType "application/json"
-    Write-Host "[+] Demo Engine started successfully: Run ID $($startResp.run_id)" -ForegroundColor Green
-} catch {
-    Write-Host "[!] Warning: Auto-start demo endpoint returned: $_" -ForegroundColor Yellow
-}
+# 4. Initialize Database Schema & Seed Data
+Write-Host "[*] Initializing SQLite database schema & demo records..." -ForegroundColor Yellow
+& $PythonExe -c "from storage.database import init_db; from server import seed_initial_demo_data; init_db(); seed_initial_demo_data(); print('Database schema and demonstration data ready.')"
 
 $DemoUrl = "http://localhost:$Port/demo"
 Write-Host "====================================================================" -ForegroundColor Cyan
@@ -107,26 +65,14 @@ Write-Host " >> DEMO WEB INTERFACE: $DemoUrl" -ForegroundColor Green
 Write-Host " >> REST API DOCS:      http://localhost:$Port/docs" -ForegroundColor Gray
 Write-Host " >> MULTI-ROOM MONITOR: http://localhost:$Port/" -ForegroundColor Gray
 Write-Host "====================================================================" -ForegroundColor Cyan
+Write-Host " Starting VIGIL AI Server on port $Port..." -ForegroundColor Yellow
 Write-Host " Press Ctrl+C in this terminal to gracefully shutdown." -ForegroundColor Cyan
 
-# 7. Open Browser
+# 5. Open Browser
 if (-not $NoBrowser) {
     Start-Process $DemoUrl
 }
 
-# 8. Keep process alive until Ctrl+C
-try {
-    while ($true) {
-        if ($ServerProc.HasExited) {
-            Write-Host "[-] Server process terminated unexpectedly." -ForegroundColor Red
-            break
-        }
-        Start-Sleep -Seconds 1
-    }
-} finally {
-    Write-Host "`n[*] Shutting down VIGIL AI Demo Server..." -ForegroundColor Yellow
-    if ($ServerProc -and -not $ServerProc.HasExited) {
-        Stop-Process -Id $ServerProc.Id -Force -ErrorAction SilentlyContinue
-    }
-    Write-Host "[+] Clean shutdown complete." -ForegroundColor Green
-}
+# 6. Run Server in Foreground
+& $PythonExe server.py --host 0.0.0.0 --port $Port
+

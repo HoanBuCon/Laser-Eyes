@@ -109,9 +109,10 @@ def main() -> None:
     print("\n" + "=" * 70)
     print("      🚀 VIGIL AI ENTERPRISE EXAM PROCTORING SERVER RUNNING")
     print("=" * 70)
-    print(f"  * Web Dashboard : http://localhost:{args.port}/")
-    print(f"  * REST API Docs : http://localhost:{args.port}/docs")
-    print(f"  * ReDoc Schema  : http://localhost:{args.port}/redoc")
+    print(f"  * Web Demo (ICTU) : http://localhost:{args.port}/demo")
+    print(f"  * Web Dashboard   : http://localhost:{args.port}/")
+    print(f"  * REST API Docs   : http://localhost:{args.port}/docs")
+    print(f"  * ReDoc Schema    : http://localhost:{args.port}/redoc")
     print("=" * 70 + "\n")
 
     # 4. Start Uvicorn Server

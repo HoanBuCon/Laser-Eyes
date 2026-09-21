@@ -288,7 +288,7 @@ class DemoRuntime:
             if self.status.state in (DemoState.RUNNING.value, DemoState.PAUSED.value):
                 self.status.state = DemoState.STOPPED.value
         if self._thread and self._thread.is_alive() and threading.current_thread() != self._thread:
-            self._thread.join(timeout=5.0)
+            self._thread.join(timeout=10.0)
         with self._lock:
             return self.status.to_dict()
 
@@ -536,9 +536,16 @@ class DemoRuntime:
 
         runtime_cfg = resolve_runtime_config(scene_profile=scene_profile, demo_config=config)
 
+        if self._stop_event.is_set():
+            return
+
         # Initialize AI Models & Engines
         detector = PoseClassroomDetector(confidence_threshold=config.pose_conf)
+        if self._stop_event.is_set():
+            return
         head_provider_inst = create_head_pose_provider(config.head_provider)
+        if self._stop_event.is_set():
+            return
         obs_extractor = ObservationExtractor(head_pose_provider=head_provider_inst)
         episode_engine = TemporalEpisodeEngine(**runtime_cfg["temporal"])
         pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph, **runtime_cfg["patterns"])

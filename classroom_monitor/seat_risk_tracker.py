@@ -29,6 +29,7 @@ import numpy as np
 
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, PatternType
 from classroom_monitor.models import ClassroomEvent, Detection, SeverityLevel
+from classroom_monitor.scene_context import CapabilityStatus, SeatContext
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode
 
 logger = logging.getLogger("SeatRiskTracker")
@@ -148,6 +149,7 @@ class SeatRiskTracker:
         detection: Optional[Detection] = None,
         frame_image: Optional[np.ndarray] = None,
         camera_id: Optional[str] = None,
+        seat_context: Optional[SeatContext] = None,
     ) -> Optional[ClassroomEvent]:
         """Update seat risk using temporal decay, episode increments, pattern bonuses, and incident aggregation."""
         profile = self.get_or_create_profile(seat_id, camera_id=camera_id)
@@ -177,6 +179,17 @@ class SeatRiskTracker:
         for ep in active_episodes:
             if ep.seat_id == seat_id and ep.episode_id not in profile.processed_episode_ids:
                 base_w = EPISODE_PRIORITY_WEIGHTS.get(ep.episode_type, 0.0)
+                # Capability Gating: WRIST_BELOW_DESK requires ENABLED capability (POLYGON_CALIBRATED) to add risk
+                if ep.episode_type == EpisodeType.WRIST_BELOW_DESK.value:
+                    desk_cap = None
+                    if seat_context is not None:
+                        desk_cap = seat_context.capabilities.desk_hand_interaction
+                    elif ep.metadata and "desk_capability" in ep.metadata:
+                        desk_cap = ep.metadata.get("desk_capability")
+
+                    if desk_cap not in (CapabilityStatus.ENABLED, CapabilityStatus.ENABLED.value):
+                        base_w = 0.0  # DEGRADED (BOUNDARY_ONLY) or DISABLED contributes 0.0 risk points
+
                 if base_w > 0:
                     profile.risk_score = min(100.0, profile.risk_score + (base_w * ep.quality))
                 profile.processed_episode_ids.add(ep.episode_id)

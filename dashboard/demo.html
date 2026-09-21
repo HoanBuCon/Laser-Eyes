@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — AI-Assisted Exam Monitoring Co-Pilot | Competition Demo</title>
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { 500: '#06b6d4', 600: '#0891b2' },
+                        dark: { 950: '#070a12', 900: '#0b0f19', 800: '#111827', 700: '#1f2937' }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/demo.css">
+</head>
+<body class="bg-[#070a12] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
+                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">SRS v2.0 Co-Pilot</span>
+                    </div>
+                    <p class="text-xs text-gray-400 font-mono">AI-Assisted Exam Monitoring &amp; Human-in-the-Loop Review Queue</p>
+                </div>
+            </div>
+
+            <!-- Top Telemetry & Status Badges -->
+            <div class="flex items-center gap-3">
+                <div id="modeBadge" class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                    MODE: <span id="modeText">LIVE AI ANALYSIS</span>
+                </div>
+                <div id="stateBadge" class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-gray-800 text-gray-300 border border-gray-700">
+                    STATUS: <span id="stateText">IDLE</span>
+                </div>
+                <div id="fpsBadge" class="px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-gray-800 text-cyan-300 border border-gray-700">
+                    <span id="fpsText">-- FPS (--x)</span>
+                </div>
+                <div id="wsBadge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span id="wsText">LIVE WS</span>
+                </div>
+                <a href="/" class="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white text-xs font-medium transition border border-gray-700">
+                    Dashboard
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+
+        <!-- Control Toolbar Card -->
+        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+            
+            <!-- Left: Preset & Mode Selection -->
+            <div class="flex flex-wrap items-center gap-3">
+                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                    <button id="btnPresetIndia" onclick="selectPreset('india')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md">
+                        India Classroom (21 Seats)
+                    </button>
+                    <button id="btnPresetStudent" onclick="selectPreset('student')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                        Student Classroom (12 Seats)
+                    </button>
+                </div>
+
+                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                    <button id="btnModeLive" onclick="selectMode('LIVE')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow">
+                        Live Analysis
+                    </button>
+                    <button id="btnModeReplay" onclick="selectMode('REPLAY')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                        Recorded Replay
+                    </button>
+                </div>
+
+                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
+                    <input type="checkbox" id="chkDebugOverlay" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
+                    <span>Debug Overlay</span>
+                </label>
+            </div>
+
+            <!-- Right: Playback Controls -->
+            <div class="flex items-center gap-2">
+                <button id="btnStart" onclick="startDemo()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
+                    Start Analysis
+                </button>
+                <button id="btnPause" onclick="pauseDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
+                    Pause
+                </button>
+                <button id="btnResume" onclick="resumeDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
+                    Resume
+                </button>
+                <button id="btnStop" onclick="stopDemo()" class="px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-semibold transition">
+                    Stop
+                </button>
+                <button id="btnReset" onclick="resetDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs font-semibold border border-gray-700 transition" title="Reset Session">
+                    Reset
+                </button>
+            </div>
+        </div>
+
+        <!-- Middle Section: Video Monitor + Telemetry Sidebar -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Video Monitor Viewport (2 cols) -->
+            <div class="lg:col-span-2 bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+                <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono">Clean Proctor Video Stream</h2>
+                    </div>
+                    <div class="text-xs font-mono text-gray-400">
+                        Frame: <span id="lblFrameIdx" class="text-cyan-400 font-bold">0</span> / <span id="lblTotalFrames">0</span>
+                        (<span id="lblTimeSec">0.0s</span>)
+                    </div>
+                </div>
+
+                <!-- Video Frame Area -->
+                <div class="relative bg-black rounded-xl overflow-hidden mt-3 aspect-video flex items-center justify-center border border-gray-800/80 shadow-inner group">
+                    <img id="videoStreamImg" src="/api/v1/demo/stream" alt="Live Proctor Stream" class="w-full h-full object-contain" onerror="handleStreamError(this)">
+                    <div id="videoPlaceholder" class="absolute inset-0 bg-gray-950/90 flex flex-col items-center justify-center gap-3 text-gray-400">
+                        <div class="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-cyan-400">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        </div>
+                        <p class="text-sm font-mono">Select preset &amp; press <strong class="text-emerald-400">Start Analysis</strong> to begin stream</p>
+                    </div>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="mt-3">
+                    <div class="w-full bg-gray-950 rounded-full h-1.5 overflow-hidden border border-gray-800">
+                        <div id="progressBar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-200" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Telemetry & Room State Overview (1 col) -->
+            <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+                <div>
+                    <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono border-b border-gray-800 pb-3">Session Telemetry</h2>
+                    
+                    <div class="grid grid-cols-2 gap-3 mt-4">
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Room Context</div>
+                            <div id="lblRoomCode" class="text-sm font-bold text-gray-100 mt-0.5">ROOM-CALIB-01</div>
+                        </div>
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Camera View</div>
+                            <div id="lblCameraId" class="text-sm font-bold text-cyan-400 mt-0.5">CAM-CALIB-01</div>
+                        </div>
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Calibrated Seats</div>
+                            <div id="lblCalibratedSeats" class="text-lg font-bold text-gray-100 mt-0.5">21</div>
+                        </div>
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Occupied Seats</div>
+                            <div id="lblOccupiedSeats" class="text-lg font-bold text-emerald-400 mt-0.5">--</div>
+                        </div>
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Suspicious Seats</div>
+                            <div id="lblSuspiciousSeats" class="text-lg font-bold text-amber-400 mt-0.5">0</div>
+                        </div>
+                        <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
+                            <div class="text-[11px] font-mono text-gray-400 uppercase">Review Incidents</div>
+                            <div id="lblIncidentCount" class="text-lg font-bold text-red-400 mt-0.5">0</div>
+                        </div>
+                    </div>
+
+                    <!-- AI Pipeline Stack Details -->
+                    <div class="mt-5 space-y-2 text-xs font-mono">
+                        <div class="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Pipeline Specification:</div>
+                        <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
+                            <span>Perception Engine:</span>
+                            <span class="text-cyan-400">YOLO-Pose Native HD</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
+                            <span>Head Pose Estimator:</span>
+                            <span class="text-cyan-400">6DRepNet Batched @ 5Hz</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
+                            <span>Temporal Filtering:</span>
+                            <span class="text-cyan-400">Dual Hysteresis (400ms)</span>
+                        </div>
+                        <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
+                            <span>Evidence Buffer:</span>
+                            <span class="text-cyan-400">10s MP4 + SHA-256</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-cyan-300 text-xs leading-relaxed">
+                    <strong>Co-Pilot Principle:</strong> AI flags candidate behavioral incidents with full video context; the Human Proctor retains final adjudication authority.
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Section: Review Queue -->
+        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-gray-100 tracking-tight">Review Queue (Human Adjudication)</h2>
+                        <span id="queueBadgeCount" class="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 text-xs font-bold">0 Pending</span>
+                    </div>
+                    <p class="text-xs text-gray-400 font-mono mt-0.5">Click any incident card to view peak snapshot, 10-second video evidence, and record human decision.</p>
+                </div>
+
+                <!-- Status Filter Pills -->
+                <div class="flex items-center gap-1.5 text-xs font-mono">
+                    <button onclick="filterQueue('ALL')" class="filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
+                    <button onclick="filterQueue('PENDING')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
+                    <button onclick="filterQueue('CONFIRMED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
+                    <button onclick="filterQueue('REJECTED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
+                    <button onclick="filterQueue('INCONCLUSIVE')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
+                </div>
+            </div>
+
+            <!-- Incident Cards Grid Container -->
+            <div id="reviewQueueGrid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 min-h-[140px]">
+                <div class="col-span-full py-10 flex flex-col items-center justify-center text-gray-500 font-mono text-xs gap-2">
+                    <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    <span>No review incidents emitted yet. Start video stream to begin monitoring.</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Evidence & Human Review Modal -->
+    <div id="reviewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            
+            <!-- Modal Header -->
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur z-10">
+                <div class="flex items-center gap-3">
+                    <span id="modalSeatBadge" class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono">SEAT --</span>
+                    <h3 id="modalPatternTitle" class="text-base font-bold text-gray-100">Review Incident Evidence</h3>
+                    <span id="modalSeverityBadge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/40">HIGH</span>
+                </div>
+                <button onclick="closeReviewModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Modal Body -->
+            <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                <!-- Left: Media Evidence Viewports -->
+                <div class="space-y-4">
+                    <div>
+                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">10-Second Candidate Video Clip:</div>
+                        <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                            <video id="modalVideoPlayer" controls class="w-full h-full object-contain"></video>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">Peak Frame Snapshot:</div>
+                        <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                            <img id="modalSnapshotImg" src="" alt="Peak Evidence Frame" class="w-full h-full object-contain">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Incident Forensics & Human Action Form -->
+                <div class="space-y-5 flex flex-col justify-between">
+                    
+                    <!-- Forensics Metadata -->
+                    <div class="space-y-3 text-xs font-mono bg-gray-950 p-4 rounded-xl border border-gray-800">
+                        <div class="flex justify-between border-b border-gray-800/60 pb-1.5">
+                            <span class="text-gray-400">Behavior Signal:</span>
+                            <span id="modalBehaviorText" class="text-cyan-400 font-semibold">--</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-800/60 pb-1.5">
+                            <span class="text-gray-400">Review Priority Score:</span>
+                            <span id="modalRiskScore" class="text-red-400 font-bold">-- / 100</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-800/60 pb-1.5">
+                            <span class="text-gray-400">Occurrence Frequency:</span>
+                            <span id="modalOccurrence" class="text-amber-300 font-semibold">x1</span>
+                        </div>
+                        <div class="flex justify-between border-b border-gray-800/60 pb-1.5">
+                            <span class="text-gray-400">Time Range:</span>
+                            <span id="modalTimeRange" class="text-gray-200">--</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Supporting Cues:</span>
+                            <ul id="modalSupportingCues" class="mt-1 space-y-0.5 text-gray-300 list-disc list-inside"></ul>
+                        </div>
+                        <div class="pt-1 text-[11px] text-gray-500 truncate">
+                            SHA-256: <span id="modalSha256" class="text-gray-400 select-all">--</span>
+                        </div>
+                    </div>
+
+                    <!-- Human Decision Form -->
+                    <div class="space-y-3 bg-gray-950 p-4 rounded-xl border border-gray-800">
+                        <div class="text-xs font-bold font-mono text-gray-300 uppercase">Human Proctor Adjudication:</div>
+                        
+                        <!-- Action Selector Buttons -->
+                        <div class="grid grid-cols-3 gap-2">
+                            <button type="button" onclick="selectDecision('CONFIRMED')" id="btnDecConfirm" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-emerald-400">
+                                Confirm Violation
+                            </button>
+                            <button type="button" onclick="selectDecision('REJECTED')" id="btnDecReject" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-amber-400">
+                                Reject (FP)
+                            </button>
+                            <button type="button" onclick="selectDecision('INCONCLUSIVE')" id="btnDecInconclusive" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-purple-400">
+                                Inconclusive
+                            </button>
+                        </div>
+
+                        <!-- Decision Reason Code Select -->
+                        <div>
+                            <label class="block text-[11px] font-mono text-gray-400 mb-1">Reason Code:</label>
+                            <select id="modalReasonSelect" class="w-full bg-gray-900 border border-gray-800 rounded-lg px-3 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-cyan-500">
+                                <option value="NONE">SELECT_REASON (Optional)</option>
+                                <optgroup label="Confirm Violation">
+                                    <option value="OBSERVED_POLICY_VIOLATION">OBSERVED_POLICY_VIOLATION</option>
+                                    <option value="UNAUTHORIZED_INTERACTION">UNAUTHORIZED_INTERACTION</option>
+                                    <option value="UNAUTHORIZED_MATERIAL">UNAUTHORIZED_MATERIAL</option>
+                                    <option value="OTHER">OTHER</option>
+                                </optgroup>
+                                <optgroup label="Reject (False Positive)">
+                                    <option value="NORMAL_WRITING">NORMAL_WRITING</option>
+                                    <option value="NORMAL_HEAD_MOVEMENT">NORMAL_HEAD_MOVEMENT</option>
+                                    <option value="PROCTOR_OCCLUSION">PROCTOR_OCCLUSION</option>
+                                    <option value="SEAT_MAPPING_ERROR">SEAT_MAPPING_ERROR</option>
+                                    <option value="LOW_IMAGE_QUALITY">LOW_IMAGE_QUALITY</option>
+                                    <option value="FALSE_POSITIVE">FALSE_POSITIVE</option>
+                                    <option value="OTHER">OTHER</option>
+                                </optgroup>
+                                <optgroup label="Inconclusive">
+                                    <option value="INSUFFICIENT_EVIDENCE">INSUFFICIENT_EVIDENCE</option>
+                                    <option value="OCCLUDED">OCCLUDED</option>
+                                    <option value="LOW_IMAGE_QUALITY">LOW_IMAGE_QUALITY</option>
+                                    <option value="OTHER">OTHER</option>
+                                </optgroup>
+                            </select>
+                        </div>
+
+                        <!-- Notes Area -->
+                        <div>
+                            <label class="block text-[11px] font-mono text-gray-400 mb-1">Proctor Notes:</label>
+                            <textarea id="modalNotesText" rows="2" placeholder="Provide context or rationale for discipline committee..." class="w-full bg-gray-900 border border-gray-800 rounded-lg p-2 text-xs text-gray-200 focus:outline-none focus:border-cyan-500"></textarea>
+                        </div>
+
+                        <!-- Submit Button -->
+                        <button id="btnSubmitDecision" onclick="submitHumanReview()" class="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-lg shadow-cyan-500/20">
+                            Submit Adjudication
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-800/80 py-4 bg-gray-950/60 text-center text-xs font-mono text-gray-500">
+        VIGIL AI Enterprise Proctoring System &bull; Single-Source SRS v2.0 Execution &bull; Built for ICTU 2026 Competition
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/static/js/demo.js"></script>
+</body>
+</html>

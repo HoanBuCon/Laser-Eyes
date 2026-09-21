@@ -1,8 +1,9 @@
-"""End-to-End Video Processor for Classroom Cheating Surveillance.
+"""[LEGACY / DEPRECATED] End-to-End Video Processor for Classroom Surveillance.
 
-Reads camera streams or video files, executes YOLO inference (with optional SAHI),
-runs EventEngine, manages 10s video evidence buffer, renders rich HUD overlays,
-saves peak-confidence snapshots, and dispatches real-time callbacks.
+NOTE: This module belongs to the legacy 1-Stage inference pipeline and is retained solely
+for backward compatibility. The canonical SRS v2 proctoring architecture is implemented
+under `classroom_monitor.demo.*` (DemoRuntime, DemoHUDOverlayRenderer, SeatRiskTracker).
+DO NOT use this module for new development or competition demos.
 """
 
 from __future__ import annotations

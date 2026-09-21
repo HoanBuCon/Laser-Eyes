@@ -95,6 +95,7 @@ class _EpisodeTrackerState:
     confidences: List[float] = field(default_factory=list)
     qualities: List[float] = field(default_factory=list)
     current_episode_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class TemporalEpisodeEngine:
@@ -362,6 +363,9 @@ class TemporalEpisodeEngine:
                 rw_obs and rw_obs.value == WristZone.WRITING.value
             )
 
+            desk_cap = (lw_obs.metadata.get("desk_capability") if lw_obs and lw_obs.metadata else None) or (
+                rw_obs.metadata.get("desk_capability") if rw_obs and rw_obs.metadata else None
+            )
             ep_under = self._update_channel(
                 seat_id=seat_id,
                 ep_type=EpisodeType.WRIST_BELOW_DESK.value,
@@ -372,6 +376,7 @@ class TemporalEpisodeEngine:
                 confidence=1.0,
                 timestamp_ms=timestamp_ms,
                 is_missing=False,
+                metadata={"desk_capability": desk_cap} if desk_cap else None,
             )
             if ep_under:
                 active_episodes.append(ep_under)
@@ -470,9 +475,12 @@ class TemporalEpisodeEngine:
         confidence: float,
         timestamp_ms: float,
         is_missing: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[TemporalEpisode]:
         """Generic dual-threshold state machine for an episodic channel with missing grace mechanism."""
         tracker = self._get_tracker(seat_id, ep_type)
+        if metadata:
+            tracker.metadata.update(metadata)
 
         if is_missing:
             # Handle Missing / Unknown observation
@@ -506,6 +514,7 @@ class TemporalEpisodeEngine:
                         confidence=mean_conf,
                         quality=mean_qual,
                         peak_intensity=tracker.peak_intensity,
+                        metadata=dict(tracker.metadata),
                     )
                     self.completed_episodes.append(completed_ep)
                     tracker.missing_start_ms = None
@@ -528,6 +537,7 @@ class TemporalEpisodeEngine:
                     confidence=mean_conf,
                     quality=mean_qual,
                     peak_intensity=tracker.peak_intensity,
+                    metadata=dict(tracker.metadata),
                 )
 
             return None
@@ -589,6 +599,7 @@ class TemporalEpisodeEngine:
                         confidence=mean_conf,
                         quality=mean_qual,
                         peak_intensity=tracker.peak_intensity,
+                        metadata=dict(tracker.metadata),
                     )
                     self.completed_episodes.append(completed_ep)
                     return completed_ep
@@ -610,6 +621,7 @@ class TemporalEpisodeEngine:
                 confidence=mean_conf,
                 quality=mean_qual,
                 peak_intensity=tracker.peak_intensity,
+                metadata=dict(tracker.metadata),
             )
 
         return None
@@ -636,6 +648,7 @@ class TemporalEpisodeEngine:
                     confidence=mean_conf,
                     quality=mean_qual,
                     peak_intensity=tracker.peak_intensity,
+                    metadata=dict(tracker.metadata),
                 )
                 self.completed_episodes.append(completed_ep)
                 flushed.append(completed_ep)

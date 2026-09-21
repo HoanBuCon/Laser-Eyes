@@ -1,10 +1,13 @@
-# BÁO CÁO NGHIỆM THU HOÀN THIỆN PROTOTYPE VIGIL AI (ICTU 2026)
+# [HISTORICAL / SUPERSEDED] BÁO CÁO NGHIỆM THU HOÀN THIỆN PROTOTYPE VIGIL AI (ICTU 2026)
+> [!NOTE]
+> **TÀI LIỆU LỊCH SỬ / SUPERSEDED:** Tài liệu này phản ánh trạng thái nghiệm thu prototype trước khi hợp nhất hệ thống Unified Demo System (Web UI + Replay + Live).
+> Tài liệu chính thức hiện tại: [`docs/DEMO_SYSTEM_HUMAN_ACCEPTANCE.md`](file:///D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes/docs/DEMO_SYSTEM_HUMAN_ACCEPTANCE.md) và [`docs/UNIFIED_DEMO_SYSTEM_GUIDE.md`](file:///D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes/docs/UNIFIED_DEMO_SYSTEM_GUIDE.md).
+
 **Tài liệu:** `docs/ICTU_2026_PROTOTYPE_ACCEPTANCE.md`  
 **Dự án:** VIGIL AI — AI-Assisted Exam Monitoring Co-Pilot  
-**Phiên bản:** 2.0 — Final Prototype Completion  
+**Phiên bản:** 2.0 — Final Prototype Completion (Archived)  
 **Nhánh Git:** `feat/ictu-2026-prototype-final`  
-**Ngày lập:** 18/09/2026  
-**Trạng thái:** HOÀN THÀNH TOÀN DIỆN (PROTOTYPE FREEZE)
+**Trạng thái:** SUPERSEDED BY UNIFIED DEMO SYSTEM
 
 ---
 

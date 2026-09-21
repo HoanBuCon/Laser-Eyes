@@ -1,9 +1,11 @@
-# VIGIL AI SRS v2.0: Final Demo Execution Guide
+# [HISTORICAL / SUPERSEDED] VIGIL AI SRS v2.0: Final Demo Execution Guide
+> [!NOTE]
+> **TÀI LIỆU LỊCH SỬ / SUPERSEDED:** Hướng dẫn vận hành hệ thống Unified Demo System chính thức hiện tại xem tại: [`docs/UNIFIED_DEMO_SYSTEM_GUIDE.md`](file:///D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes/docs/UNIFIED_DEMO_SYSTEM_GUIDE.md).
 
 **Project:** VIGIL AI — AI-Assisted Exam Monitoring Co-Pilot  
 **Competition:** ICTU 2026 Working Prototype  
 **Architecture:** Calibrated Actor-Centric Temporal Perception Architecture (SRS v2.0)  
-**Status:** `DEMO_RUNNER_READY_FOR_HUMAN_REVIEW`
+**Status:** `SUPERSEDED BY UNIFIED DEMO SYSTEM`
 
 ---
 

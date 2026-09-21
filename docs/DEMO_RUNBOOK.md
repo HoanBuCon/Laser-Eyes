@@ -1,8 +1,11 @@
-# HƯỚNG DẪN VẬN HÀNH VÀ TRÌNH DIỄN DEMO VIGIL AI (DEMO RUNBOOK)
+# [HISTORICAL / SUPERSEDED] HƯỚNG DẪN VẬN HÀNH VÀ TRÌNH DIỄN DEMO VIGIL AI (DEMO RUNBOOK)
+> [!NOTE]
+> **TÀI LIỆU LỊCH SỬ / SUPERSEDED:** Hướng dẫn vận hành demo hợp nhất chính thức hiện tại xem tại: [`docs/UNIFIED_DEMO_SYSTEM_GUIDE.md`](file:///D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes/docs/UNIFIED_DEMO_SYSTEM_GUIDE.md).
+
 **Tài liệu:** `docs/DEMO_RUNBOOK.md`  
 **Dự án:** VIGIL AI — AI-Assisted Exam Monitoring Co-Pilot (ICTU 2026)  
-**Phiên bản:** 1.0 — Final Prototype Completion  
-**Ngày lập:** 18/09/2026  
+**Phiên bản:** 1.0 — Archived  
+**Trạng thái:** SUPERSEDED BY UNIFIED DEMO SYSTEM  
 
 ---
 

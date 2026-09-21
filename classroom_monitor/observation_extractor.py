@@ -230,6 +230,7 @@ class ObservationExtractor:
         desk_geo = seat_context.desk_geometry
 
         # Evaluate Left Wrist
+        desk_cap_str = seat_context.capabilities.desk_hand_interaction.value
         lw_zone = self._evaluate_wrist_zone(lw, desk_geo, seat_context.capabilities.desk_hand_interaction)
         observations.append(
             RawObservation(
@@ -240,6 +241,7 @@ class ObservationExtractor:
                 quality=float(lw[2]),
                 confidence=float(lw[2]),
                 source="desk_geometry_matcher",
+                metadata={"desk_capability": desk_cap_str},
             )
         )
 
@@ -254,6 +256,7 @@ class ObservationExtractor:
                 quality=float(rw[2]),
                 confidence=float(rw[2]),
                 source="desk_geometry_matcher",
+                metadata={"desk_capability": desk_cap_str},
             )
         )
 

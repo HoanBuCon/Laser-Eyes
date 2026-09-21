@@ -404,6 +404,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
             # Stage 7: Seat Risk Prioritization Tracker & Incident Event Generation
             t0 = time.perf_counter()
             for seat_code, occ in seat_mgr.occupancies.items():
+                s_ctx = seat_graph.get_context(seat_code)
                 evt = risk_tracker.update_seat(
                     seat_id=seat_code,
                     active_episodes=active_this_frame,
@@ -412,6 +413,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                     detection=occ.assigned_detection,
                     frame_image=frame,
                     camera_id=config.camera_id,
+                    seat_context=s_ctx,
                 )
                 if evt is not None:
                     all_events.append(evt)

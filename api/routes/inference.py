@@ -1,4 +1,8 @@
-"""Inference Control and Video Stream API Endpoints."""
+"""[LEGACY / DEPRECATED] Inference Control and Video Stream API Endpoints.
+
+NOTE: This router runs the legacy VideoProcessor. The canonical SRS v2 competition demo
+pipeline is available under `/api/v1/demo/*` powered by `classroom_monitor.demo.runtime.DemoRuntime`.
+"""
 
 from __future__ import annotations
 

@@ -106,6 +106,8 @@ class DemoHUDOverlayRenderer:
 
         return canvas
 
+    render = render_frame
+
     # -------------------------------------------------------------------------
     # CLEAN PROCTOR MODE RENDERING
     # -------------------------------------------------------------------------

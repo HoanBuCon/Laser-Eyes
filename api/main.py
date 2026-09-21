@@ -18,9 +18,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from api.realtime import realtime_manager
 from api.routes import (
     cameras,
     data_workbench,
+    demo,
     events,
     inference,
     rooms,
@@ -40,31 +42,6 @@ logging.basicConfig(
 logger = logging.getLogger("VigilAPI")
 
 
-class ConnectionManager:
-    """Manages active WebSocket connections for realtime dashboard notifications."""
-
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_json(message)
-            except Exception:
-                self.disconnect(connection)
-
-
-ws_manager = ConnectionManager()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown hooks."""
@@ -76,9 +53,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="VIGIL AI — Exam Cheating Surveillance API",
-    description="Enterprise Multi-Room AI Proctoring and Cheating Detection REST API (SRS v1.0).",
-    version="2.5.0",
+    title="VIGIL AI — AI-Assisted Exam Monitoring API",
+    description="Enterprise Multi-Room AI Proctoring and Review Incident Management REST API (SRS v2.0).",
+    version="2.6.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
@@ -93,8 +70,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Register demo router at root as well for direct dashboard convenience
+app.include_router(demo.router)
+
 # Register API Routers under /api/v1 (SRS standard) and /api (legacy compatibility)
 for prefix in ["/api/v1", "/api"]:
+    app.include_router(demo.router, prefix=prefix)
     app.include_router(sites.router, prefix=prefix)
     app.include_router(rooms.router, prefix=prefix)
     app.include_router(cameras.router, prefix=prefix)
@@ -111,7 +92,7 @@ for prefix in ["/api/v1", "/api"]:
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
     """Service liveness probe."""
-    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.5.0"}
+    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0"}
 
 
 @app.get("/ready", tags=["Health"])
@@ -122,9 +103,10 @@ def readiness_check():
 
 
 @app.websocket("/ws/events")
+@app.websocket("/ws/demo")
 async def websocket_events_endpoint(websocket: WebSocket):
-    """WebSocket stream for real-time proctoring event notifications."""
-    await ws_manager.connect(websocket)
+    """WebSocket stream for real-time proctoring event notifications & live demo telemetry."""
+    await realtime_manager.connect(websocket)
     try:
         while True:
             # Keep connection open and receive optional client ping
@@ -132,7 +114,7 @@ async def websocket_events_endpoint(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        realtime_manager.disconnect(websocket)
 
 
 # Mount Dashboard Static Directory
@@ -147,6 +129,14 @@ if dashboard_dir.exists():
         if index_file.exists():
             return FileResponse(str(index_file))
         return {"message": "Dashboard index.html not found, please visit /docs"}
+
+    @app.get("/demo", tags=["Dashboard"])
+    def serve_demo_page():
+        """Serve the Unified Competition Demo Page."""
+        demo_file = dashboard_dir / "demo.html"
+        if demo_file.exists():
+            return FileResponse(str(demo_file))
+        return {"message": "Competition demo page demo.html not found, please visit /docs"}
 
     @app.get("/calibration", tags=["Dashboard"])
     def serve_calibration_tool():

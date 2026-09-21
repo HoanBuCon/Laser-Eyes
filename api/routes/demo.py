@@ -242,14 +242,17 @@ async def mjpeg_stream_endpoint():
     runtime = DemoRuntime.get_instance()
 
     async def frame_generator():
-        while True:
-            jpeg = runtime.get_latest_jpeg()
-            if jpeg is not None:
-                yield (
-                    b"--frame\r\n"
-                    b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
-                )
-            await asyncio.sleep(0.033)  # ~30 FPS polling for new frame
+        try:
+            while True:
+                jpeg = runtime.get_latest_jpeg()
+                if jpeg is not None:
+                    yield (
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n"
+                    )
+                await asyncio.sleep(0.033)  # ~30 FPS polling for new frame
+        except (asyncio.CancelledError, GeneratorExit, Exception):
+            return
 
     return StreamingResponse(
         frame_generator(),

@@ -135,20 +135,36 @@ function selectMode(mode) {
 // -----------------------------------------------------------------------------
 
 async function startDemo() {
-    const debug = document.getElementById('chkDebugOverlay').checked;
-    const res = await fetch('/api/v1/demo/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            preset: activePreset,
-            mode: activeMode,
-            debug_overlay: debug,
-        }),
-    });
-    const data = await res.json();
-    renderStatus(data);
-    refreshStream();
-    fetchEvents();
+    const btnStart = document.getElementById('btnStart');
+    if (btnStart) {
+        btnStart.disabled = true;
+        btnStart.classList.add('opacity-50');
+    }
+    try {
+        const debug = document.getElementById('chkDebugOverlay').checked;
+        const res = await fetch('/api/v1/demo/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                preset: activePreset,
+                mode: activeMode,
+                debug_overlay: debug,
+            }),
+        });
+        const data = await res.json();
+        renderStatus(data);
+        refreshStream();
+        fetchEvents();
+    } catch (err) {
+        console.error('Failed to start demo:', err);
+    } finally {
+        setTimeout(() => {
+            if (btnStart) {
+                btnStart.disabled = false;
+                btnStart.classList.remove('opacity-50');
+            }
+        }, 1500);
+    }
 }
 
 async function pauseDemo() {

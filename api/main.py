@@ -61,6 +61,12 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Silence browser default favicon requests."""
+    return Response(status_code=204)
+
+
 # Enable CORS for web dashboards and external microservices
 app.add_middleware(
     CORSMiddleware,

@@ -1,5 +1,5 @@
 # =====================================================================
-# VIGIL AI — UNIFIED COMPETITION DEMO SYSTEM LAUNCHER
+# VIGIL AI -- UNIFIED COMPETITION DEMO SYSTEM LAUNCHER
 # SRS v2 PIPELINE + WEB MONITOR + REVIEW QUEUE
 # =====================================================================
 
@@ -22,7 +22,7 @@ $ProjectRoot = Split-Path -Parent $ScriptDir
 Set-Location $ProjectRoot
 
 Write-Host "====================================================================" -ForegroundColor Cyan
-Write-Host " VIGIL AI — UNIFIED COMPETITION DEMO SYSTEM (SRS v2.0)" -ForegroundColor Cyan
+Write-Host " VIGIL AI -- UNIFIED COMPETITION DEMO SYSTEM (SRS v2.0)" -ForegroundColor Cyan
 Write-Host "====================================================================" -ForegroundColor Cyan
 
 # 1. Locate Virtual Environment Python

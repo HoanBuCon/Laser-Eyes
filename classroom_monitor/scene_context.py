@@ -251,38 +251,61 @@ class SeatContext:
             and self.desk_geometry.writing_zone_polygon is None
         ):
             self.capabilities.desk_hand_interaction = CapabilityStatus.DISABLED
-        else:
+        elif self.desk_geometry.writing_zone_polygon is not None and len(self.desk_geometry.writing_zone_polygon) >= 3:
             self.capabilities.desk_hand_interaction = CapabilityStatus.ENABLED
+        elif self.desk_geometry.desk_boundary_y is not None:
+            self.capabilities.desk_hand_interaction = CapabilityStatus.DEGRADED
+        else:
+            self.capabilities.desk_hand_interaction = CapabilityStatus.DISABLED
 
         if not (self.neighbors.left_neighbor_id or self.neighbors.right_neighbor_id or self.neighbors.front_neighbor_id):
             self.capabilities.pairwise_relation = CapabilityStatus.DEGRADED
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SeatContext:
+        # 1. Desk Geometry: Nested dictionary takes precedence, fallback to flat keys
         desk_geo_data = data.get("desk_geometry")
-        desk_geo = DeskGeometry.from_dict(desk_geo_data) if desk_geo_data else None
-
-        # Also support legacy flat desk_y / desk_polygon
-        if desk_geo is None:
-            desk_y_flat = data.get("desk_y")
-            desk_poly_flat = data.get("desk_polygon")
-            if desk_y_flat is not None or desk_poly_flat is not None:
+        if desk_geo_data is not None and isinstance(desk_geo_data, dict):
+            desk_geo = DeskGeometry.from_dict(desk_geo_data)
+        else:
+            desk_boundary_y = data.get("desk_boundary_y")
+            if desk_boundary_y is None:
+                desk_boundary_y = data.get("desk_y")
+            writing_poly = data.get("writing_zone_polygon") or data.get("writing_zone") or data.get("desk_polygon")
+            under_poly = data.get("under_desk_polygon") or data.get("under_desk_zone")
+            if desk_boundary_y is not None or writing_poly is not None or under_poly is not None:
                 desk_geo = DeskGeometry.from_dict({
-                    "desk_boundary_y": desk_y_flat,
-                    "writing_zone_polygon": desk_poly_flat,
+                    "desk_boundary_y": desk_boundary_y,
+                    "writing_zone_polygon": writing_poly,
+                    "under_desk_polygon": under_poly,
                 })
+            else:
+                desk_geo = None
 
+        # 2. Reference Directions: Nested dictionary takes precedence, fallback to flat keys
+        ref_dirs_data = data.get("reference_directions")
+        if ref_dirs_data is not None and isinstance(ref_dirs_data, dict):
+            ref_dirs = SeatReferenceDirections.from_dict(ref_dirs_data)
+        else:
+            ref_dirs = SeatReferenceDirections.from_dict({
+                "baseline_yaw": data.get("baseline_yaw", 0.0),
+                "baseline_pitch": data.get("baseline_pitch", 0.0),
+                "left_direction_yaw": data.get("left_direction_yaw", -45.0),
+                "right_direction_yaw": data.get("right_direction_yaw", 45.0),
+                "front_direction_yaw": data.get("front_direction_yaw", 0.0),
+            })
+
+        # 3. Neighbors & Capabilities
         neighbors_data = data.get("neighbors") or {}
-        ref_dirs_data = data.get("reference_directions") or {}
         caps_data = data.get("capabilities") or {}
 
         return cls(
             seat_id=str(data.get("seat_id") or data.get("id") or data.get("seat_code", "")),
             room_id=str(data.get("room_id", "")),
             camera_id=data.get("camera_id"),
-            seat_code=str(data.get("seat_code", "")),
+            seat_code=str(data.get("seat_code") or data.get("seat_id", "")),
             neighbors=SeatNeighbors.from_dict(neighbors_data),
-            reference_directions=SeatReferenceDirections.from_dict(ref_dirs_data),
+            reference_directions=ref_dirs,
             desk_geometry=desk_geo,
             capabilities=SeatCapabilities.from_dict(caps_data),
             calibration_version=str(data.get("calibration_version", "v2.0")),
@@ -431,6 +454,30 @@ class SceneProfile:
     raw_config: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SceneProfile:
+        seat_graph = SeatGraph.from_dict(data)
+        seats_list = data.get("seats", [])
+        if isinstance(seats_list, list) and len(seats_list) > 0:
+            has_neighbors = any(
+                isinstance(s, dict) and s.get("neighbors") and any(s["neighbors"].values())
+                for s in seats_list
+            )
+            if not has_neighbors:
+                seat_graph.auto_infer_neighbors_from_polygons(seats_list)
+
+        return cls(
+            scene_id=str(data.get("scene_id", "scene")),
+            room_code=str(data.get("room_code", "")),
+            room_name=str(data.get("room_name", "")),
+            camera_id=str(data.get("camera_id", "")),
+            video_file=str(data.get("video_file", "")),
+            video_resolution=data.get("video_resolution", {"width": 1280, "height": 720, "fps": 30.0}),
+            seat_graph=seat_graph,
+            calibration_version=str(data.get("calibration_version", "v2.0")),
+            raw_config=data,
+        )
+
+    @classmethod
     def from_file(cls, path: Union[str, Path]) -> SceneProfile:
         p = Path(path)
         if not p.exists():
@@ -443,27 +490,8 @@ class SceneProfile:
         else:
             data = json.loads(text)
 
-        seat_graph = SeatGraph.from_dict(data)
-        # If neighbors are not manually populated, auto infer
-        seats_list = data.get("seats", [])
-        if isinstance(seats_list, list) and len(seats_list) > 0:
-            # Check if any neighbor is defined
-            has_neighbors = any(
-                isinstance(s, dict) and s.get("neighbors") and any(s["neighbors"].values())
-                for s in seats_list
-            )
-            if not has_neighbors:
-                seat_graph.auto_infer_neighbors_from_polygons(seats_list)
-
-        return cls(
-            scene_id=str(data.get("scene_id", p.stem)),
-            room_code=str(data.get("room_code", "")),
-            room_name=str(data.get("room_name", "")),
-            camera_id=str(data.get("camera_id", "")),
-            video_file=str(data.get("video_file", "")),
-            video_resolution=data.get("video_resolution", {"width": 1280, "height": 720, "fps": 30.0}),
-            seat_graph=seat_graph,
-            calibration_version=str(data.get("calibration_version", "v2.0")),
-            raw_config=data,
-        )
+        profile = cls.from_dict(data)
+        if not data.get("scene_id"):
+            profile.scene_id = p.stem
+        return profile
 

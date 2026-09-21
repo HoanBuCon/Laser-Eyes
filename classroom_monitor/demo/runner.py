@@ -166,6 +166,21 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     evidence_dir = out_p / "evidence"
     evidence_dir.mkdir(parents=True, exist_ok=True)
 
+    # Clean output isolation: purge stale generated demo artifacts
+    for stale_pattern in ("*.json", "*.mp4", "*.csv"):
+        for stale_file in out_p.glob(stale_pattern):
+            try:
+                stale_file.unlink()
+            except OSError:
+                pass
+    if evidence_dir.exists():
+        for stale_ev in evidence_dir.glob("*"):
+            if stale_ev.is_file():
+                try:
+                    stale_ev.unlink()
+                except OSError:
+                    pass
+
     print("\n" + "=" * 80)
     print(f" VIGIL AI SRS v2.0 - EXECUTING DEMO PIPELINE: {config.name.upper()}")
     print("=" * 80)

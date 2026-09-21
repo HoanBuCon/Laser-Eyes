@@ -5,14 +5,18 @@ Implements Two Distinct Display Modes:
    - Unobtrusive, production-grade AI co-pilot view for exam proctors.
    - Zero visual clutter: Person bboxes OFF, Skeletons OFF, Head rays OFF, Desk lines OFF.
    - Normal/Empty seats: Dim minimal label [S01] without polygon borders.
-   - Incident / Suspicious seats: Distinct colored border and floating Incident Badge ONLY on active seats.
+   - Suspicious seats: Amber border + score badge (canonical threshold >= 60.0 or RiskState.SUSPICIOUS).
+   - Incident / Review Required seats: High-contrast RED border and floating Review Card ONLY for active review incidents.
    - Clean ASCII labels (e.g. S01, S08) eliminating cv2.putText Unicode glyph errors.
+   - Incident reason derived strictly from ClassroomEvent.behavior / active incident (never non-causal active episodes).
    - Clean Top Status Bar and Bottom Incident Ticker.
 
 2. Developer Debug Mode (--debug-overlay or 'D' hotkey):
    - Full computer vision telemetry: YOLO-Pose bounding boxes, 17-keypoint skeletons,
      3D Head Orientation yaw/pitch rays, Full Seat ROI polygons, Desk lines, and
      Top-Right Stage Latency / Telemetry panel.
+   - Clearly separates internal AI state (NORMAL, OBSERVE, SUSPICIOUS, FLAGGED_FOR_REVIEW, COOLDOWN)
+     from human review incidents.
 """
 
 from __future__ import annotations
@@ -88,14 +92,14 @@ class DemoHUDOverlayRenderer:
         if show_debug:
             # === DEVELOPER DEBUG MODE ===
             self._render_debug_detections(canvas, det_list, obs_dict)
-            self._render_debug_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list)
+            self._render_debug_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_debug_roaming(canvas, roam_list)
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
             self._render_bottom_ticker(canvas, events_list, timestamp_ms)
             self._render_debug_panel(canvas, runtime_metrics or {}, episodes_list, obs_dict)
         else:
             # === CLEAN PROCTOR MODE (DEFAULT PRESENTATION) ===
-            self._render_proctor_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list)
+            self._render_proctor_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_proctor_roaming(canvas, roam_list)
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
             self._render_bottom_ticker(canvas, events_list, timestamp_ms)
@@ -113,11 +117,15 @@ class DemoHUDOverlayRenderer:
         risk_tracker: SeatRiskTracker,
         active_episodes: List[TemporalEpisode],
         recent_events: List[ClassroomEvent],
+        timestamp_ms: float = 0.0,
     ) -> None:
         """Render seats in clean proctor mode: only highlight seats requiring human attention."""
         flagged_seats = []
         suspicious_seats = []
         normal_seats = []
+
+        suspicious_th = getattr(risk_tracker, "suspicious_threshold", 60.0)
+        flagged_th = getattr(risk_tracker, "flagged_threshold", 80.0)
 
         for seat_id, s_def in seat_mgr.seats.items():
             poly = s_def.polygon.astype(np.int32)
@@ -137,24 +145,46 @@ class DemoHUDOverlayRenderer:
             is_occupied = occ is not None and occ.state == SeatState.OCCUPIED
             has_active_ep = any(getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id for ep in active_episodes)
 
-            # Determine severity state (only occupied or active seats can be flagged)
-            is_flagged = (
-                (state in (RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value) or score >= 75.0)
-                and (is_occupied or has_active_ep)
-            )
+            # Check if there is an active Review Incident for this seat
+            recent_seat_events = [
+                e for e in recent_events
+                if getattr(e, "seat_id", getattr(e, "seat_code", "")) == seat_id
+            ]
+            latest_evt = recent_seat_events[-1] if recent_seat_events else None
+
+            is_active_incident = False
+            incident_evt = None
+
+            if latest_evt is not None:
+                evt_ts = getattr(latest_evt, "timestamp_ms", None)
+                if evt_ts is None:
+                    evt_ts = (getattr(latest_evt, "timestamp", 0.0) or 0.0) * 1000.0
+                if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
+                    is_active_incident = True
+                    incident_evt = latest_evt
+            elif state == RiskState.FLAGGED_FOR_REVIEW.value or score >= flagged_th:
+                is_active_incident = True
+                if profile and profile.active_event:
+                    incident_evt = profile.active_event
+
+            # Categorize seat:
+            # 1. FLAGGED (RED): Active Review Incident ONLY
+            # 2. SUSPICIOUS (AMBER): Canonical SUSPICIOUS state or score >= suspicious_threshold (60.0)
+            # 3. NORMAL / OBSERVE (or COOLDOWN without active incident): Gray minimal badge
+            is_flagged = is_active_incident and (is_occupied or has_active_ep)
             is_suspicious = (
-                (state == RiskState.SUSPICIOUS.value or (score >= 50.0 and not is_flagged))
+                (state == RiskState.SUSPICIOUS.value or (score >= suspicious_th and not is_flagged))
                 and (is_occupied or has_active_ep)
             )
 
             if is_flagged:
-                flagged_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl))
+                flagged_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl, incident_evt, profile))
             elif is_suspicious:
                 suspicious_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl))
             else:
                 normal_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl))
 
-        # PASS 1: Render NORMAL / EMPTY seats (minimal unobtrusive pill badges)
+        # PASS 1: Render NORMAL / OBSERVE / EMPTY / QUIET COOLDOWN seats (minimal unobtrusive pill badges)
         for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl in normal_seats:
             (tw, th), _ = cv2.getTextSize(short_lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.32, 1)
             cv2.rectangle(canvas, (cx - tw // 2 - 3, cy - th - 2), (cx + tw // 2 + 3, cy + 2), (15, 15, 15), -1)
@@ -168,24 +198,21 @@ class DemoHUDOverlayRenderer:
             cv2.rectangle(canvas, (cx - tw // 2 - 3, cy - th - 3), (cx + tw // 2 + 3, cy + 3), (20, 20, 20), -1)
             cv2.putText(canvas, badge_txt, (cx - tw // 2, cy - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (0, 190, 255), 1, cv2.LINE_AA)
 
-        # PASS 3: Render FLAGGED seats on top (High-contrast RED border and SOLID floating Incident Badge)
-        for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl in flagged_seats:
+        # PASS 3: Render FLAGGED seats on top (High-contrast RED border and floating Incident Badge)
+        for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl, incident_evt, profile in flagged_seats:
             cv2.polylines(canvas, [poly], isClosed=True, color=(30, 30, 235), thickness=2 if canvas.shape[1] < 800 else 3, lineType=cv2.LINE_AA)
 
-            seat_act_eps = [
-                ep for ep in active_episodes
-                if getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id
-            ]
-            recent_evt = next((e for e in reversed(recent_events) if getattr(e, "seat_id", getattr(e, "seat_code", "")) == seat_id), None)
-
-            if seat_act_eps:
-                raw_type = seat_act_eps[0].episode_type
-                beh_str = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
-                beh_str = beh_str.replace("_", " ").title()
-            elif recent_evt:
-                beh_str = recent_evt.behavior.replace("_", " ").title()
+            # Causal incident reason derived strictly from ClassroomEvent / active_incident
+            if incident_evt is not None:
+                beh_raw = getattr(incident_evt, "behavior", getattr(incident_evt, "title", "Review Required"))
+            elif profile and profile.active_incident:
+                beh_raw = profile.active_incident.get("behavior", "Review Required")
+            elif profile and profile.active_event:
+                beh_raw = profile.active_event.behavior
             else:
-                beh_str = "Suspicious Posture"
+                beh_raw = "Review Required"
+
+            beh_str = str(beh_raw).replace("_", " ").title()
 
             f_title = 0.36 if canvas.shape[1] < 800 else 0.42
             f_sub = 0.30 if canvas.shape[1] < 800 else 0.35
@@ -288,10 +315,14 @@ class DemoHUDOverlayRenderer:
         risk_tracker: SeatRiskTracker,
         active_episodes: Optional[List[TemporalEpisode]] = None,
         recent_events: Optional[List[ClassroomEvent]] = None,
+        timestamp_ms: float = 0.0,
     ) -> None:
-        """Draw full seat polygon boundaries, desk boundaries, and alert badges for suspicious/flagged seats."""
+        """Draw full seat polygon boundaries, desk boundaries, and alert badges with developer telemetry."""
         ep_list = active_episodes or []
         evt_list = recent_events or []
+        suspicious_th = getattr(risk_tracker, "suspicious_threshold", 60.0)
+        flagged_th = getattr(risk_tracker, "flagged_threshold", 80.0)
+
         for seat_id, s_def in seat_mgr.seats.items():
             poly = s_def.polygon.astype(np.int32)
             if len(poly) == 0:
@@ -307,14 +338,37 @@ class DemoHUDOverlayRenderer:
 
             occ = seat_mgr.occupancies.get(seat_id)
             is_occupied = occ is not None and occ.state == SeatState.OCCUPIED
-            has_active_ep = any(getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id for ep in ep_list)
+            seat_act_eps = [
+                ep for ep in ep_list
+                if getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id
+            ]
+            has_active_ep = len(seat_act_eps) > 0
 
-            is_flagged = (
-                (state in (RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value) or score >= 75.0)
-                and (is_occupied or has_active_ep)
-            )
+            # Check if there is an active Review Incident for this seat
+            recent_seat_events = [
+                e for e in evt_list
+                if getattr(e, "seat_id", getattr(e, "seat_code", "")) == seat_id
+            ]
+            latest_evt = recent_seat_events[-1] if recent_seat_events else None
+
+            is_active_incident = False
+            incident_evt = None
+
+            if latest_evt is not None:
+                evt_ts = getattr(latest_evt, "timestamp_ms", None)
+                if evt_ts is None:
+                    evt_ts = (getattr(latest_evt, "timestamp", 0.0) or 0.0) * 1000.0
+                if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
+                    is_active_incident = True
+                    incident_evt = latest_evt
+            elif state == RiskState.FLAGGED_FOR_REVIEW.value or score >= flagged_th:
+                is_active_incident = True
+                if profile and profile.active_event:
+                    incident_evt = profile.active_event
+
+            is_flagged = is_active_incident and (is_occupied or has_active_ep)
             is_suspicious = (
-                (state == RiskState.SUSPICIOUS.value or (score >= 50.0 and not is_flagged))
+                (state == RiskState.SUSPICIOUS.value or (score >= suspicious_th and not is_flagged))
                 and (is_occupied or has_active_ep)
             )
 
@@ -324,6 +378,9 @@ class DemoHUDOverlayRenderer:
             elif is_suspicious:
                 poly_col = (0, 165, 255)
                 thick = 2
+            elif state == RiskState.COOLDOWN.value:
+                poly_col = (200, 180, 50)
+                thick = 1
             else:
                 poly_col = (100, 255, 100)
                 thick = 1
@@ -336,23 +393,21 @@ class DemoHUDOverlayRenderer:
                 d_y = int(s_def.desk_y)
                 cv2.line(canvas, (min_x, d_y), (max_x, d_y), (100, 180, 255), 1, cv2.LINE_AA)
 
-            if is_flagged or is_suspicious:
-                seat_act_eps = [
-                    ep for ep in ep_list
-                    if getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id
-                ]
-                recent_evt = next((e for e in reversed(evt_list) if getattr(e, "seat_id", getattr(e, "seat_code", "")) == seat_id), None)
-                if seat_act_eps:
-                    raw_type = seat_act_eps[0].episode_type
-                    beh_str = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
-                    beh_str = beh_str.replace("_", " ").title()
-                elif recent_evt:
-                    beh_str = recent_evt.behavior.replace("_", " ").title()
+            if is_flagged:
+                # Review badge with causal behavior
+                if incident_evt is not None:
+                    beh_raw = getattr(incident_evt, "behavior", getattr(incident_evt, "title", "Review Required"))
+                elif profile and profile.active_incident:
+                    beh_raw = profile.active_incident.get("behavior", "Review Required")
+                elif profile and profile.active_event:
+                    beh_raw = profile.active_event.behavior
                 else:
-                    beh_str = "Suspicious"
+                    beh_raw = "Review Required"
 
-                badge_header = f"{short_lbl}: REVIEW" if is_flagged else f"{short_lbl}: SUSPICIOUS"
+                beh_str = str(beh_raw).replace("_", " ").title()
+                badge_header = f"{short_lbl}: REVIEW"
                 badge_sub = f"{beh_str} ({score:.0f})"
+
                 f_title = 0.38 if canvas.shape[1] < 800 else 0.44
                 f_sub = 0.32 if canvas.shape[1] < 800 else 0.36
                 (w1, h1), _ = cv2.getTextSize(badge_header, cv2.FONT_HERSHEY_SIMPLEX, f_title, 1)
@@ -366,9 +421,43 @@ class DemoHUDOverlayRenderer:
                 by2 = by1 + card_h
 
                 cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (18, 18, 24), -1)
-                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (40, 40, 240) if is_flagged else (0, 165, 255), 1, cv2.LINE_AA)
-                cv2.putText(canvas, badge_header, (bx1 + 5, by1 + h1 + 2), cv2.FONT_HERSHEY_SIMPLEX, f_title, (60, 80, 255) if is_flagged else (0, 190, 255), 1, cv2.LINE_AA)
+                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (40, 40, 240), 1, cv2.LINE_AA)
+                cv2.putText(canvas, badge_header, (bx1 + 5, by1 + h1 + 2), cv2.FONT_HERSHEY_SIMPLEX, f_title, (60, 80, 255), 1, cv2.LINE_AA)
                 cv2.putText(canvas, badge_sub, (bx1 + 5, by2 - 3), cv2.FONT_HERSHEY_SIMPLEX, f_sub, (230, 230, 230), 1, cv2.LINE_AA)
+
+            elif is_suspicious:
+                if seat_act_eps:
+                    raw_type = seat_act_eps[0].episode_type
+                    ep_name = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
+                    beh_str = ep_name.replace("_", " ").title()
+                else:
+                    beh_str = "Suspicious"
+
+                badge_header = f"{short_lbl}: SUSPICIOUS"
+                badge_sub = f"{beh_str} ({score:.0f})"
+
+                f_title = 0.38 if canvas.shape[1] < 800 else 0.44
+                f_sub = 0.32 if canvas.shape[1] < 800 else 0.36
+                (w1, h1), _ = cv2.getTextSize(badge_header, cv2.FONT_HERSHEY_SIMPLEX, f_title, 1)
+                (w2, h2), _ = cv2.getTextSize(badge_sub, cv2.FONT_HERSHEY_SIMPLEX, f_sub, 1)
+                card_w = max(w1, w2) + 12
+                card_h = h1 + h2 + 8
+
+                bx1 = max(4, min(canvas.shape[1] - card_w - 4, cx - card_w // 2))
+                by1 = max(34, top_y - card_h - 4)
+                bx2 = bx1 + card_w
+                by2 = by1 + card_h
+
+                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (18, 18, 24), -1)
+                cv2.rectangle(canvas, (bx1, by1), (bx2, by2), (0, 165, 255), 1, cv2.LINE_AA)
+                cv2.putText(canvas, badge_header, (bx1 + 5, by1 + h1 + 2), cv2.FONT_HERSHEY_SIMPLEX, f_title, (0, 190, 255), 1, cv2.LINE_AA)
+                cv2.putText(canvas, badge_sub, (bx1 + 5, by2 - 3), cv2.FONT_HERSHEY_SIMPLEX, f_sub, (230, 230, 230), 1, cv2.LINE_AA)
+
+            elif state == RiskState.COOLDOWN.value:
+                dbg_txt = f"{short_lbl}:CD({score:.0f})"
+                (tw, th), _ = cv2.getTextSize(dbg_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1)
+                cv2.rectangle(canvas, (cx - tw // 2 - 2, cy - th - 2), (cx + tw // 2 + 2, cy + 2), (10, 10, 10), -1)
+                cv2.putText(canvas, dbg_txt, (cx - tw // 2, cy - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.34, (200, 200, 100), 1, cv2.LINE_AA)
             else:
                 dbg_txt = f"{short_lbl}:{score:.0f}"
                 (tw, th), _ = cv2.getTextSize(dbg_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.34, 1)
@@ -450,11 +539,23 @@ class DemoHUDOverlayRenderer:
 
         total_seats = len(seat_mgr.seats)
         occupied_seats = sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED)
-        review_count = sum(
-            1 for p in risk_tracker.profiles.values()
-            if p.current_state in (RiskState.FLAGGED_FOR_REVIEW.value, RiskState.COOLDOWN.value)
-            or p.risk_score >= 75.0
-        )
+
+        # Count active review incidents
+        active_review_seats = set()
+        for evt in recent_events:
+            evt_ts = getattr(evt, "timestamp_ms", None)
+            if evt_ts is None:
+                evt_ts = (getattr(evt, "timestamp", 0.0) or 0.0) * 1000.0
+            if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
+                s_id = getattr(evt, "seat_id", getattr(evt, "seat_code", ""))
+                if s_id:
+                    active_review_seats.add(s_id)
+
+        for s_id, p in risk_tracker.profiles.items():
+            if p.current_state == RiskState.FLAGGED_FOR_REVIEW.value:
+                active_review_seats.add(s_id)
+
+        review_count = len(active_review_seats)
 
         font = cv2.FONT_HERSHEY_SIMPLEX
         y_pos = 19 if w < 800 else 21
@@ -468,7 +569,7 @@ class DemoHUDOverlayRenderer:
             scale = 0.40
             txt_left = f"VIGIL AI | Room: {room_code} | Cam: {camera_id}"
             txt_mid = f"Time: {time_str} ({timestamp_ms:.0f}ms) | {occupied_seats}/{total_seats} Occupied"
-            txt_right = f"[ ! ] {review_count} SEAT(S) IN REVIEW" if review_count > 0 else "Normal Surveillance"
+            txt_right = f"[ ! ] {review_count} ACTIVE REVIEW INCIDENT(S)" if review_count > 0 else "Normal Surveillance"
 
         cv2.putText(canvas, txt_left, (10, y_pos), font, scale, (220, 220, 220), 1, cv2.LINE_AA)
 

@@ -27,6 +27,9 @@ function authenticatedUrl(url) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    selectPreset(activePreset);
+    selectMode(activeMode);
+    filterQueue(activeFilter);
     initWebSocket();
     fetchPresets();
     fetchStatus();
@@ -78,13 +81,8 @@ function updateWsBadge(connected) {
     const txt = document.getElementById('wsText');
     if (!badge || !txt) return;
 
-    if (connected) {
-        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold';
-        txt.textContent = 'LIVE WS';
-    } else {
-        badge.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold';
-        txt.textContent = 'WS OFFLINE';
-    }
+    badge.dataset.connected = String(connected);
+    txt.textContent = connected ? 'LIVE WS' : 'WS OFFLINE';
 }
 
 function handleWebSocketMessage(msg) {
@@ -114,15 +112,14 @@ function selectPreset(preset) {
     const btnIndia = document.getElementById('btnPresetIndia');
     const btnStudent = document.getElementById('btnPresetStudent');
 
+    btnIndia.setAttribute('aria-pressed', String(preset === 'india'));
+    btnStudent.setAttribute('aria-pressed', String(preset === 'student'));
+
     if (preset === 'india') {
-        btnIndia.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md';
-        btnStudent.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200';
         document.getElementById('lblRoomCode').textContent = 'ROOM-CALIB-01';
         document.getElementById('lblCameraId').textContent = 'CAM-CALIB-01';
         document.getElementById('lblCalibratedSeats').textContent = '21';
     } else {
-        btnStudent.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md';
-        btnIndia.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200';
         document.getElementById('lblRoomCode').textContent = 'ROOM-STUDENT-01';
         document.getElementById('lblCameraId').textContent = 'CAM-STUDENT-01';
         document.getElementById('lblCalibratedSeats').textContent = '12';
@@ -134,14 +131,15 @@ function selectMode(mode) {
     const btnLive = document.getElementById('btnModeLive');
     const btnReplay = document.getElementById('btnModeReplay');
     const modeText = document.getElementById('modeText');
+    const modeBadge = document.getElementById('modeBadge');
+
+    btnLive.setAttribute('aria-pressed', String(mode === 'LIVE'));
+    btnReplay.setAttribute('aria-pressed', String(mode === 'REPLAY'));
+    if (modeBadge) modeBadge.dataset.mode = mode;
 
     if (mode === 'LIVE') {
-        btnLive.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow';
-        btnReplay.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200';
         modeText.textContent = 'LIVE AI ANALYSIS';
     } else {
-        btnReplay.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-purple-600 text-white shadow';
-        btnLive.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200';
         modeText.textContent = 'RECORDED REPLAY';
     }
 }
@@ -271,15 +269,10 @@ function renderStatus(st) {
 
     if (stateText) stateText.textContent = st.state;
     if (stateBadge) {
+        stateBadge.dataset.state = st.state;
         if (st.state === 'RUNNING') {
-            stateBadge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
             if (placeholder) placeholder.style.display = 'none';
-        } else if (st.state === 'PAUSED') {
-            stateBadge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40';
-        } else if (st.state === 'COMPLETED') {
-            stateBadge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/40';
         } else {
-            stateBadge.className = 'px-2.5 py-1 rounded-md text-xs font-mono font-semibold bg-gray-800 text-gray-300 border border-gray-700';
             if (st.state === 'IDLE' && placeholder) placeholder.style.display = 'flex';
         }
     }
@@ -309,11 +302,7 @@ function renderStatus(st) {
 function filterQueue(status) {
     activeFilter = status;
     document.querySelectorAll('.filter-btn').forEach((b) => {
-        if (b.textContent.toUpperCase() === status || (status === 'ALL' && b.textContent === 'All')) {
-            b.className = 'filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold';
-        } else {
-            b.className = 'filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800';
-        }
+        b.setAttribute('aria-pressed', String(b.dataset.filter === status));
     });
     renderReviewQueue();
 }
@@ -514,20 +503,9 @@ function updateDecisionButtons() {
     const btnRej = document.getElementById('btnDecReject');
     const btnInc = document.getElementById('btnDecInconclusive');
 
-    btnConf.className =
-        selectedDecision === 'CONFIRMED'
-            ? 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-emerald-600 border-emerald-500 text-white shadow'
-            : 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-emerald-400';
-
-    btnRej.className =
-        selectedDecision === 'REJECTED'
-            ? 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-amber-600 border-amber-500 text-white shadow'
-            : 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-amber-400';
-
-    btnInc.className =
-        selectedDecision === 'INCONCLUSIVE'
-            ? 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-purple-600 border-purple-500 text-white shadow'
-            : 'px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-purple-400';
+    btnConf.setAttribute('aria-pressed', String(selectedDecision === 'CONFIRMED'));
+    btnRej.setAttribute('aria-pressed', String(selectedDecision === 'REJECTED'));
+    btnInc.setAttribute('aria-pressed', String(selectedDecision === 'INCONCLUSIVE'));
 }
 
 async function submitHumanReview() {

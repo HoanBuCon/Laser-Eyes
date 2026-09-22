@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import builtins
 import json
+import re
 import threading
 import time
 import uuid
@@ -652,6 +653,27 @@ def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
     assert "function escapeHtml" in source
     assert "function apiFetch" in source
     assert "X-Vigil-Demo-Token" in source
+
+
+def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
+    html = Path("dashboard/demo.html").read_text(encoding="utf-8")
+    css = Path("dashboard/css/demo.css").read_text(encoding="utf-8")
+    tokens = Path("dashboard/css/vigil-tokens.css").read_text(encoding="utf-8")
+    javascript = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
+
+    assert 'href="/static/css/vigil-tokens.css"' in html
+    assert 'class="vigil-sidebar"' in html
+    assert 'id="reviewQueue"' in html
+    assert "--vigil-sidebar:" in tokens
+    assert ".vigil-sidebar" in css
+    assert "badge.dataset.connected" in javascript
+    assert "stateBadge.dataset.state" in javascript
+    assert "stateBadge.className" not in javascript
+    assert "btnIndia.className" not in javascript
+
+    html_ids = set(re.findall(r'id="([^"]+)"', html))
+    javascript_ids = set(re.findall(r"getElementById\('([^']+)'\)", javascript))
+    assert javascript_ids <= html_ids
 
 
 def test_configured_demo_token_protects_api(monkeypatch):

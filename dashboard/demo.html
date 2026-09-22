@@ -25,21 +25,44 @@
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
     <link rel="stylesheet" href="/static/css/demo.css">
 </head>
-<body class="bg-[#070a12] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+<body class="vigil-classroom bg-[#070a12] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+
+    <!-- Local Gaze-inspired persistent workspace navigation -->
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/demo" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy">
+                <strong>VIGIL AI</strong>
+                <small>CLASSROOM COPILOT</small>
+            </span>
+        </a>
+
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item is-active"><span>01</span><strong>Live monitor</strong></a>
+            <a href="#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+        </nav>
+
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
+    <header class="classroom-topbar border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <div class="topbar-context-mark w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
-                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">SRS v2.0 Co-Pilot</span>
-                    </div>
-                    <p class="text-xs text-gray-400 font-mono">AI-Assisted Exam Monitoring &amp; Human-in-the-Loop Review Queue</p>
+                    <div class="vigil-page-eyebrow">CLASSROOM / LIVE MONITOR</div>
+                    <h1 class="vigil-page-title">Room observation</h1>
+                    <p class="vigil-page-subtitle">Observable signals, temporal context and evidence for human review.</p>
                 </div>
             </div>
 
@@ -66,14 +89,14 @@
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+    <main class="classroom-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
 
         <!-- Control Toolbar Card -->
-        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="session-toolbar bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
             
             <!-- Left: Preset & Mode Selection -->
             <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                <div class="segmented-control preset-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
                     <button id="btnPresetIndia" onclick="selectPreset('india')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md">
                         India Classroom (21 Seats)
                     </button>
@@ -82,7 +105,7 @@
                     </button>
                 </div>
 
-                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                <div class="segmented-control mode-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
                     <button id="btnModeLive" onclick="selectMode('LIVE')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow">
                         Live Analysis
                     </button>
@@ -91,14 +114,14 @@
                     </button>
                 </div>
 
-                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
+                <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
                     <input type="checkbox" id="chkDebugOverlay" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
                     <span>Debug Overlay</span>
                 </label>
             </div>
 
             <!-- Right: Playback Controls -->
-            <div class="flex items-center gap-2">
+            <div class="playback-controls flex items-center gap-2">
                 <button id="btnStart" onclick="startDemo()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                     Start Analysis
@@ -119,11 +142,11 @@
         </div>
 
         <!-- Middle Section: Video Monitor + Telemetry Sidebar -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="monitor-grid grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             <!-- Video Monitor Viewport (2 cols) -->
-            <div class="lg:col-span-2 bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
-                <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+            <div class="viewer-card lg:col-span-2 bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+                <div class="panel-heading flex items-center justify-between pb-3 border-b border-gray-800">
                     <div class="flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
                         <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono">Clean Proctor Video Stream</h2>
@@ -135,7 +158,7 @@
                 </div>
 
                 <!-- Video Frame Area -->
-                <div class="relative bg-black rounded-xl overflow-hidden mt-3 aspect-video flex items-center justify-center border border-gray-800/80 shadow-inner group">
+                <div class="video-viewport relative bg-black rounded-xl overflow-hidden mt-3 aspect-video flex items-center justify-center border border-gray-800/80 shadow-inner group">
                     <img id="videoStreamImg" src="/api/v1/demo/stream" alt="Live Proctor Stream" class="w-full h-full object-contain" onerror="handleStreamError(this)">
                     <div id="videoPlaceholder" class="absolute inset-0 bg-gray-950/90 flex flex-col items-center justify-center gap-3 text-gray-400">
                         <div class="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-cyan-400">
@@ -154,11 +177,11 @@
             </div>
 
             <!-- Telemetry & Room State Overview (1 col) -->
-            <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+            <div class="telemetry-card bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
                 <div>
                     <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono border-b border-gray-800 pb-3">Session Telemetry</h2>
                     
-                    <div class="grid grid-cols-2 gap-3 mt-4">
+                    <div class="telemetry-grid grid grid-cols-2 gap-3 mt-4">
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Room Context</div>
                             <div id="lblRoomCode" class="text-sm font-bold text-gray-100 mt-0.5">ROOM-CALIB-01</div>
@@ -186,7 +209,7 @@
                     </div>
 
                     <!-- AI Pipeline Stack Details -->
-                    <div class="mt-5 space-y-2 text-xs font-mono">
+                    <div class="pipeline-list mt-5 space-y-2 text-xs font-mono">
                         <div class="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Pipeline Specification:</div>
                         <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
                             <span>Perception Engine:</span>
@@ -207,15 +230,15 @@
                     </div>
                 </div>
 
-                <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-cyan-300 text-xs leading-relaxed">
+                <div class="copilot-note p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-cyan-300 text-xs leading-relaxed">
                     <strong>Co-Pilot Principle:</strong> AI flags candidate behavioral incidents with full video context; the Human Proctor retains final adjudication authority.
                 </div>
             </div>
         </div>
 
         <!-- Bottom Section: Review Queue -->
-        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+        <div id="reviewQueue" class="review-panel bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="review-heading flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-base font-bold text-gray-100 tracking-tight">Review Queue (Human Adjudication)</h2>
@@ -225,12 +248,12 @@
                 </div>
 
                 <!-- Status Filter Pills -->
-                <div class="flex items-center gap-1.5 text-xs font-mono">
-                    <button onclick="filterQueue('ALL')" class="filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
-                    <button onclick="filterQueue('PENDING')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
-                    <button onclick="filterQueue('CONFIRMED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
-                    <button onclick="filterQueue('REJECTED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
-                    <button onclick="filterQueue('INCONCLUSIVE')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
+                <div class="review-filters flex items-center gap-1.5 text-xs font-mono">
+                    <button data-filter="ALL" onclick="filterQueue('ALL')" class="filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
+                    <button data-filter="PENDING" onclick="filterQueue('PENDING')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
+                    <button data-filter="CONFIRMED" onclick="filterQueue('CONFIRMED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
+                    <button data-filter="REJECTED" onclick="filterQueue('REJECTED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
+                    <button data-filter="INCONCLUSIVE" onclick="filterQueue('INCONCLUSIVE')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
                 </div>
             </div>
 
@@ -246,8 +269,8 @@
     </main>
 
     <!-- Evidence & Human Review Modal -->
-    <div id="reviewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+    <div id="reviewModal" class="review-modal fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="review-dialog bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
             
             <!-- Modal Header -->
             <div class="p-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur z-10">
@@ -376,7 +399,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-800/80 py-4 bg-gray-950/60 text-center text-xs font-mono text-gray-500">
+    <footer class="classroom-footer border-t border-gray-800/80 py-4 bg-gray-950/60 text-center text-xs font-mono text-gray-500">
         VIGIL AI Enterprise Proctoring System &bull; Single-Source SRS v2.0 Execution &bull; Built for ICTU 2026 Competition
     </footer>
 

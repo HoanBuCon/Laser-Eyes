@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start polling fallback every 1500ms
     pollTimer = setInterval(() => {
         fetchStatus();
+        fetchEvents();
     }, 1500);
 });
 
@@ -392,7 +393,7 @@ function formatBehaviorLabel(raw) {
 // Human Review Modal Adjudication
 // -----------------------------------------------------------------------------
 
-function openReviewModal(eventId) {
+async function openReviewModal(eventId) {
     activeEventId = eventId;
     const ev = allIncidents.get(eventId);
     if (!ev) return;
@@ -410,12 +411,33 @@ function openReviewModal(eventId) {
     const lastSeen = (ev.last_seen_ms ? ev.last_seen_ms / 1000 : firstSeen).toFixed(1);
     document.getElementById('modalTimeRange').textContent = `${firstSeen}s – ${lastSeen}s (${((ev.last_seen_ms || 0) - (ev.first_seen_ms || 0)) / 1000}s span)`;
 
-    document.getElementById('modalSha256').textContent = ev.video_sha256 || 'SHA-256 Verified';
+    const hashEl = document.getElementById('modalSha256');
+    const hashLabels = {
+        HASH_VERIFIED: 'HASH VERIFIED',
+        HASH_MISMATCH: 'HASH MISMATCH',
+        HASH_AVAILABLE_NOT_CHECKED: 'HASH AVAILABLE / NOT CHECKED',
+        HASH_NOT_AVAILABLE: 'HASH NOT AVAILABLE',
+    };
+    hashEl.textContent = hashLabels[ev.hash_status] || (ev.video_sha256 ? 'HASH AVAILABLE / NOT CHECKED' : 'HASH NOT AVAILABLE');
+    try {
+        const integrityRes = await fetch(`/api/v1/demo/events/${encodeURIComponent(eventId)}/integrity`);
+        if (integrityRes.ok) {
+            const integrity = await integrityRes.json();
+            ev.hash_status = integrity.hash_status;
+            hashEl.textContent = hashLabels[integrity.hash_status] || 'HASH NOT AVAILABLE';
+        }
+    } catch (err) {
+        console.debug('Evidence integrity check unavailable:', err);
+    }
 
     // Supporting cues
     const cuesList = document.getElementById('modalSupportingCues');
     const cues = ev.metadata && ev.metadata.supporting_cues ? ev.metadata.supporting_cues : [`Frequency: x${ev.occurrence_count || 1} repetitions`];
-    cuesList.innerHTML = cues.map((c) => `<li>${c}</li>`).join('');
+    cuesList.replaceChildren(...cues.map((cue) => {
+        const item = document.createElement('li');
+        item.textContent = String(cue);
+        return item;
+    }));
 
     // Video & Snapshot
     const videoPlayer = document.getElementById('modalVideoPlayer');

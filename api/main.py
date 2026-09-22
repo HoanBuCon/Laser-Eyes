@@ -9,16 +9,18 @@ Implements SRS v1.0 specifications:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from api.realtime import realtime_manager
+from classroom_monitor.demo.runtime import DemoRuntime
 from api.routes import (
     cameras,
     data_workbench,
@@ -47,9 +49,27 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown hooks."""
     logger.info("Initializing VIGIL AI database schema...")
     init_db()
+    loop = asyncio.get_running_loop()
+    realtime_manager.set_event_loop(loop)
+    runtime = DemoRuntime.get_instance()
+
+    def publish_event(_event, payload):
+        realtime_manager.broadcast_threadsafe({"type": "REVIEW_INCIDENT", "event": payload})
+
+    def publish_status(status):
+        payload = status.to_dict() if hasattr(status, "to_dict") else dict(status)
+        realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": payload})
+
+    runtime.register_event_callback(publish_event)
+    runtime.register_status_callback(publish_status)
     logger.info("VIGIL AI Enterprise Proctoring Server is ready!")
-    yield
-    logger.info("Shutting down VIGIL AI server...")
+    try:
+        yield
+    finally:
+        runtime.unregister_event_callback(publish_event)
+        runtime.unregister_status_callback(publish_status)
+        realtime_manager.clear_event_loop(loop)
+        logger.info("Shutting down VIGIL AI server...")
 
 
 app = FastAPI(
@@ -159,4 +179,3 @@ if dashboard_dir.exists():
         if workbench_file.exists():
             return FileResponse(str(workbench_file))
         return {"message": "Data Workbench data_workbench.html not found, please visit /docs"}
-

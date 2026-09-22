@@ -11,7 +11,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List, Set
+import threading
+from concurrent.futures import Future
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -24,6 +26,16 @@ class RealtimeManager:
     def __init__(self):
         self.active_connections: Set[WebSocket] = set()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._loop_lock = threading.Lock()
+
+    def set_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        with self._loop_lock:
+            self._loop = loop
+
+    def clear_event_loop(self, loop: Optional[asyncio.AbstractEventLoop] = None) -> None:
+        with self._loop_lock:
+            if loop is None or self._loop is loop:
+                self._loop = None
 
     async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
@@ -43,14 +55,14 @@ class RealtimeManager:
             except Exception:
                 self.disconnect(ws)
 
-    def broadcast_threadsafe(self, message: Dict[str, Any]) -> None:
+    def broadcast_threadsafe(self, message: Dict[str, Any]) -> Optional[Future]:
         """Schedule broadcast from a synchronous/background worker thread."""
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.run_coroutine_threadsafe(self.broadcast(message), loop)
-        except RuntimeError:
-            pass
+        with self._loop_lock:
+            loop = self._loop
+        if loop is None or loop.is_closed() or not loop.is_running():
+            logger.debug("Realtime broadcast skipped because the server event loop is unavailable")
+            return None
+        return asyncio.run_coroutine_threadsafe(self.broadcast(message), loop)
 
 
 # Global singleton instance

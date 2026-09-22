@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VIGIL AI — Enterprise Exam Cheating Surveillance & Proctoring</title>
+    <title>VIGIL AI — Classroom Observation & Human Review</title>
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -25,12 +25,37 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
 </head>
-<body class="bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans">
+<body class="vigil-classroom bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy">
+                <strong>VIGIL AI</strong>
+                <small>CLASSROOM COPILOT</small>
+            </span>
+        </a>
+
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
+            <a href="/demo#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item is-active"><span>05</span><strong>Operations</strong></a>
+        </nav>
+
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-gray-800/80 bg-gray-950/80 backdrop-blur sticky top-0 z-40">
+    <header class="operations-topbar border-b border-gray-800/80 bg-gray-950/80 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
@@ -41,7 +66,7 @@
                         <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
                         <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">MVP v1.0</span>
                     </div>
-                    <p class="text-xs text-gray-400 font-mono">10–20 Room Multi-Camera AI Proctoring Dashboard</p>
+                    <p class="text-xs text-gray-400 font-mono">Multi-room observation and human review workspace</p>
                 </div>
             </div>
 
@@ -71,10 +96,10 @@
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+    <main class="operations-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         <!-- Stat Counter Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="operations-stats grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="glass-panel p-5">
                 <div class="flex items-center justify-between">
                     <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Monitored Rooms</span>
@@ -134,7 +159,7 @@
                 <div>
                     <h2 class="text-base font-bold text-white flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-                        Multi-Room Surveillance Grid (10–20 Rooms)
+                        Multi-Room Observation Grid
                     </h2>
                     <p class="text-xs text-gray-400">Real-time room risk scores, active cameras, and seat occupancy</p>
                 </div>
@@ -170,7 +195,7 @@
                 <div class="flex items-center justify-between mb-4">
                     <div>
                         <h2 class="text-base font-semibold text-white flex items-center gap-2">
-                            <span>Real-Time Violation Telemetry & Human Review</span>
+                            <span>Real-Time Review Incidents</span>
                             <span id="selectedRoomFilterBadge" class="hidden text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono"></span>
                         </h2>
                         <p class="text-xs text-gray-400">Seat-anchored events requiring proctor verification</p>
@@ -200,8 +225,8 @@
     </main>
 
     <!-- Comprehensive Evidence & Human-in-the-Loop Review Modal -->
-    <div id="evidenceModal" class="fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+    <div id="evidenceModal" class="operations-modal fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
+        <div class="operations-dialog bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <!-- Modal Header -->
             <div class="flex items-center justify-between border-b border-gray-800 pb-3">
                 <div>

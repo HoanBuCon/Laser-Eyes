@@ -4,7 +4,7 @@
  * Implements:
  * - 10-20 Concurrent Exam Rooms Multi-Card Grid
  * - Real-time WebSocket event ingestion with HTTP polling fallback
- * - Seat-anchored violation telemetry feed
+ * - Seat-anchored review incident feed
  * - Dual media evidence viewer (Peak JPEG snapshot + 10s MP4 video clip)
  * - Cryptographic SHA-256 integrity hash verification
  * - Human-in-the-Loop review actions (CONFIRM, REJECT, INCONCLUSIVE)
@@ -67,11 +67,7 @@ function setWsBadge(isLive, text) {
     if (!badge || !label) return;
 
     label.innerText = text;
-    if (isLive) {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold';
-    } else {
-        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-semibold';
-    }
+    badge.dataset.connected = String(isLive);
 }
 
 function handleIncomingLiveEvent(eventData) {
@@ -230,7 +226,7 @@ function renderRoomGrid(rooms, rankings) {
         const borderStyle = isSelected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-gray-800 hover:border-gray-700';
 
         return `
-        <div onclick="selectRoom('${room.id}', '${room.name}')" class="p-4 rounded-xl bg-gray-900/80 border ${borderStyle} cursor-pointer transition flex flex-col justify-between">
+        <div onclick="selectRoom('${room.id}', '${room.name}')" class="room-card p-4 rounded-xl bg-gray-900/80 border ${borderStyle} cursor-pointer transition flex flex-col justify-between" aria-current="${isSelected}">
             <div>
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-mono font-bold text-gray-400 uppercase">${room.room_code || 'ROOM'}</span>
@@ -337,7 +333,7 @@ function renderEventFeed(events) {
         const shaShort = ev.evidence_hash ? `${ev.evidence_hash.substring(0, 10)}...` : 'N/A';
 
         return `
-        <div class="p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div class="review-incident-row p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center font-mono text-xs text-cyan-300 font-bold border border-gray-700">
                     <span class="text-[9px] text-gray-400">SEAT</span>
@@ -426,17 +422,16 @@ function switchEvidenceTab(tab) {
     const btnVid = document.getElementById('btnTabVideo');
     const videoPlayer = document.getElementById('modalEvidenceVideo');
 
+    if (btnSnap) btnSnap.setAttribute('aria-selected', String(tab === 'snapshot'));
+    if (btnVid) btnVid.setAttribute('aria-selected', String(tab === 'video'));
+
     if (tab === 'snapshot') {
         if (snapViewer) snapViewer.classList.remove('hidden');
         if (vidViewer) vidViewer.classList.add('hidden');
-        if (btnSnap) btnSnap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow';
-        if (btnVid) btnVid.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white';
         if (videoPlayer) videoPlayer.pause();
     } else {
         if (snapViewer) snapViewer.classList.add('hidden');
         if (vidViewer) vidViewer.classList.remove('hidden');
-        if (btnSnap) btnSnap.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white';
-        if (btnVid) btnVid.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow';
         if (videoPlayer) videoPlayer.play().catch(() => {});
     }
 }

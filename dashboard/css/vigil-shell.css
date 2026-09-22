@@ -1,0 +1,153 @@
+/* Shared VIGIL Classroom application shell, derived from VIGIL Local. */
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body.vigil-classroom {
+  min-width: 320px;
+  min-height: 100vh;
+  padding-left: 204px;
+  background: var(--vigil-bg);
+  color: var(--vigil-text);
+  font-family: var(--vigil-font-sans);
+  line-height: var(--vigil-line-height-body);
+}
+
+button, input, select, textarea { font: inherit; }
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--vigil-shadow-focus);
+}
+
+.vigil-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--vigil-z-modal);
+  display: flex;
+  width: 204px;
+  flex-direction: column;
+  padding: var(--vigil-space-5) var(--vigil-space-2) var(--vigil-space-4);
+  border-right: 1px solid var(--vigil-border);
+  background: var(--vigil-sidebar);
+}
+
+.vigil-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 10px 28px;
+  color: var(--vigil-text);
+  text-decoration: none;
+}
+
+.vigil-brand-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: var(--vigil-radius-xs);
+  background: var(--vigil-primary);
+  color: var(--vigil-primary-text);
+  font-size: var(--vigil-font-size-lg);
+  font-weight: 800;
+}
+
+.vigil-brand-copy { display: grid; line-height: 1.15; }
+.vigil-brand-copy strong { font-size: var(--vigil-font-size-sm); letter-spacing: .02em; }
+.vigil-brand-copy small, .vigil-nav-label {
+  color: var(--vigil-text-dim);
+  font-family: var(--vigil-font-mono);
+  font-size: .625rem;
+  font-weight: var(--vigil-font-bold);
+  letter-spacing: .11em;
+}
+
+.vigil-nav-label { margin: 0 14px var(--vigil-space-2); }
+.vigil-nav { display: grid; gap: 2px; }
+.vigil-nav-item {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: var(--vigil-radius-sm);
+  color: var(--vigil-text-muted);
+  text-decoration: none;
+  transition: background var(--vigil-duration-fast) var(--vigil-ease-standard), color var(--vigil-duration-fast) var(--vigil-ease-standard);
+}
+
+.vigil-nav-item span {
+  color: var(--vigil-text-dim);
+  font-family: var(--vigil-font-mono);
+  font-size: var(--vigil-font-size-2xs);
+}
+
+.vigil-nav-item strong { font-size: var(--vigil-font-size-xs); font-weight: var(--vigil-font-regular); }
+.vigil-nav-item:hover, .vigil-nav-item.is-active { background: var(--vigil-surface-alt); color: var(--vigil-text); }
+.vigil-nav-item.is-active span { color: var(--vigil-good); }
+
+.vigil-sidebar-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--vigil-space-2);
+  margin: auto 10px 0;
+  padding-top: var(--vigil-space-4);
+  border-top: 1px solid var(--vigil-border);
+}
+
+.vigil-sidebar-note-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 4px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--vigil-good);
+  box-shadow: 0 0 0 3px var(--vigil-good-dim);
+}
+
+.vigil-sidebar-note div { display: grid; gap: 3px; }
+.vigil-sidebar-note strong {
+  color: var(--vigil-good);
+  font-family: var(--vigil-font-mono);
+  font-size: .625rem;
+  letter-spacing: .06em;
+}
+.vigil-sidebar-note small { color: var(--vigil-text-dim); font-size: .625rem; line-height: 1.35; }
+
+@media (max-width: 1120px) {
+  body.vigil-classroom { padding-left: 68px; }
+  .vigil-sidebar { width: 68px; padding-inline: 8px; }
+  .vigil-brand { justify-content: center; margin-inline: 0; }
+  .vigil-brand-copy, .vigil-nav-label, .vigil-nav-item strong, .vigil-sidebar-note div { display: none; }
+  .vigil-nav-item { grid-template-columns: 1fr; justify-items: center; padding: 0; }
+  .vigil-nav-item span { font-size: var(--vigil-font-size-xs); }
+  .vigil-sidebar-note { justify-content: center; margin-inline: 0; }
+}
+
+@media (max-width: 840px) {
+  body.vigil-classroom { padding-left: 0; padding-bottom: 58px; }
+  .vigil-sidebar {
+    inset: auto 0 0 0;
+    width: auto;
+    height: 58px;
+    flex-direction: row;
+    align-items: center;
+    padding: 6px 8px;
+    border-top: 1px solid var(--vigil-border);
+    border-right: 0;
+  }
+  .vigil-brand, .vigil-nav-label, .vigil-sidebar-note { display: none; }
+  .vigil-nav { display: grid; width: 100%; grid-template-columns: repeat(5, 1fr); }
+  .vigil-nav-item { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

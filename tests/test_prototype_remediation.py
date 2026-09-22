@@ -657,23 +657,39 @@ def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
 
 def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
     html = Path("dashboard/demo.html").read_text(encoding="utf-8")
+    operations_html = Path("dashboard/index.html").read_text(encoding="utf-8")
     css = Path("dashboard/css/demo.css").read_text(encoding="utf-8")
     tokens = Path("dashboard/css/vigil-tokens.css").read_text(encoding="utf-8")
+    shell = Path("dashboard/css/vigil-shell.css").read_text(encoding="utf-8")
     javascript = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
+    operations_javascript = Path("dashboard/js/app.js").read_text(encoding="utf-8")
 
     assert 'href="/static/css/vigil-tokens.css"' in html
+    assert 'href="/static/css/vigil-shell.css"' in html
+    assert 'href="/static/css/vigil-shell.css"' in operations_html
     assert 'class="vigil-sidebar"' in html
+    assert 'class="vigil-sidebar"' in operations_html
     assert 'id="reviewQueue"' in html
     assert "--vigil-sidebar:" in tokens
-    assert ".vigil-sidebar" in css
+    assert ".vigil-sidebar" in shell
+    assert ".vigil-sidebar" not in css
     assert "badge.dataset.connected" in javascript
     assert "stateBadge.dataset.state" in javascript
     assert "stateBadge.className" not in javascript
     assert "btnIndia.className" not in javascript
+    assert "badge.dataset.connected" in operations_javascript
+    assert "btnSnap.className" not in operations_javascript
+    assert "Exam Cheating Surveillance" not in operations_html
 
     html_ids = set(re.findall(r'id="([^"]+)"', html))
     javascript_ids = set(re.findall(r"getElementById\('([^']+)'\)", javascript))
     assert javascript_ids <= html_ids
+
+    operations_ids = set(re.findall(r'id="([^"]+)"', operations_html))
+    operations_javascript_ids = set(
+        re.findall(r"getElementById\('([^']+)'\)", operations_javascript)
+    )
+    assert operations_javascript_ids <= operations_ids
 
 
 def test_configured_demo_token_protects_api(monkeypatch):

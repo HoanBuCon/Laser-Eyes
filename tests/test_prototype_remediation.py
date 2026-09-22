@@ -39,6 +39,11 @@ from storage.database import Base
 from storage.database import SessionLocal
 from storage.db_models import AuditLog, DetectionEvent, EventReview, ExamRoom, ExamSession, ExamSite
 from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
+from exam_monitor.app import wait_for_worker_shutdown
+from exam_monitor.engine import GazeAnalyzer
+from exam_monitor.events import EventDetector, EventRule
+from exam_monitor.models import AnalysisResult, EventType, Severity
+from api.routes.demo import _find_evidence_file
 
 
 pytestmark = pytest.mark.unit
@@ -239,6 +244,78 @@ def test_cli_and_web_adapters_share_canonical_srs_v2_pipeline():
     import classroom_monitor.demo.runtime as web_adapter
 
     assert cli_adapter.SRSv2Pipeline is web_adapter.SRSv2Pipeline
+
+
+def test_local_calibration_accepts_neutral_and_rejects_off_center(tmp_path: Path):
+    analyzer = GazeAnalyzer(
+        model_path=tmp_path / "missing-face.task",
+        object_model_path=tmp_path / "missing-object.tflite",
+    )
+    analyzer.begin_calibration()
+    for _ in range(36):
+        analyzer._maybe_collect_calibration(0.02, -0.01, 0.0, 0.0)
+    assert analyzer.calibrated
+    assert analyzer.calibration_state == "READY"
+    assert analyzer.calibration_quality > 0.8
+
+    analyzer.reset_calibration()
+    for _ in range(36):
+        analyzer._maybe_collect_calibration(0.55, 0.0, 0.0, 0.0)
+    assert not analyzer.calibrated
+    assert analyzer.calibration_state == "REJECTED"
+
+
+def test_local_allowed_material_policy_separates_detection_from_prohibition(tmp_path: Path):
+    analyzer = GazeAnalyzer(
+        model_path=tmp_path / "missing-face.task",
+        object_model_path=tmp_path / "missing-object.tflite",
+    )
+    detections = [("book", 0.9, (0, 0, 10, 10)), ("cell phone", 0.8, (0, 0, 10, 10))]
+    assert analyzer.prohibited_objects(detections) == ["book", "cell phone"]
+    analyzer.set_allowed_materials({"book"})
+    assert analyzer.prohibited_objects(detections) == ["cell phone"]
+    assert [item[0] for item in detections] == ["book", "cell phone"]
+
+
+def test_tracking_held_head_and_gaze_cannot_activate_new_local_events():
+    rules = {
+        EventType.LOOK_AWAY: EventRule(EventType.LOOK_AWAY, 0.2, 0.0, Severity.MEDIUM),
+        EventType.HEAD_TURN: EventRule(EventType.HEAD_TURN, 0.2, 0.0, Severity.MEDIUM),
+        EventType.TALKING: EventRule(EventType.TALKING, 1.0, 0.0, Severity.MEDIUM),
+        EventType.NO_FACE: EventRule(EventType.NO_FACE, 1.0, 0.0, Severity.MEDIUM),
+        EventType.MULTIPLE_FACES: EventRule(EventType.MULTIPLE_FACES, 1.0, 0.0, Severity.HIGH),
+        EventType.SUSPICIOUS_OBJECT: EventRule(EventType.SUSPICIOUS_OBJECT, 1.0, 0.0, Severity.HIGH),
+        EventType.LOW_LIGHT: EventRule(EventType.LOW_LIGHT, 1.0, 0.0, Severity.LOW),
+    }
+    detector = EventDetector(rules)
+    held = AnalysisResult(
+        timestamp=0.0,
+        face_count=1,
+        person_count=1,
+        head_direction="right",
+        eyes_outside_zone=True,
+        tracking_held=True,
+        brightness=100.0,
+    )
+    assert detector.update(held, "S", now=0.0) == []
+    assert detector.update(held, "S", now=2.0) == []
+
+
+def test_local_worker_shutdown_is_cooperative_and_non_lossy():
+    stop = threading.Event()
+    finished = threading.Event()
+
+    def worker():
+        while not stop.is_set():
+            time.sleep(0.005)
+        # Represents final in-flight event/session bookkeeping.
+        time.sleep(0.02)
+        finished.set()
+
+    thread = threading.Thread(target=worker, daemon=False)
+    thread.start()
+    assert wait_for_worker_shutdown(thread, stop, timeout=1.0)
+    assert finished.is_set()
 
 
 def _write_video(path: Path, *, frames: int = 6, fps: float = 10.0) -> None:
@@ -474,3 +551,43 @@ def test_replay_crosses_incident_evidence_hash_and_human_review(tmp_path: Path, 
         assert persisted.review is not None
     finally:
         db.close()
+
+
+def test_competition_profile_disables_legacy_inference(monkeypatch):
+    monkeypatch.delenv("VIGIL_ENABLE_LEGACY_INFERENCE", raising=False)
+    with TestClient(app) as client:
+        response = client.get("/api/v1/inference/status/legacy-session")
+    assert response.status_code == 410
+    assert "canonical" in response.json()["detail"].lower()
+
+
+def test_reference_upload_rejects_unsafe_or_unsupported_file(monkeypatch, tmp_path: Path):
+    import api.routes.cameras as cameras_module
+
+    monkeypatch.setattr(cameras_module, "REF_FRAME_DIR", tmp_path)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/cameras/reference-frame/upload",
+            files={"file": ("../../payload.exe", b"not-media", "application/octet-stream")},
+        )
+    assert response.status_code == 415
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_evidence_lookup_rejects_traversal_and_ambiguous_basename(tmp_path: Path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    first = tmp_path / "data" / "demo_runs" / "one" / "duplicate.mp4"
+    second = tmp_path / "data" / "demo_final" / "two" / "duplicate.mp4"
+    first.parent.mkdir(parents=True)
+    second.parent.mkdir(parents=True)
+    first.write_bytes(b"first")
+    second.write_bytes(b"second")
+
+    assert _find_evidence_file("../duplicate.mp4") is None
+    assert _find_evidence_file("duplicate.mp4") is None
+
+
+def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
+    source = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
+    assert "onclick=\"openReviewModal" not in source
+    assert "function escapeHtml" in source

@@ -11,12 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from api.realtime import realtime_manager
@@ -87,11 +89,29 @@ def favicon():
     return Response(status_code=204)
 
 
-# Enable CORS for web dashboards and external microservices
+def _cors_origins() -> list[str]:
+    configured = os.getenv("VIGIL_CORS_ORIGINS", "")
+    if configured.strip():
+        return [origin.strip() for origin in configured.split(",") if origin.strip()]
+    return ["http://127.0.0.1:8000", "http://localhost:8000"]
+
+
+@app.middleware("http")
+async def protect_network_demo(request: Request, call_next):
+    """Require the opt-in demo token for API calls when one is configured."""
+    token = os.getenv("VIGIL_DEMO_TOKEN")
+    if token and request.url.path.startswith(("/api/", "/demo/")):
+        supplied = request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+        if not supplied or not secrets.compare_digest(supplied, token):
+            return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
+    return await call_next(request)
+
+
+# Dashboard origins are explicit. Credentials are not needed by this prototype.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,6 +152,11 @@ def readiness_check():
 @app.websocket("/ws/demo")
 async def websocket_events_endpoint(websocket: WebSocket):
     """WebSocket stream for real-time proctoring event notifications & live demo telemetry."""
+    token = os.getenv("VIGIL_DEMO_TOKEN")
+    supplied = websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
+    if token and (not supplied or not secrets.compare_digest(supplied, token)):
+        await websocket.close(code=1008, reason="Valid demo token required")
+        return
     await realtime_manager.connect(websocket)
     try:
         while True:

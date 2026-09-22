@@ -300,23 +300,30 @@ async def mjpeg_stream_endpoint():
 # -----------------------------------------------------------------------------
 
 def _find_evidence_file(filename: str, subfolder: str = "evidence") -> Optional[Path]:
-    """Locate evidence snapshot or video across candidate run and preset directories."""
+    """Locate one unambiguous, contained evidence file by safe basename."""
+    if filename != Path(filename).name or filename in {"", ".", ".."}:
+        return None
     candidate_roots = [
         Path("data/demo_runs"),
         Path("data/demo_final"),
-        Path("data"),
     ]
+    matches: list[Path] = []
     for root in candidate_roots:
         if root.exists():
+            resolved_root = root.resolve()
             for match in root.rglob(filename):
-                if match.is_file():
-                    return match
-    return None
+                resolved_match = match.resolve()
+                if resolved_match.is_file() and resolved_root in resolved_match.parents:
+                    matches.append(resolved_match)
+    unique = list(dict.fromkeys(matches))
+    return unique[0] if len(unique) == 1 else None
 
 
 @router.get("/evidence/snapshot/{filename}")
 def get_evidence_snapshot(filename: str):
     """Serve candidate peak frame snapshot image."""
+    if Path(filename).suffix.lower() not in {".jpg", ".jpeg", ".png", ".webp"}:
+        raise HTTPException(status_code=415, detail="Unsupported snapshot type")
     fpath = _find_evidence_file(filename)
     if not fpath or not fpath.exists():
         raise HTTPException(status_code=404, detail=f"Snapshot '{filename}' not found")
@@ -326,6 +333,8 @@ def get_evidence_snapshot(filename: str):
 @router.get("/evidence/video/{filename}")
 def get_evidence_video(filename: str):
     """Serve 10-second candidate evidence MP4 video clip."""
+    if Path(filename).suffix.lower() != ".mp4":
+        raise HTTPException(status_code=415, detail="Unsupported evidence video type")
     fpath = _find_evidence_file(filename)
     if not fpath or not fpath.exists():
         raise HTTPException(status_code=404, detail=f"Evidence video '{filename}' not found")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -105,11 +106,19 @@ def get_camera_reference_frame(camera_id: str, repo: CameraRepository = Depends(
 @router.post("/cameras/reference-frame/upload")
 async def upload_reference_frame(file: UploadFile = File(...)):
     """Upload a custom reference image or video file for Seat ROI calibration."""
-    ext = Path(file.filename or "").suffix.lower()
-    save_name = f"ref_{int(time.time())}_{file.filename}"
+    ext = Path(Path(file.filename or "").name).suffix.lower()
+    allowed_extensions = {".jpg", ".jpeg", ".png", ".webp", ".mp4", ".avi", ".mkv", ".mov"}
+    if ext not in allowed_extensions:
+        raise HTTPException(status_code=415, detail="Unsupported reference media extension")
+    if file.content_type and not file.content_type.startswith(("image/", "video/", "application/octet-stream")):
+        raise HTTPException(status_code=415, detail="Unsupported reference media MIME type")
+    max_bytes = 100 * 1024 * 1024
+    contents = await file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
+        raise HTTPException(status_code=413, detail="Upload exceeds 100 MiB limit")
+    save_name = f"ref_{int(time.time())}_{secrets.token_hex(8)}{ext}"
     save_path = REF_FRAME_DIR / save_name
 
-    contents = await file.read()
     with open(save_path, "wb") as f:
         f.write(contents)
 
@@ -151,7 +160,10 @@ async def upload_reference_frame(file: UploadFile = File(...)):
 @router.get("/cameras/reference-frame/view/{filename}")
 def view_reference_frame_file(filename: str):
     """Serve uploaded reference frame image."""
-    fpath = REF_FRAME_DIR / filename
-    if not fpath.exists():
+    if filename != Path(filename).name:
+        raise HTTPException(status_code=400, detail="Invalid reference frame filename")
+    root = REF_FRAME_DIR.resolve()
+    fpath = (root / filename).resolve()
+    if root not in fpath.parents or not fpath.is_file():
         raise HTTPException(status_code=404, detail="Reference frame file not found")
-    return FileResponse(str(fpath.resolve()), media_type="image/jpeg")
+    return FileResponse(str(fpath), media_type="image/jpeg")

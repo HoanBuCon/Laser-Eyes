@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import secrets
 import sys
 
 import uvicorn
@@ -93,10 +95,22 @@ def seed_initial_demo_data() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="VIGIL AI Enterprise Server Launcher")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Binding host IP")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Binding host IP (localhost by default)")
     parser.add_argument("--port", type=int, default=8000, help="Listening port")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument(
+        "--demo-token",
+        default=os.getenv("VIGIL_DEMO_TOKEN"),
+        help="Required lightweight API token when binding beyond localhost",
+    )
     args = parser.parse_args()
+
+    loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+    if args.host not in loopback_hosts and not args.demo_token:
+        parser.error("A --demo-token (or VIGIL_DEMO_TOKEN) is required for LAN/public binding")
+    os.environ["VIGIL_BIND_HOST"] = args.host
+    if args.demo_token:
+        os.environ["VIGIL_DEMO_TOKEN"] = args.demo_token
 
     # 1. Initialize DB Schema
     logger.info("Initializing schema tables...")
@@ -113,6 +127,8 @@ def main() -> None:
     print(f"  * Web Dashboard   : http://localhost:{args.port}/")
     print(f"  * REST API Docs   : http://localhost:{args.port}/docs")
     print(f"  * ReDoc Schema    : http://localhost:{args.port}/redoc")
+    if args.demo_token:
+        print("  * Network access  : protected by X-Vigil-Demo-Token")
     print("=" * 70 + "\n")
 
     # 4. Start Uvicorn Server

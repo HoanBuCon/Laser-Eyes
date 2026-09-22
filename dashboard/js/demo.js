@@ -321,7 +321,7 @@ function renderReviewQueue() {
         grid.innerHTML = `
             <div class="col-span-full py-10 flex flex-col items-center justify-center text-gray-500 font-mono text-xs gap-2">
                 <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <span>No incidents matching filter [${activeFilter}].</span>
+                <span>No incidents matching filter [${escapeHtml(activeFilter)}].</span>
             </div>
         `;
         return;
@@ -331,8 +331,10 @@ function renderReviewQueue() {
         .map((ev) => {
             const risk = Math.round(ev.peak_risk_score || ev.risk_score || 75);
             const occ = ev.occurrence_count || 1;
-            const pattern = formatBehaviorLabel(ev.primary_pattern || ev.behavior);
-            const seat = ev.seat_id || 'SEAT-??';
+            const pattern = escapeHtml(formatBehaviorLabel(ev.primary_pattern || ev.behavior));
+            const seat = escapeHtml(ev.seat_id || 'SEAT-??');
+            const eventId = escapeHtml(String(ev.event_id || ''));
+            const severity = escapeHtml(ev.severity || 'MEDIUM');
             const firstSeen = (ev.first_seen_ms ? ev.first_seen_ms / 1000 : 0).toFixed(1);
             const lastSeen = (ev.last_seen_ms ? ev.last_seen_ms / 1000 : firstSeen).toFixed(1);
 
@@ -351,11 +353,11 @@ function renderReviewQueue() {
                     : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
 
             return `
-                <div class="incident-card bg-gray-950/80 border border-gray-800/90 rounded-xl p-4 flex flex-col justify-between space-y-3 cursor-pointer" onclick="openReviewModal('${ev.event_id}')">
+                <div class="incident-card bg-gray-950/80 border border-gray-800/90 rounded-xl p-4 flex flex-col justify-between space-y-3 cursor-pointer" data-event-id="${eventId}">
                     <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <span class="px-2 py-1 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono">[${seat}]</span>
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${sevBadge} border">${ev.severity || 'MEDIUM'}</span>
+                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${sevBadge} border">${severity}</span>
                         </div>
                         ${statusBadge}
                     </div>
@@ -379,6 +381,18 @@ function renderReviewQueue() {
             `;
         })
         .join('');
+    grid.querySelectorAll('.incident-card[data-event-id]').forEach((card) => {
+        card.addEventListener('click', () => openReviewModal(card.dataset.eventId));
+    });
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
 }
 
 function formatBehaviorLabel(raw) {

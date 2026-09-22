@@ -15,7 +15,7 @@ import uuid
 from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -127,6 +127,7 @@ class TemporalEpisodeEngine:
         self._smoothing_buffers: Dict[Tuple[str, str], deque[float]] = {}
         self._last_sample_timestamps: Dict[Tuple[str, str], float] = {}
         self.completed_episodes: List[TemporalEpisode] = []
+        self._ever_occupied: Set[str] = set()
 
     def _get_tracker(self, seat_id: str, ep_type: str) -> _EpisodeTrackerState:
         key = (seat_id, ep_type)
@@ -155,6 +156,7 @@ class TemporalEpisodeEngine:
         for k in list(self._last_sample_timestamps.keys()):
             if k[0] == seat_id:
                 del self._last_sample_timestamps[k]
+        self._ever_occupied.discard(seat_id)
 
     def process_observations(
         self,
@@ -398,7 +400,10 @@ class TemporalEpisodeEngine:
         # 5. Evaluate Seat Empty
         occ_obs = obs_map.get(ObservationType.SEAT_OCCUPANCY.value)
         if occ_obs is not None and occ_obs.value in ("EMPTY", "OCCUPIED", "OCCLUDED", "MULTIPLE_PERSON"):
-            is_empty = (occ_obs.value == "EMPTY")
+            if occ_obs.value in ("OCCUPIED", "MULTIPLE_PERSON"):
+                self._ever_occupied.add(seat_id)
+            was_occupied = seat_id in self._ever_occupied
+            is_empty = (occ_obs.value == "EMPTY" and was_occupied)
             is_released = (occ_obs.value != "EMPTY")
             ep_empty = self._update_channel(
                 seat_id=seat_id,
@@ -410,6 +415,7 @@ class TemporalEpisodeEngine:
                 confidence=1.0,
                 timestamp_ms=timestamp_ms,
                 is_missing=False,
+                metadata={"prior_occupied": was_occupied},
             )
             if ep_empty:
                 active_episodes.append(ep_empty)

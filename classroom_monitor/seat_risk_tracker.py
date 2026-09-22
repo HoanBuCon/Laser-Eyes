@@ -95,6 +95,7 @@ class SeatRiskProfile:
     total_incidents_count: int = 0
     last_event_timestamp_ms: float = 0.0
     is_recidivist: bool = False
+    recidivism_bonus_event_count: int = 0
 
     active_incident: Optional[Dict[str, Any]] = None
     active_event: Optional[ClassroomEvent] = None
@@ -208,10 +209,20 @@ class SeatRiskTracker:
                 profile.recent_patterns.append(pat)
 
                 if pat.pattern_type in PATTERN_PRIORITY_WEIGHTS:
-                    profile.peak_pattern = pat
+                    current_peak_weight = (
+                        PATTERN_PRIORITY_WEIGHTS.get(profile.peak_pattern.pattern_type, -1.0)
+                        * profile.peak_pattern.quality
+                        * profile.peak_pattern.confidence
+                        if profile.peak_pattern is not None else -1.0
+                    )
+                    if increment > current_peak_weight:
+                        profile.peak_pattern = pat
 
                 # Update ongoing active incident if present
-                if profile.active_incident is not None:
+                if (
+                    profile.active_incident is not None
+                    and profile.active_incident.get("behavior") == pat.pattern_type
+                ):
                     profile.active_incident["occurrence_count"] = profile.active_incident.get("occurrence_count", 1) + 1
                     profile.active_incident["last_seen_timestamp_ms"] = timestamp_ms
                     profile.active_incident["peak_risk_score"] = max(profile.active_incident.get("peak_risk_score", profile.risk_score), profile.risk_score)
@@ -255,8 +266,13 @@ class SeatRiskTracker:
             and (timestamp_ms - profile.last_event_timestamp_ms) < self.recidivism_window_ms
         )
         profile.is_recidivist = is_recidivist
-        if is_recidivist and profile.risk_score >= self.suspicious_threshold:
+        if (
+            is_recidivist
+            and profile.risk_score >= self.suspicious_threshold
+            and profile.recidivism_bonus_event_count != profile.total_event_count
+        ):
             profile.risk_score = min(100.0, profile.risk_score + 10.0)
+            profile.recidivism_bonus_event_count = profile.total_event_count
 
         # 8. State Machine Evaluation
         previous_state = profile.current_state
@@ -402,4 +418,3 @@ class SeatRiskTracker:
             profile.state_enter_timestamp_ms = timestamp_ms
 
         return event_to_emit
-

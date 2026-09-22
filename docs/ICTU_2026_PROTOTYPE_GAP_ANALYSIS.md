@@ -1,4 +1,6 @@
 # BÁO CÁO PHÂN TÍCH KHOẢNG TRỐNG NÂNG CẤP PROTOTYPE VIGIL AI (ICTU 2026)
+
+> **HISTORICAL / SUPERSEDED.** FPS and completion claims below do not describe the remediated implementation. Use `docs/PROTOTYPE_CURRENT_STATUS.md`.
 **Tài liệu:** `docs/ICTU_2026_PROTOTYPE_GAP_ANALYSIS.md`  
 **Phiên bản:** 1.0 — Final Prototype Completion  
 **Nhánh Git:** `feat/ictu-2026-prototype-final`  

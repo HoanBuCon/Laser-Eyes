@@ -1,4 +1,6 @@
 # KẾ HOẠCH TRIỂN KHAI MODULE PHÁT HIỆN GIAN LẬN QUA CAMERA LỚP HỌC
+
+> **HISTORICAL / SUPERSEDED PLAN.** “Production-ready” statements are not current validation. See `docs/PROTOTYPE_CURRENT_STATUS.md`.
 ## CLASSROOM CHEATING DETECTION — YOLO-BASED PIPELINE
 
 **Dự án:** VIGIL AI — Hệ thống giám sát thi tự động  

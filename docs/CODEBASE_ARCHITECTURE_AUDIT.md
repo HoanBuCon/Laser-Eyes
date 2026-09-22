@@ -1,5 +1,7 @@
 # VIGIL AI — Full Codebase Architecture, Correctness & Technical Debt Audit
 
+> **SUPERSEDED AUDIT BASELINE (85d86c6).** Findings are retained for provenance. Current implementation facts and validation results are in `docs/PROTOTYPE_CURRENT_STATUS.md`.
+
 **Audit date:** 2026-09-23  
 **Target branch:** `feat/ictu-2026-prototype-final`  
 **Audited commit:** `85d86c6cb7b280a32d3123dc77e7b2abec72c380`  
@@ -594,4 +596,3 @@ Replace README, mark historical reports, publish one HEAD-bound run manifest and
 - `docs/TECHNICAL_DEBT_REGISTER.md`
 - `docs/LEGACY_AND_DEAD_CODE_MAP.md`
 - `docs/VIGIL_LOCAL_VS_CLASSROOM.md`
-

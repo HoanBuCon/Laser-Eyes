@@ -1,5 +1,7 @@
 # VIGIL Local vs VIGIL Classroom SRS v2
 
+> **CURRENT PRODUCT BOUNDARY; implementation details audited at baseline 85d86c6.** The two perception engines remain separate. Remediation status is tracked in `docs/PROTOTYPE_CURRENT_STATUS.md`.
+
 **Decision:** retain two applications with separate perception adapters and UIs; converge only on shared domain, evidence, session, review and operational contracts.
 
 ## 1. Functional comparison
@@ -204,4 +206,3 @@ Do not undertake a repository-wide common-layer migration before the competition
 4. After the competition, extract shared contracts and the single Classroom pipeline core behind tests.
 
 The goal for the deadline is a defensible, reproducible prototype with visible capability limits—not a large unified platform.
-

@@ -93,3 +93,41 @@ Effort: **XS** < half day, **S** about half–one day, **M** 1–3 days, **L** >
 | 4 — security/cleanup | upload/evidence routes, DB config/migrations, deployment profile, legacy route | Safe isolated demo and clear active surface | Breaking convenience URLs/data | Traversal/size/auth tests, migration rehearsal, legacy 410 tests |
 | 5 — docs/data | README, runbook, report headers, benchmark manifest | Defensible claims and reproducible demo | Reintroducing stale numbers | Fresh run at audited remediation commit; human review of wording |
 
+## Remediation history — 2026-09-23
+
+The issue descriptions above are retained as audit history. Status below is authoritative for source commit `96f04da`; a documentation-only successor may be the branch HEAD. Real-model runs were captured at its functional predecessor `41604e7`.
+
+| ID | Status | Fix commit(s) | Validation | Remaining limitation |
+|---|---|---|---|---|
+| TD-P0-001 | RESOLVED | `6595493`, `41604e7` | LIVE and REPLAY incident integration tests; real Web LIVE/REPLAY crossed incidents and loaded evidence | Browser acceptance still required |
+| TD-P0-002 | RESOLVED | `b237589` | Missing-model fail-closed test; explicit mock test; real YOLO/SixDRepNet full runs | HPE DEGRADED remains allowed but visible |
+| TD-P0-003 | RESOLVED | `2d01489` | Captured-loop realtime test, idempotent callback tests, polling test; real HTTP queue update | Manual browser reconnect acceptance remains |
+| TD-P1-001 | RESOLVED | `510e377` | Same component set does not re-emit after cooldown | History pruning remains TD-P2-008 |
+| TD-P1-002 | RESOLVED | `510e377` | Empty-from-start and OCCUPIED→EMPTY regression tests | Detection misses can still hide prior occupancy |
+| TD-P1-003 | RESOLVED | `510e377` | Update-rate-independent recidivism test | Weight/threshold quality is not validated here |
+| TD-P1-004 | RESOLVED FOR PROTOTYPE | `6595493` | start/stop/start, double-start refusal, pause/resume and isolation tests | Long soak remains post-competition |
+| TD-P1-005 | RESOLVED | `6595493` | timeout-based buffer reset/finalization test | none known |
+| TD-P1-006 | RESOLVED FOR CLASSROOM | `6595493` | contract adapter and runtime/API persistence tests | Local intentionally not migrated |
+| TD-P1-007 | RESOLVED | `6595493` | durable review, 409 missing target, EventReview and AuditLog tests | production authorization deferred |
+| TD-P1-008 | RESOLVED | `6595493` | verified/mismatch/not-available states and real digest comparison | SHA-256 is not chain of custody |
+| TD-P1-009 | RESOLVED FOR FRESH DB | `6595493` | SQLite FK/camera identity test | existing installations need formal migrations |
+| TD-P1-010 | PARTIALLY RESOLVED | `6595493` | fresh-schema uniqueness and event-scoped evidence tests | atomic upsert/migration race hardening deferred |
+| TD-P1-011 | PARTIALLY RESOLVED | `6595493` | WAL, busy timeout and surfaced persistence health | Alembic/versioned migrations deferred |
+| TD-P1-012 | RESOLVED FOR COMPETITION | `5b17fa7` | legacy route returns explicit HTTP 410 | legacy code retained post-competition |
+| TD-P1-013 | RESOLVED FOR DEMO | `5b17fa7`, `41604e7` | upload validation, containment, ambiguous basename and event identity tests | streaming multipart inspection can be stronger |
+| TD-P1-014 | RESOLVED FOR DEMO | `5b17fa7`, `96f04da` | localhost launcher, explicit CORS, LAN token gate and dashboard propagation tests | not production RBAC |
+| TD-P1-015 | PARTIALLY RESOLVED | `5b17fa7` | Review Queue escaping/no inline handler test | audit remaining non-demo dashboards post-competition |
+| TD-P1-016 | RESOLVED | `ab6e7cc` | cooperative non-daemon shutdown test | real Tkinter/camera acceptance required |
+| TD-P1-017 | RESOLVED FOR PROTOTYPE | `ab6e7cc` | neutral accepted/off-center rejected calibration tests | no posture-drift adaptation by design |
+| TD-P1-018 | RESOLVED | `ab6e7cc` | open/closed-book material policy test | UI currently exposes the book policy only |
+| TD-P1-019 | RESOLVED | `6595493` | READY and FAILED paths; 31 real run clips were non-empty | disk-full soak not executed |
+| TD-P1-020 | RESOLVED IN CURRENT UI/DOCS | `6595493`, documentation commit | hash wording and integrity endpoint tests | signed custody controls deferred |
+| TD-P1-021 | RESOLVED | `2d01489` | favicon regression test returns 204 | none known |
+| TD-P1-022 | RESOLVED | `41604e7` | duplicate-basename event-scoped media test; real replay HTTP 200 | legacy basename endpoints remain compatibility-only and fail ambiguous |
+| TD-P2-001 | RESOLVED FOR FRAME SEMANTICS | `3c03f3e` | CLI/Web adapter identity and shared-pipeline tests; both real modes run | lifecycle/render/export remain adapter-specific intentionally |
+| TD-P2-002 | RESOLVED FOR PROTOTYPE | `3c03f3e` | precedence tests and effective config/run manifest | numeric tuning not performed |
+| TD-P2-003..018 | DEFERRED — POST COMPETITION | — | See original rows | Requires data, architecture or owner decisions beyond safe one-week scope |
+| TD-P2-019 | RESOLVED FOR REQUIRED BOUNDARIES | all remediation commits | 259 automated tests plus real full CLI/Web validation | tests do not prove accuracy |
+| TD-P2-020..025 | PARTIAL / DEFERRED | multiple | current health/status/profile artifacts | See `PROTOTYPE_CURRENT_STATUS.md` |
+| TD-P3-001, TD-P3-008 | RESOLVED | documentation commit | README/current status use measured HEAD-bound facts | historical files retained and labelled |
+| TD-P3-002..007 | DEFERRED — POST COMPETITION | — | human decision required | cleanup must not destabilize acceptance build |

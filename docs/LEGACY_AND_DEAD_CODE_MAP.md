@@ -1,5 +1,7 @@
 # VIGIL AI — Legacy, Compatibility and Dead-Code Map
 
+> **AUDIT BASELINE / HISTORICAL MAP (85d86c6).** No legacy code was deleted during remediation. See `docs/PROTOTYPE_CURRENT_STATUS.md` for the active competition surface.
+
 **Audited commit:** `85d86c6cb7b280a32d3123dc77e7b2abec72c380`  
 **Policy:** nothing was deleted. “Dead candidate” means no active product entrypoint was found; it does not prove that an external user or unpublished script does not depend on it.
 
@@ -141,4 +143,3 @@ Before deleting legacy classroom code, a human owner should answer:
 5. Which generated evidence/DB files are mandatory judging fixtures versus accidental repository history?
 
 Recommended one-week decision: hide/disable the broken legacy inference endpoint in the demo profile, keep files in place, and focus remediation on the current SRS v2 web/CLI paths. Deletion can wait until after the competition.
-

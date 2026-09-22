@@ -1,4 +1,6 @@
 # BÁO CÁO KHẢO SÁT TOÀN DIỆN CODEBASE DỰ ÁN VIGIL AI
+
+> **HISTORICAL / SUPERSEDED.** This report is not evidence of current readiness. See `docs/PROTOTYPE_CURRENT_STATUS.md`.
 ## HỆ THỐNG GIÁM SÁT THI TRỰC TUYẾN TỰ ĐỘNG (AI EXAM MONITORING)
 
 **Tên dự án:** VIGIL AI — Local Exam Monitoring MVP  

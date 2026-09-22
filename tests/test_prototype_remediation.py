@@ -588,8 +588,6 @@ def test_evidence_lookup_rejects_traversal_and_ambiguous_basename(tmp_path: Path
 
 
 def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, monkeypatch):
-    import classroom_monitor.demo.runtime as runtime_module
-
     monkeypatch.chdir(tmp_path)
     target = tmp_path / "data" / "demo_final" / "student" / "evidence" / "same.mp4"
     duplicate = tmp_path / "data" / "demo_runs" / "old" / "evidence" / "same.mp4"
@@ -640,3 +638,17 @@ def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
     source = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
     assert "onclick=\"openReviewModal" not in source
     assert "function escapeHtml" in source
+    assert "function apiFetch" in source
+    assert "X-Vigil-Demo-Token" in source
+
+
+def test_configured_demo_token_protects_api(monkeypatch):
+    monkeypatch.setenv("VIGIL_DEMO_TOKEN", "competition-secret")
+    with TestClient(app) as client:
+        denied = client.get("/api/v1/demo/status")
+        allowed = client.get(
+            "/api/v1/demo/status",
+            headers={"X-Vigil-Demo-Token": "competition-secret"},
+        )
+    assert denied.status_code == 401
+    assert allowed.status_code == 200

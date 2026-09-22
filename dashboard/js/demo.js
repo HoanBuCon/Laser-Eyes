@@ -11,6 +11,20 @@ let selectedDecision = 'CONFIRMED';
 let ws = null;
 let pollTimer = null;
 let allIncidents = new Map(); // event_id -> event object
+const demoToken = new URLSearchParams(window.location.search).get('token') || '';
+
+function apiFetch(url, options = {}) {
+    const headers = new Headers(options.headers || {});
+    if (demoToken) headers.set('X-Vigil-Demo-Token', demoToken);
+    return fetch(url, { ...options, headers });
+}
+
+function authenticatedUrl(url) {
+    if (!demoToken || !url) return url;
+    const parsed = new URL(url, window.location.origin);
+    parsed.searchParams.set('token', demoToken);
+    return `${parsed.pathname}${parsed.search}`;
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     initWebSocket();
@@ -31,7 +45,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/demo`;
+    const wsToken = demoToken ? `?token=${encodeURIComponent(demoToken)}` : '';
+    const wsUrl = `${protocol}//${window.location.host}/ws/demo${wsToken}`;
 
     try {
         ws = new WebSocket(wsUrl);
@@ -143,7 +158,7 @@ async function startDemo() {
     }
     try {
         const debug = document.getElementById('chkDebugOverlay').checked;
-        const res = await fetch('/api/v1/demo/start', {
+        const res = await apiFetch('/api/v1/demo/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -169,25 +184,25 @@ async function startDemo() {
 }
 
 async function pauseDemo() {
-    const res = await fetch('/api/v1/demo/pause', { method: 'POST' });
+    const res = await apiFetch('/api/v1/demo/pause', { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function resumeDemo() {
-    const res = await fetch('/api/v1/demo/resume', { method: 'POST' });
+    const res = await apiFetch('/api/v1/demo/resume', { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function stopDemo() {
-    const res = await fetch('/api/v1/demo/stop', { method: 'POST' });
+    const res = await apiFetch('/api/v1/demo/stop', { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function resetDemo() {
-    const res = await fetch('/api/v1/demo/reset', { method: 'POST' });
+    const res = await apiFetch('/api/v1/demo/reset', { method: 'POST' });
     const data = await res.json();
     allIncidents.clear();
     renderStatus(data);
@@ -199,7 +214,7 @@ function refreshStream() {
     const img = document.getElementById('videoStreamImg');
     const placeholder = document.getElementById('videoPlaceholder');
     if (img) {
-        img.src = '/api/v1/demo/stream?t=' + Date.now();
+        img.src = authenticatedUrl('/api/v1/demo/stream?t=' + Date.now());
         if (placeholder) placeholder.style.display = 'none';
     }
 }
@@ -215,7 +230,7 @@ function handleStreamError(img) {
 
 async function fetchPresets() {
     try {
-        const res = await fetch('/api/v1/demo/presets');
+        const res = await apiFetch('/api/v1/demo/presets');
         const presets = await res.json();
         // Presets populated
     } catch (e) {}
@@ -223,7 +238,7 @@ async function fetchPresets() {
 
 async function fetchStatus() {
     try {
-        const res = await fetch('/api/v1/demo/status');
+        const res = await apiFetch('/api/v1/demo/status');
         const data = await res.json();
         renderStatus(data);
     } catch (e) {}
@@ -231,7 +246,7 @@ async function fetchStatus() {
 
 async function fetchEvents() {
     try {
-        const res = await fetch('/api/v1/demo/events');
+        const res = await apiFetch('/api/v1/demo/events');
         const events = await res.json();
         allIncidents.clear();
         events.forEach((ev) => allIncidents.set(ev.event_id, ev));
@@ -434,7 +449,7 @@ async function openReviewModal(eventId) {
     };
     hashEl.textContent = hashLabels[ev.hash_status] || (ev.video_sha256 ? 'HASH AVAILABLE / NOT CHECKED' : 'HASH NOT AVAILABLE');
     try {
-        const integrityRes = await fetch(`/api/v1/demo/events/${encodeURIComponent(eventId)}/integrity`);
+        const integrityRes = await apiFetch(`/api/v1/demo/events/${encodeURIComponent(eventId)}/integrity`);
         if (integrityRes.ok) {
             const integrity = await integrityRes.json();
             ev.hash_status = integrity.hash_status;
@@ -458,7 +473,7 @@ async function openReviewModal(eventId) {
     const snapshotImg = document.getElementById('modalSnapshotImg');
 
     if (ev.video_url) {
-        videoPlayer.src = ev.video_url;
+        videoPlayer.src = authenticatedUrl(ev.video_url);
         videoPlayer.load();
         videoPlayer.play().catch(() => {});
     } else {
@@ -466,7 +481,7 @@ async function openReviewModal(eventId) {
     }
 
     if (ev.snapshot_url) {
-        snapshotImg.src = ev.snapshot_url;
+        snapshotImg.src = authenticatedUrl(ev.snapshot_url);
     } else {
         snapshotImg.src = '';
     }
@@ -521,7 +536,7 @@ async function submitHumanReview() {
     const reason = document.getElementById('modalReasonSelect').value;
     const notes = document.getElementById('modalNotesText').value;
 
-    const res = await fetch(`/api/v1/demo/events/${activeEventId}/review`, {
+    const res = await apiFetch(`/api/v1/demo/events/${encodeURIComponent(activeEventId)}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -193,15 +193,22 @@ class SeatRepository:
         polygon_json: str | List[List[float]],
         camera_id: Optional[str] = None,
         seat_label: Optional[str] = None,
+        context_json: Optional[str | Dict[str, Any]] = None,
         enabled: bool = True,
     ) -> SeatROI:
         poly_str = polygon_json if isinstance(polygon_json, str) else json.dumps(polygon_json)
+        ctx_str = (
+            context_json
+            if isinstance(context_json, str)
+            else (json.dumps(context_json) if context_json is not None else None)
+        )
         seat = SeatROI(
             room_id=room_id,
             camera_id=camera_id,
             seat_code=seat_code,
             seat_label=seat_label or seat_code,
             polygon_json=poly_str,
+            context_json=ctx_str,
             enabled=enabled,
         )
         self.db.add(seat)
@@ -249,9 +256,17 @@ class SeatRepository:
             seat_code = s["seat_code"]
             existing = self.get_by_code(room_id, seat_code)
             poly_str = s["polygon_json"] if isinstance(s["polygon_json"], str) else json.dumps(s["polygon_json"])
+            ctx_data = s.get("context_json")
+            ctx_str = (
+                ctx_data
+                if isinstance(ctx_data, str)
+                else (json.dumps(ctx_data) if ctx_data is not None else None)
+            )
             if existing:
                 existing.camera_id = camera_id
                 existing.polygon_json = poly_str
+                if ctx_str is not None:
+                    existing.context_json = ctx_str
                 existing.seat_label = s.get("seat_label", existing.seat_label)
                 existing.enabled = s.get("enabled", True)
                 existing.updated_at = datetime.datetime.utcnow()
@@ -263,6 +278,7 @@ class SeatRepository:
                     seat_code=seat_code,
                     seat_label=s.get("seat_label", seat_code),
                     polygon_json=poly_str,
+                    context_json=ctx_str,
                     enabled=s.get("enabled", True),
                 )
                 self.db.add(new_seat)
@@ -276,6 +292,7 @@ class SeatRepository:
         seat_code: Optional[str] = None,
         seat_label: Optional[str] = None,
         polygon_json: Optional[str | List[List[float]]] = None,
+        context_json: Optional[str | Dict[str, Any]] = None,
         enabled: Optional[bool] = None,
     ) -> Optional[SeatROI]:
         seat = self.get_by_id(seat_id)
@@ -287,6 +304,12 @@ class SeatRepository:
             seat.seat_label = seat_label
         if polygon_json is not None:
             seat.polygon_json = polygon_json if isinstance(polygon_json, str) else json.dumps(polygon_json)
+        if context_json is not None:
+            seat.context_json = (
+                context_json
+                if isinstance(context_json, str)
+                else json.dumps(context_json)
+            )
         if enabled is not None:
             seat.enabled = enabled
         seat.updated_at = datetime.datetime.utcnow()

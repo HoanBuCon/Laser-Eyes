@@ -14,10 +14,16 @@ import json
 import logging
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
 import numpy as np
+
+try:
+    import yaml
+except ImportError:
+    yaml = None
 
 logger = logging.getLogger("SceneContext")
 
@@ -245,38 +251,61 @@ class SeatContext:
             and self.desk_geometry.writing_zone_polygon is None
         ):
             self.capabilities.desk_hand_interaction = CapabilityStatus.DISABLED
-        else:
+        elif self.desk_geometry.writing_zone_polygon is not None and len(self.desk_geometry.writing_zone_polygon) >= 3:
             self.capabilities.desk_hand_interaction = CapabilityStatus.ENABLED
+        elif self.desk_geometry.desk_boundary_y is not None:
+            self.capabilities.desk_hand_interaction = CapabilityStatus.DEGRADED
+        else:
+            self.capabilities.desk_hand_interaction = CapabilityStatus.DISABLED
 
         if not (self.neighbors.left_neighbor_id or self.neighbors.right_neighbor_id or self.neighbors.front_neighbor_id):
             self.capabilities.pairwise_relation = CapabilityStatus.DEGRADED
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SeatContext:
+        # 1. Desk Geometry: Nested dictionary takes precedence, fallback to flat keys
         desk_geo_data = data.get("desk_geometry")
-        desk_geo = DeskGeometry.from_dict(desk_geo_data) if desk_geo_data else None
-
-        # Also support legacy flat desk_y / desk_polygon
-        if desk_geo is None:
-            desk_y_flat = data.get("desk_y")
-            desk_poly_flat = data.get("desk_polygon")
-            if desk_y_flat is not None or desk_poly_flat is not None:
+        if desk_geo_data is not None and isinstance(desk_geo_data, dict):
+            desk_geo = DeskGeometry.from_dict(desk_geo_data)
+        else:
+            desk_boundary_y = data.get("desk_boundary_y")
+            if desk_boundary_y is None:
+                desk_boundary_y = data.get("desk_y")
+            writing_poly = data.get("writing_zone_polygon") or data.get("writing_zone") or data.get("desk_polygon")
+            under_poly = data.get("under_desk_polygon") or data.get("under_desk_zone")
+            if desk_boundary_y is not None or writing_poly is not None or under_poly is not None:
                 desk_geo = DeskGeometry.from_dict({
-                    "desk_boundary_y": desk_y_flat,
-                    "writing_zone_polygon": desk_poly_flat,
+                    "desk_boundary_y": desk_boundary_y,
+                    "writing_zone_polygon": writing_poly,
+                    "under_desk_polygon": under_poly,
                 })
+            else:
+                desk_geo = None
 
+        # 2. Reference Directions: Nested dictionary takes precedence, fallback to flat keys
+        ref_dirs_data = data.get("reference_directions")
+        if ref_dirs_data is not None and isinstance(ref_dirs_data, dict):
+            ref_dirs = SeatReferenceDirections.from_dict(ref_dirs_data)
+        else:
+            ref_dirs = SeatReferenceDirections.from_dict({
+                "baseline_yaw": data.get("baseline_yaw", 0.0),
+                "baseline_pitch": data.get("baseline_pitch", 0.0),
+                "left_direction_yaw": data.get("left_direction_yaw", -45.0),
+                "right_direction_yaw": data.get("right_direction_yaw", 45.0),
+                "front_direction_yaw": data.get("front_direction_yaw", 0.0),
+            })
+
+        # 3. Neighbors & Capabilities
         neighbors_data = data.get("neighbors") or {}
-        ref_dirs_data = data.get("reference_directions") or {}
         caps_data = data.get("capabilities") or {}
 
         return cls(
             seat_id=str(data.get("seat_id") or data.get("id") or data.get("seat_code", "")),
             room_id=str(data.get("room_id", "")),
             camera_id=data.get("camera_id"),
-            seat_code=str(data.get("seat_code", "")),
+            seat_code=str(data.get("seat_code") or data.get("seat_id", "")),
             neighbors=SeatNeighbors.from_dict(neighbors_data),
-            reference_directions=SeatReferenceDirections.from_dict(ref_dirs_data),
+            reference_directions=ref_dirs,
             desk_geometry=desk_geo,
             capabilities=SeatCapabilities.from_dict(caps_data),
             calibration_version=str(data.get("calibration_version", "v2.0")),
@@ -377,3 +406,92 @@ class SeatGraph:
             "room_id": self.room_id,
             "seats": {sid: ctx.to_dict() for sid, ctx in self.seats_context.items()},
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SeatGraph:
+        room_id = str(data.get("room_id") or data.get("room_code", ""))
+        graph = cls(room_id=room_id)
+        seats_data = data.get("seats", [])
+        if isinstance(seats_data, dict):
+            for sid, s_dict in seats_data.items():
+                if isinstance(s_dict, dict):
+                    ctx = SeatContext.from_dict(s_dict)
+                    graph.add_seat_context(ctx)
+        elif isinstance(seats_data, list):
+            for s_item in seats_data:
+                if isinstance(s_item, dict):
+                    ctx = SeatContext.from_dict(s_item)
+                    graph.add_seat_context(ctx)
+        return graph
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> SeatGraph:
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Scene configuration file not found: {p}")
+        text = p.read_text(encoding="utf-8")
+        if p.suffix.lower() in [".yaml", ".yml"]:
+            if yaml is None:
+                raise ImportError("PyYAML is required to parse YAML scene configs")
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+        return cls.from_dict(data)
+
+
+@dataclass
+class SceneProfile:
+    """Complete Scene Profile containing room metadata, resolution, and SeatGraph."""
+
+    scene_id: str
+    room_code: str
+    room_name: str
+    camera_id: str
+    video_file: str
+    video_resolution: Dict[str, Any]
+    seat_graph: SeatGraph
+    calibration_version: str = "v2.0"
+    raw_config: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> SceneProfile:
+        seat_graph = SeatGraph.from_dict(data)
+        seats_list = data.get("seats", [])
+        if isinstance(seats_list, list) and len(seats_list) > 0:
+            has_neighbors = any(
+                isinstance(s, dict) and s.get("neighbors") and any(s["neighbors"].values())
+                for s in seats_list
+            )
+            if not has_neighbors:
+                seat_graph.auto_infer_neighbors_from_polygons(seats_list)
+
+        return cls(
+            scene_id=str(data.get("scene_id", "scene")),
+            room_code=str(data.get("room_code", "")),
+            room_name=str(data.get("room_name", "")),
+            camera_id=str(data.get("camera_id", "")),
+            video_file=str(data.get("video_file", "")),
+            video_resolution=data.get("video_resolution", {"width": 1280, "height": 720, "fps": 30.0}),
+            seat_graph=seat_graph,
+            calibration_version=str(data.get("calibration_version", "v2.0")),
+            raw_config=data,
+        )
+
+    @classmethod
+    def from_file(cls, path: Union[str, Path]) -> SceneProfile:
+        p = Path(path)
+        if not p.exists():
+            raise FileNotFoundError(f"Scene config file not found: {p}")
+        text = p.read_text(encoding="utf-8")
+        if p.suffix.lower() in [".yaml", ".yml"]:
+            if yaml is None:
+                raise ImportError("PyYAML is required to parse YAML scene configs")
+            data = yaml.safe_load(text) or {}
+        else:
+            data = json.loads(text)
+
+        profile = cls.from_dict(data)
+        if not data.get("scene_id"):
+            profile.scene_id = p.stem
+        return profile
+

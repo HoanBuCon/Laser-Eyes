@@ -1,0 +1,103 @@
+{
+  "scene_id": "student_classroom",
+  "room_code": "ROOM-STUDENT-01",
+  "calibration_status": "AUTO_INFERRED_REQUIRING_HUMAN_VERIFICATION",
+  "seats": {
+    "SEAT-STUDENT-01": {
+      "seat_code": "SEAT-STUDENT-01",
+      "left_neighbor": "SEAT-STUDENT-06",
+      "right_neighbor": "SEAT-STUDENT-05",
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-02": {
+      "seat_code": "SEAT-STUDENT-02",
+      "left_neighbor": null,
+      "right_neighbor": "SEAT-STUDENT-10",
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-03": {
+      "seat_code": "SEAT-STUDENT-03",
+      "left_neighbor": "SEAT-STUDENT-12",
+      "right_neighbor": "SEAT-STUDENT-04",
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-04": {
+      "seat_code": "SEAT-STUDENT-04",
+      "left_neighbor": "SEAT-STUDENT-03",
+      "right_neighbor": null,
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-05": {
+      "seat_code": "SEAT-STUDENT-05",
+      "left_neighbor": "SEAT-STUDENT-01",
+      "right_neighbor": "SEAT-STUDENT-09",
+      "front_neighbor": "SEAT-STUDENT-01",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-06": {
+      "seat_code": "SEAT-STUDENT-06",
+      "left_neighbor": "SEAT-STUDENT-10",
+      "right_neighbor": "SEAT-STUDENT-11",
+      "front_neighbor": null,
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-07": {
+      "seat_code": "SEAT-STUDENT-07",
+      "left_neighbor": "SEAT-STUDENT-09",
+      "right_neighbor": "SEAT-STUDENT-12",
+      "front_neighbor": "SEAT-STUDENT-03",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-08": {
+      "seat_code": "SEAT-STUDENT-08",
+      "left_neighbor": "SEAT-STUDENT-11",
+      "right_neighbor": "SEAT-STUDENT-09",
+      "front_neighbor": "SEAT-STUDENT-05",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-09": {
+      "seat_code": "SEAT-STUDENT-09",
+      "left_neighbor": "SEAT-STUDENT-05",
+      "right_neighbor": "SEAT-STUDENT-07",
+      "front_neighbor": "SEAT-STUDENT-05",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-10": {
+      "seat_code": "SEAT-STUDENT-10",
+      "left_neighbor": "SEAT-STUDENT-02",
+      "right_neighbor": "SEAT-STUDENT-06",
+      "front_neighbor": "SEAT-STUDENT-06",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-11": {
+      "seat_code": "SEAT-STUDENT-11",
+      "left_neighbor": "SEAT-STUDENT-06",
+      "right_neighbor": "SEAT-STUDENT-05",
+      "front_neighbor": "SEAT-STUDENT-02",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    },
+    "SEAT-STUDENT-12": {
+      "seat_code": "SEAT-STUDENT-12",
+      "left_neighbor": "SEAT-STUDENT-07",
+      "right_neighbor": "SEAT-STUDENT-03",
+      "front_neighbor": "SEAT-STUDENT-04",
+      "back_neighbor": null,
+      "source": "AUTO_INFERRED"
+    }
+  }
+}

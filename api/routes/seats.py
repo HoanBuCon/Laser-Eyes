@@ -47,6 +47,7 @@ def create_seat_for_room(room_id: str, seat_data: SeatCreate, db: Session = Depe
         polygon_json=seat_data.polygon_json,
         camera_id=seat_data.camera_id,
         seat_label=seat_data.seat_label,
+        context_json=seat_data.context_json,
         enabled=seat_data.enabled,
     )
 
@@ -75,13 +76,14 @@ def get_seat(seat_id: str, db: Session = Depends(get_db)):
 
 @router.put("/seats/{seat_id}", response_model=SeatResponse)
 def update_seat(seat_id: str, payload: SeatUpdate, db: Session = Depends(get_db)):
-    """Update seat polygon coordinates, code, label, or enabled state."""
+    """Update seat polygon coordinates, code, label, context_json, or enabled state."""
     repo = SeatRepository(db)
     updated = repo.update(
         seat_id=seat_id,
         seat_code=payload.seat_code,
         seat_label=payload.seat_label,
         polygon_json=payload.polygon_json,
+        context_json=payload.context_json,
         enabled=payload.enabled,
     )
     if not updated:

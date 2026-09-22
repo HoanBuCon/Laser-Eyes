@@ -12,9 +12,10 @@ from __future__ import annotations
 
 import logging
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -94,6 +95,7 @@ class _EpisodeTrackerState:
     confidences: List[float] = field(default_factory=list)
     qualities: List[float] = field(default_factory=list)
     current_episode_id: Optional[str] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
 
 class TemporalEpisodeEngine:
@@ -118,16 +120,43 @@ class TemporalEpisodeEngine:
         self.lean_activation_deg = lean_activation_deg
         self.lean_release_deg = lean_release_deg
         self.pitch_down_activation_deg = pitch_down_activation_deg
+        self.median_filter_window = 3
 
         # (seat_id, episode_type) -> _EpisodeTrackerState
         self._trackers: Dict[Tuple[str, str], _EpisodeTrackerState] = {}
+        self._smoothing_buffers: Dict[Tuple[str, str], deque[float]] = {}
+        self._last_sample_timestamps: Dict[Tuple[str, str], float] = {}
         self.completed_episodes: List[TemporalEpisode] = []
+        self._ever_occupied: Set[str] = set()
 
     def _get_tracker(self, seat_id: str, ep_type: str) -> _EpisodeTrackerState:
         key = (seat_id, ep_type)
         if key not in self._trackers:
             self._trackers[key] = _EpisodeTrackerState(episode_type=ep_type, seat_id=seat_id)
         return self._trackers[key]
+
+    def _apply_median_smoothing(self, seat_id: str, channel: str, val: float, timestamp_ms: float) -> float:
+        """Apply rolling median filter (w=3), resetting if gap > 1500ms."""
+        key = (seat_id, channel)
+        last_ts = self._last_sample_timestamps.get(key, -100000.0)
+        if (timestamp_ms - last_ts) > 1500.0 or key not in self._smoothing_buffers:
+            self._smoothing_buffers[key] = deque(maxlen=self.median_filter_window)
+        self._smoothing_buffers[key].append(val)
+        self._last_sample_timestamps[key] = timestamp_ms
+        return float(np.median(list(self._smoothing_buffers[key])))
+
+    def reset_seat(self, seat_id: str) -> None:
+        """Reset state tracking and smoothing buffers for a specific seat actor."""
+        for k in list(self._trackers.keys()):
+            if k[0] == seat_id:
+                del self._trackers[k]
+        for k in list(self._smoothing_buffers.keys()):
+            if k[0] == seat_id:
+                del self._smoothing_buffers[k]
+        for k in list(self._last_sample_timestamps.keys()):
+            if k[0] == seat_id:
+                del self._last_sample_timestamps[k]
+        self._ever_occupied.discard(seat_id)
 
     def process_observations(
         self,
@@ -148,7 +177,8 @@ class TemporalEpisodeEngine:
         is_yaw_missing = (head_yaw_obs is None or head_yaw_obs.value is None)
 
         if not is_yaw_missing:
-            yaw = float(head_yaw_obs.value)
+            raw_yaw = float(head_yaw_obs.value)
+            yaw = self._apply_median_smoothing(seat_id, "yaw", raw_yaw, timestamp_ms)
             quality = head_yaw_obs.quality
             confidence = head_yaw_obs.confidence
 
@@ -219,7 +249,8 @@ class TemporalEpisodeEngine:
         is_pitch_missing = (pitch_obs is None or pitch_obs.value is None)
 
         if not is_pitch_missing:
-            pitch = float(pitch_obs.value)
+            raw_pitch = float(pitch_obs.value)
+            pitch = self._apply_median_smoothing(seat_id, "pitch", raw_pitch, timestamp_ms)
             is_down = pitch >= self.pitch_down_activation_deg
             is_released = pitch < (self.pitch_down_activation_deg - 8.0)
             ep_pitch = self._update_channel(
@@ -255,7 +286,8 @@ class TemporalEpisodeEngine:
         is_lean_missing = (lean_obs is None or lean_obs.value is None)
 
         if not is_lean_missing:
-            angle = float(lean_obs.value)
+            raw_angle = float(lean_obs.value)
+            angle = self._apply_median_smoothing(seat_id, "lean", raw_angle, timestamp_ms)
             # Left Lean
             is_lean_left = angle <= -self.lean_activation_deg
             is_rel_left = angle > -self.lean_release_deg
@@ -333,6 +365,9 @@ class TemporalEpisodeEngine:
                 rw_obs and rw_obs.value == WristZone.WRITING.value
             )
 
+            desk_cap = (lw_obs.metadata.get("desk_capability") if lw_obs and lw_obs.metadata else None) or (
+                rw_obs.metadata.get("desk_capability") if rw_obs and rw_obs.metadata else None
+            )
             ep_under = self._update_channel(
                 seat_id=seat_id,
                 ep_type=EpisodeType.WRIST_BELOW_DESK.value,
@@ -343,6 +378,7 @@ class TemporalEpisodeEngine:
                 confidence=1.0,
                 timestamp_ms=timestamp_ms,
                 is_missing=False,
+                metadata={"desk_capability": desk_cap} if desk_cap else None,
             )
             if ep_under:
                 active_episodes.append(ep_under)
@@ -364,7 +400,10 @@ class TemporalEpisodeEngine:
         # 5. Evaluate Seat Empty
         occ_obs = obs_map.get(ObservationType.SEAT_OCCUPANCY.value)
         if occ_obs is not None and occ_obs.value in ("EMPTY", "OCCUPIED", "OCCLUDED", "MULTIPLE_PERSON"):
-            is_empty = (occ_obs.value == "EMPTY")
+            if occ_obs.value in ("OCCUPIED", "MULTIPLE_PERSON"):
+                self._ever_occupied.add(seat_id)
+            was_occupied = seat_id in self._ever_occupied
+            is_empty = (occ_obs.value == "EMPTY" and was_occupied)
             is_released = (occ_obs.value != "EMPTY")
             ep_empty = self._update_channel(
                 seat_id=seat_id,
@@ -376,6 +415,7 @@ class TemporalEpisodeEngine:
                 confidence=1.0,
                 timestamp_ms=timestamp_ms,
                 is_missing=False,
+                metadata={"prior_occupied": was_occupied},
             )
             if ep_empty:
                 active_episodes.append(ep_empty)
@@ -441,9 +481,12 @@ class TemporalEpisodeEngine:
         confidence: float,
         timestamp_ms: float,
         is_missing: bool = False,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Optional[TemporalEpisode]:
         """Generic dual-threshold state machine for an episodic channel with missing grace mechanism."""
         tracker = self._get_tracker(seat_id, ep_type)
+        if metadata:
+            tracker.metadata.update(metadata)
 
         if is_missing:
             # Handle Missing / Unknown observation
@@ -477,6 +520,7 @@ class TemporalEpisodeEngine:
                         confidence=mean_conf,
                         quality=mean_qual,
                         peak_intensity=tracker.peak_intensity,
+                        metadata=dict(tracker.metadata),
                     )
                     self.completed_episodes.append(completed_ep)
                     tracker.missing_start_ms = None
@@ -499,6 +543,7 @@ class TemporalEpisodeEngine:
                     confidence=mean_conf,
                     quality=mean_qual,
                     peak_intensity=tracker.peak_intensity,
+                    metadata=dict(tracker.metadata),
                 )
 
             return None
@@ -560,6 +605,7 @@ class TemporalEpisodeEngine:
                         confidence=mean_conf,
                         quality=mean_qual,
                         peak_intensity=tracker.peak_intensity,
+                        metadata=dict(tracker.metadata),
                     )
                     self.completed_episodes.append(completed_ep)
                     return completed_ep
@@ -581,6 +627,7 @@ class TemporalEpisodeEngine:
                 confidence=mean_conf,
                 quality=mean_qual,
                 peak_intensity=tracker.peak_intensity,
+                metadata=dict(tracker.metadata),
             )
 
         return None
@@ -607,6 +654,7 @@ class TemporalEpisodeEngine:
                     confidence=mean_conf,
                     quality=mean_qual,
                     peak_intensity=tracker.peak_intensity,
+                    metadata=dict(tracker.metadata),
                 )
                 self.completed_episodes.append(completed_ep)
                 flushed.append(completed_ep)

@@ -1,0 +1,47 @@
+[
+  {
+    "event_id": "cd957c0f-b6e2-4e39-ba17-d2410636fb62",
+    "room_id": "ROOM-STUDENT-01",
+    "camera_id": "CAM-STUDENT-01",
+    "seat_code": "SEAT-STUDENT-05",
+    "actor_track_id": null,
+    "timestamp_ms": 9150.0,
+    "first_seen_ms": 9150.0,
+    "last_seen_ms": 9150.0,
+    "occurrence_count": 1,
+    "peak_risk_score": 99.1,
+    "component_episode_ids": [
+      "feb5c7af-7e46-4cc9-a4c7-74fd505503f3"
+    ],
+    "supporting_pattern_ids": [
+      "676e4830-bc94-4b82-9376-cba25151db64"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\student\\evidence\\cd957c0f-b6e2-4e39-ba17-d2410636fb62_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\student\\evidence\\cd957c0f-b6e2-4e39-ba17-d2410636fb62_snapshot.jpg",
+    "sha256_hash": "b1b32b01f881ee742adceab74a6af8a5070e5e1e64f5d1420503c9d1f3687183",
+    "metadata": {
+      "risk_score": 99.1,
+      "peak_risk_score": 99.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "feb5c7af-7e46-4cc9-a4c7-74fd505503f3"
+      ],
+      "supporting_pattern_ids": [
+        "676e4830-bc94-4b82-9376-cba25151db64"
+      ],
+      "incident_id": "cd957c0f-b6e2-4e39-ba17-d2410636fb62",
+      "first_seen_ms": 9150.0,
+      "last_seen_ms": 9150.0,
+      "occurrence_count": 1,
+      "sha256_hash": "b1b32b01f881ee742adceab74a6af8a5070e5e1e64f5d1420503c9d1f3687183"
+    }
+  }
+]

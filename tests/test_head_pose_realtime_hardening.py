@@ -256,23 +256,27 @@ def test_rt10_hysteresis_activation_and_release():
     assert len(eps) == 0
 
     # 2. Yaw = 35 deg (above 32) sustained -> Active
-    obs_35 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=35.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=200.0)]
-    engine.process_observations(obs_35, timestamp_ms=200.0)
-    obs_35_later = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=35.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=500.0)]
-    eps = engine.process_observations(obs_35_later, timestamp_ms=500.0)
+    obs_35_1 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=35.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=200.0)]
+    engine.process_observations(obs_35_1, timestamp_ms=200.0)
+    obs_35_2 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=35.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=350.0)]
+    engine.process_observations(obs_35_2, timestamp_ms=350.0)
+    obs_35_3 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=35.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=600.0)]
+    eps = engine.process_observations(obs_35_3, timestamp_ms=600.0)
     assert len(eps) == 1
     assert eps[0].episode_type == EpisodeType.HEAD_TURN_RIGHT.value
 
     # 3. Yaw drops to 22 deg (below 32, but above release threshold 16) -> REMAINS ACTIVE
-    obs_22 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=22.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=700.0)]
-    eps = engine.process_observations(obs_22, timestamp_ms=700.0)
+    obs_22 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=22.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=800.0)]
+    eps = engine.process_observations(obs_22, timestamp_ms=800.0)
     assert len(eps) == 1
 
     # 4. Yaw drops to 10 deg (below release threshold 16) sustained -> RELEASES
-    obs_10 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=10.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=900.0)]
-    engine.process_observations(obs_10, timestamp_ms=900.0)
-    obs_10_later = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=10.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=1200.0)]
-    eps_ended = engine.process_observations(obs_10_later, timestamp_ms=1200.0)
+    obs_10_1 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=10.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=1000.0)]
+    engine.process_observations(obs_10_1, timestamp_ms=1000.0)
+    obs_10_2 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=10.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=1150.0)]
+    engine.process_observations(obs_10_2, timestamp_ms=1150.0)
+    obs_10_3 = [RawObservation(observation_type="HEAD_YAW_RELATIVE", value=10.0, quality=0.9, seat_id="SEAT-01", timestamp_ms=1450.0)]
+    eps_ended = engine.process_observations(obs_10_3, timestamp_ms=1450.0)
     assert len(eps_ended) == 1
     assert eps_ended[0].state == EpisodeState.ENDED
 

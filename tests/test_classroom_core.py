@@ -503,6 +503,7 @@ def test_pose_classroom_detector_and_factory():
     assert isinstance(detector_2, PoseClassroomDetector)
 
     # Mock detection run
+    detector_2.allow_mock = True
     detector_2._is_mock = True
     dummy_frame = np.zeros((720, 1280, 3), dtype=np.uint8)
     dets_f0 = detector_2.detect(dummy_frame, frame_index=0)

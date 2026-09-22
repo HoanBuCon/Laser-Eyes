@@ -14,7 +14,7 @@ Implements Scope 03 (FR-PER-003, FR-PER-004) and Scope 06 of SRS v2.0:
 
 from __future__ import annotations
 
-import abc
+from abc import ABC, abstractmethod
 import logging
 import threading
 import time
@@ -52,10 +52,37 @@ class HeadOrientationEstimate:
         }
 
 
-class HeadOrientationProvider(abc.ABC):
-    """Abstract interface for all head pose estimation providers."""
+class HeadOrientationProvider(ABC):
+    """Abstract base class for all head orientation estimation providers."""
 
-    @abc.abstractmethod
+    def __init__(self, **kwargs):
+        self.total_single_calls: int = 0
+        self.total_batch_calls: int = 0
+        self.total_model_forward_calls: int = 0
+        self.total_crops_requested: int = 0
+        self.total_crops_valid: int = 0
+        self.total_crops_rejected: int = 0
+        self.batch_sizes: List[int] = []
+        self.forward_times_ms: List[float] = []
+
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Return raw telemetry counters for verification and profiling."""
+        avg_batch = float(np.mean(self.batch_sizes)) if self.batch_sizes else 0.0
+        max_batch = int(max(self.batch_sizes)) if self.batch_sizes else 0
+        avg_fwd = float(np.mean(self.forward_times_ms)) if self.forward_times_ms else 0.0
+        return {
+            "estimate_single_calls": self.total_single_calls,
+            "estimate_batch_calls": self.total_batch_calls,
+            "model_forward_calls": self.total_model_forward_calls,
+            "total_head_crops": self.total_crops_requested,
+            "valid_head_crops": self.total_crops_valid,
+            "rejected_head_crops": self.total_crops_rejected,
+            "average_batch_size": round(avg_batch, 2),
+            "max_batch_size": max_batch,
+            "average_forward_ms": round(avg_fwd, 2),
+        }
+
+    @abstractmethod
     def estimate(
         self,
         keypoints: np.ndarray,
@@ -64,14 +91,44 @@ class HeadOrientationProvider(abc.ABC):
         seat_baseline_pitch: float = 0.0,
         frame: Optional[np.ndarray] = None,
     ) -> HeadOrientationEstimate:
-        """Estimate 3D head yaw and pitch relative to the seat's neutral perspective."""
+        """Estimate 3D head orientation for a single person detection."""
         pass
+
+    def estimate_batch(
+        self,
+        requests: List[Dict[str, Any]],
+        frame: Optional[np.ndarray] = None,
+    ) -> Dict[str, HeadOrientationEstimate]:
+        """Optional batched head pose estimation interface.
+
+        Each request dictionary contains:
+        {
+            'seat_id': str,
+            'keypoints': np.ndarray,
+            'bbox': tuple,
+            'seat_baseline_yaw': float,
+            'seat_baseline_pitch': float
+        }
+        """
+        self.total_batch_calls += 1
+        self.total_crops_requested += len(requests)
+        results = {}
+        for req in requests:
+            results[req["seat_id"]] = self.estimate(
+                keypoints=req.get("keypoints"),
+                bbox=req.get("bbox"),
+                seat_baseline_yaw=req.get("seat_baseline_yaw", 0.0),
+                seat_baseline_pitch=req.get("seat_baseline_pitch", 0.0),
+                frame=frame,
+            )
+        return results
 
 
 class PoseHeuristicHeadOrientationProvider(HeadOrientationProvider):
     """Zero-shot 2D keypoint geometric head orientation provider."""
 
     def __init__(self, min_kp_conf: float = 0.30, min_quality: float = 0.20, **kwargs):
+        super().__init__(**kwargs)
         self.min_kp_conf = min_kp_conf
         self.min_quality = min_quality
 
@@ -84,6 +141,7 @@ class PoseHeuristicHeadOrientationProvider(HeadOrientationProvider):
         frame: Optional[np.ndarray] = None,
     ) -> HeadOrientationEstimate:
         """Estimate relative Head Yaw and Pitch from 2D facial keypoints."""
+        self.total_single_calls += 1
         if keypoints is None or len(keypoints) < 5:
             return HeadOrientationEstimate(source="pose_heuristic", quality=0.0)
 
@@ -122,6 +180,11 @@ class PoseHeuristicHeadOrientationProvider(HeadOrientationProvider):
         frame: Optional[np.ndarray] = None,
     ) -> Dict[str, HeadOrientationEstimate]:
         """Fast vectorized 2D keypoint estimation for all seats."""
+        self.total_batch_calls += 1
+        self.total_crops_requested += len(requests)
+        self.total_crops_valid += len(requests)
+        self.batch_sizes.append(len(requests))
+
         results: Dict[str, HeadOrientationEstimate] = {}
         for req in requests:
             s_id = req["seat_id"]
@@ -158,78 +221,59 @@ class HeadCropExtractor:
         if frame is None or frame.size == 0:
             return None, 0.0
 
-        h_img, w_img = frame.shape[:2]
-        if h_img < self.min_crop_size or w_img < self.min_crop_size:
-            return None, 0.0
+        h, w = frame.shape[:2]
+        crop_box = None
+        quality = 0.0
 
-        valid_kps = []
         if keypoints is not None and len(keypoints) >= 5:
-            # Head keypoints: nose(0), l_eye(1), r_eye(2), l_ear(3), r_ear(4)
-            for i in range(min(5, len(keypoints))):
-                kp = keypoints[i]
-                if kp[2] >= self.min_kp_conf and 0 <= kp[0] < w_img and 0 <= kp[1] < h_img:
-                    valid_kps.append(kp)
+            head_kps = keypoints[:5]
+            valid_kps = [kp for kp in head_kps if kp[2] >= self.min_kp_conf]
+            if len(valid_kps) >= 2:
+                xs = [kp[0] for kp in valid_kps]
+                ys = [kp[1] for kp in valid_kps]
+                min_x, max_x = min(xs), max(xs)
+                min_y, max_y = min(ys), max(ys)
+                head_w = max_x - min_x
+                head_h = max_y - min_y
 
-        if valid_kps:
-            # Landmark-based ROI
-            kp_pts = np.array([kp[:2] for kp in valid_kps])
-            min_x, min_y = np.min(kp_pts, axis=0)
-            max_x, max_y = np.max(kp_pts, axis=0)
+                pad_x = max(head_w * self.padding_ratio, 16.0)
+                pad_y = max(head_h * self.padding_ratio, 16.0)
 
-            span_w = max(16.0, max_x - min_x)
-            span_h = max(16.0, max_y - min_y)
-            pad_x = span_w * self.padding_ratio
-            pad_y = span_h * self.padding_ratio
+                x1 = int(max(0, min_x - pad_x))
+                y1 = int(max(0, min_y - pad_y))
+                x2 = int(min(w, max_x + pad_x))
+                y2 = int(min(h, max_y + pad_y))
 
-            x1 = int(np.clip(min_x - pad_x, 0, w_img))
-            y1 = int(np.clip(min_y - pad_y, 0, h_img))
-            x2 = int(np.clip(max_x + pad_x, 0, w_img))
-            y2 = int(np.clip(max_y + pad_y, 0, h_img))
+                if (x2 - x1) >= self.min_crop_size and (y2 - y1) >= self.min_crop_size:
+                    crop_box = (x1, y1, x2, y2)
+                    quality = float(np.clip(np.mean([kp[2] for kp in valid_kps]), 0.0, 1.0))
 
-            if (x2 - x1) < self.min_crop_size:
-                needed_x = self.min_crop_size - (x2 - x1)
-                x1 = int(np.clip(x1 - needed_x // 2, 0, w_img))
-                x2 = int(np.clip(x1 + self.min_crop_size, 0, w_img))
-            if (y2 - y1) < self.min_crop_size:
-                needed_y = self.min_crop_size - (y2 - y1)
-                y1 = int(np.clip(y1 - needed_y // 2, 0, h_img))
-                y2 = int(np.clip(y1 + self.min_crop_size, 0, h_img))
-
-            landmark_quality = float(np.mean([kp[2] for kp in valid_kps]))
-        elif bbox is not None and len(bbox) == 4:
-            # Fallback: upper 35% of person bbox
+        # Fallback to upper 25% of bbox if keypoints are occluded
+        if crop_box is None and bbox is not None:
             bx1, by1, bx2, by2 = bbox
-            if bx2 <= bx1 or by2 <= by1:
-                return None, 0.0
-            x1 = int(np.clip(bx1, 0, w_img))
-            y1 = int(np.clip(by1, 0, h_img))
-            x2 = int(np.clip(bx2, 0, w_img))
-            y2 = int(np.clip(by1 + (by2 - by1) * 0.35, 0, h_img))
-            landmark_quality = 0.35
-        else:
+            bw = bx2 - bx1
+            bh = by2 - by1
+            if bw >= self.min_crop_size and bh >= self.min_crop_size * 2:
+                x1 = int(max(0, bx1))
+                y1 = int(max(0, by1))
+                x2 = int(min(w, bx2))
+                y2 = int(min(h, by1 + bh * 0.28))
+                if (x2 - x1) >= self.min_crop_size and (y2 - y1) >= self.min_crop_size:
+                    crop_box = (x1, y1, x2, y2)
+                    quality = 0.40
+
+        if crop_box is None:
             return None, 0.0
 
-        crop_w = x2 - x1
-        crop_h = y2 - y1
-
-        if crop_w < self.min_crop_size or crop_h < self.min_crop_size:
-            return None, 0.0
-
+        x1, y1, x2, y2 = crop_box
         crop = frame[y1:y2, x1:x2]
-        if crop.size == 0 or crop.shape[0] < self.min_crop_size or crop.shape[1] < self.min_crop_size:
-            return None, 0.0
-
-        # Quality derived from landmark confidence and crop resolution
-        crop_size_quality = float(min(1.0, max(crop_w, crop_h) / 64.0))
-        quality = float(np.clip(landmark_quality * crop_size_quality, 0.0, 1.0))
-
         return crop, quality
 
 
 class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
-    """Pretrained 6DRepNet 3D Head Pose Estimation Provider with Tensor Batching."""
+    """High-Throughput Deep Learning 6DRepNet Head Orientation Estimator with Batch Inference."""
 
-    _shared_model = None
+    _shared_model: Optional[object] = None
     _model_lock = threading.Lock()
 
     def __init__(
@@ -239,7 +283,9 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
         min_quality: float = 0.35,
         crop_extractor: Optional[HeadCropExtractor] = None,
         model_instance: Optional[object] = None,
+        **kwargs,
     ):
+        super().__init__(**kwargs)
         self.gpu_id = gpu_id
         self.dict_path = dict_path
         self.min_quality = min_quality
@@ -280,6 +326,7 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
         frame: Optional[np.ndarray] = None,
     ) -> HeadOrientationEstimate:
         """Single-crop estimation fallback."""
+        self.total_single_calls += 1
         batch_res = self.estimate_batch(
             requests=[{
                 "seat_id": "DEFAULT",
@@ -298,11 +345,15 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
         frame: Optional[np.ndarray] = None,
     ) -> Dict[str, HeadOrientationEstimate]:
         """High-Throughput Batched 6DRepNet Inference on GPU for all eligible seat actors."""
+        self.total_batch_calls += 1
+        self.total_crops_requested += len(requests)
+
         results: Dict[str, HeadOrientationEstimate] = {}
         if not requests:
             return results
 
         if frame is None or frame.size == 0 or SixDRepNetHeadOrientationProvider._shared_model is None:
+            self.total_crops_rejected += len(requests)
             for req in requests:
                 results[req["seat_id"]] = HeadOrientationEstimate(source="sixdrepnet", quality=0.0)
             return results
@@ -320,8 +371,10 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
 
             crop, quality = self.crop_extractor.extract_crop(frame=frame, keypoints=kps, bbox=box)
             if crop is None or quality < self.min_quality:
+                self.total_crops_rejected += 1
                 results[s_id] = HeadOrientationEstimate(source="sixdrepnet", quality=quality)
             else:
+                self.total_crops_valid += 1
                 valid_crops.append(crop)
                 valid_meta.append((s_id, quality, base_yaw, base_pitch))
 
@@ -335,6 +388,9 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
         # 2. Fast Batch Tensor Forward
         try:
             t0 = time.perf_counter()
+            self.total_model_forward_calls += 1
+            self.batch_sizes.append(len(valid_crops))
+
             if hasattr(model_obj, "transformations") and hasattr(model_obj, "model"):
                 import cv2
                 import torch
@@ -367,7 +423,9 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
                     r_list.append(float(r[0]) if hasattr(r, "__getitem__") else float(r))
                 p_arr, y_arr, r_arr = np.array(p_list), np.array(y_list), np.array(r_list)
 
-            self.last_forward_time_ms = (time.perf_counter() - t0) * 1000.0
+            fwd_ms = (time.perf_counter() - t0) * 1000.0
+            self.last_forward_time_ms = fwd_ms
+            self.forward_times_ms.append(fwd_ms)
             self.last_batch_size = len(valid_crops)
 
             # 3. Canonical Normalization & Baseline Subtraction

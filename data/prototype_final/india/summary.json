@@ -1,0 +1,23 @@
+{
+  "srs_version": "2.0.0",
+  "video_file": "india_classroom.mp4",
+  "video_stem": "india_classroom",
+  "room_id": "ROOM-CALIB-01",
+  "camera_id": "CAM-01",
+  "resolution": "1280x720",
+  "video_fps": 30.0,
+  "duration_seconds": 71.77,
+  "total_frames": 2150,
+  "average_inference_time_ms": 18.45,
+  "average_processing_fps": 4.68,
+  "average_hpe_batch_size": 5.2,
+  "average_hpe_forward_ms": 21.31,
+  "gpu_device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "peak_vram_mb": 340.78,
+  "configured_seats": 21,
+  "total_episodes": 492,
+  "total_patterns": 153,
+  "events_emitted": 92,
+  "state_transitions": 188,
+  "output_video": "data\\prototype_final\\india\\india_classroom_result.mp4"
+}

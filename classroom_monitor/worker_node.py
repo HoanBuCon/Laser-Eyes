@@ -224,6 +224,8 @@ class WorkerNodeRunner:
                     detections,
                     timestamp_ms=v_frame.timestamp_ms,
                     frame_idx=v_frame.frame_index,
+                    frame_w=v_frame.width,
+                    frame_h=v_frame.height,
                 )
 
                 # 5. Extract Behavior Signals and Update Risk Machine per Seat

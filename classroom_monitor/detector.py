@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -18,6 +18,10 @@ from classroom_monitor.models import Detection
 from classroom_monitor.spatial_matcher import compute_bbox_iou
 
 logger = logging.getLogger("ClassroomDetector")
+
+
+class ModelUnavailableError(RuntimeError):
+    """Real perception is unavailable and synthetic inference was not authorized."""
 
 
 class ClassroomDetector:
@@ -352,6 +356,7 @@ class PoseClassroomDetector:
         model_path: Optional[str | Path] = None,
         confidence_threshold: Optional[float] = None,
         config: Optional[ClassroomConfig] = None,
+        allow_mock: bool = False,
     ):
         self.config = config or DEFAULT_CONFIG
         self.confidence = (
@@ -363,6 +368,8 @@ class PoseClassroomDetector:
         self.class_names = self.config.class_names
         self.model = None
         self._is_mock = False
+        self.allow_mock = bool(allow_mock)
+        self.model_error: Optional[str] = None
 
         self._initialize_model()
 
@@ -370,7 +377,8 @@ class PoseClassroomDetector:
         try:
             from ultralytics import YOLO
         except ImportError:
-            logger.warning("Ultralytics library is not installed. Operating in mock mode.")
+            self.model_error = "Ultralytics library is not installed"
+            logger.error("%s; real pose inference is unavailable.", self.model_error)
             self._is_mock = True
             return
 
@@ -380,10 +388,34 @@ class PoseClassroomDetector:
                 self.model = YOLO(str(self.model_path))
                 return
             except Exception as exc:
-                logger.warning("Could not load pose model %s: %s", self.model_path, exc)
+                self.model_error = f"Could not load pose model {self.model_path}: {exc}"
+                logger.error("%s", self.model_error)
 
-        logger.warning("Pose weights not found. Operating in mock mode.")
+        if self.model_error is None:
+            self.model_error = f"Pose weights not found: {self.model_path}"
+        logger.error("%s; real pose inference is unavailable.", self.model_error)
         self._is_mock = True
+
+    @property
+    def inference_mode(self) -> str:
+        if self.model is not None and not self._is_mock:
+            return "REAL"
+        return "MOCK" if self.allow_mock else "ERROR"
+
+    @property
+    def capability_health(self) -> Dict[str, str]:
+        return {
+            "pose": self.inference_mode,
+            "pose_model": str(self.model_path),
+            "pose_error": self.model_error or "",
+        }
+
+    def ensure_available(self) -> None:
+        if self.inference_mode == "ERROR":
+            raise ModelUnavailableError(
+                f"Real pose model is unavailable: {self.model_error or self.model_path}. "
+                "Synthetic detections require explicit allow_mock=True."
+            )
 
     def detect(self, frame: np.ndarray, frame_index: int = 0) -> List[Detection]:
         if frame is None or frame.size == 0:
@@ -392,6 +424,7 @@ class PoseClassroomDetector:
         h, w = frame.shape[:2]
 
         if self._is_mock or self.model is None:
+            self.ensure_available()
             return self._mock_detect(frame, frame_index, w, h)
 
         try:
@@ -403,8 +436,9 @@ class PoseClassroomDetector:
                 verbose=False,
             )[0]
         except Exception as exc:
-            logger.error("Pose inference exception: %s", exc)
-            return []
+            self.model_error = f"Pose inference exception: {exc}"
+            logger.error("%s", self.model_error)
+            raise ModelUnavailableError(self.model_error) from exc
 
         if results.boxes is None or len(results.boxes) == 0:
             return []

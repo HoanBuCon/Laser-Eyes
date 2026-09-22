@@ -63,7 +63,7 @@ async function loadRooms() {
     }
 }
 
-async function loadCamerasForRoom(roomId) {
+async function loadCamerasForRoom(roomId, autoLoadReference = true) {
     try {
         const res = await fetch(`/api/v1/rooms/${roomId}/cameras`);
         const selectCam = document.getElementById('selectCamera');
@@ -80,6 +80,14 @@ async function loadCamerasForRoom(roomId) {
             if (allCamRes.ok) cameras = await allCamRes.json();
         }
 
+        // Prefer the idempotently seeded competition source over stale camera
+        // rows that may still reference renamed/missing demo files.
+        cameras.sort((left, right) => {
+            const leftCanonical = left.name.startsWith('VIGIL ') ? 1 : 0;
+            const rightCanonical = right.name.startsWith('VIGIL ') ? 1 : 0;
+            return rightCanonical - leftCanonical;
+        });
+
         if (cameras.length > 0) {
             selectCam.innerHTML = cameras.map(c => `
                 <option value="${c.id}">${c.name} (${c.position || 'Overhead'})</option>
@@ -91,8 +99,8 @@ async function loadCamerasForRoom(roomId) {
         }
 
         // Auto-load seats and reference frame for this room/camera
-        reloadSeatsFromDB();
-        fetchCameraReferenceFrame();
+        await reloadSeatsFromDB();
+        if (autoLoadReference) fetchCameraReferenceFrame();
     } catch (err) {
         console.error('Failed to load cameras for room:', err);
     }
@@ -131,15 +139,47 @@ async function fetchCameraReferenceFrame() {
             redrawCanvas();
         };
         img.onerror = () => {
-            setDrawingStatus('OFFLINE (FALLBACK DEMO)', 'text-amber-400');
-            // Try demo fallback directly
-            loadFallbackDemoFrame();
+            setDrawingStatus('CAMERA SOURCE UNAVAILABLE', 'text-red-400');
         };
         img.src = url;
     } catch (e) {
         console.warn('Reference frame grab error:', e);
-        loadFallbackDemoFrame();
+        setDrawingStatus('CAMERA SOURCE UNAVAILABLE', 'text-red-400');
     }
+}
+
+async function loadCalibrationPreset(preset) {
+    const roomCode = preset === 'student' ? 'ROOM-STUDENT-01' : 'ROOM-CALIB-01';
+    const room = rooms.find(item => item.room_code === roomCode);
+    if (!room) {
+        setDrawingStatus(`${roomCode} NOT CONFIGURED — RESTART SERVER`, 'text-red-400');
+        return;
+    }
+
+    currentRoomId = room.id;
+    document.getElementById('selectRoom').value = room.id;
+    await loadCamerasForRoom(room.id, false);
+    await loadPresetReferenceFrame(preset);
+}
+
+async function loadPresetReferenceFrame(preset) {
+    setDrawingStatus(`LOADING ${preset.toUpperCase()} VIDEO...`, 'text-amber-400');
+    const img = new Image();
+    img.onload = () => {
+        referenceImage = img;
+        refWidth = img.naturalWidth || 1280;
+        refHeight = img.naturalHeight || 720;
+        canvas.width = refWidth;
+        canvas.height = refHeight;
+        document.getElementById('canvasResLabel').innerText = `${refWidth} × ${refHeight}`;
+        document.getElementById('canvasEmptyPlaceholder').classList.add('hidden');
+        setDrawingStatus(`${preset.toUpperCase()} VIDEO — READY TO DRAW`, 'text-emerald-400');
+        redrawCanvas();
+    };
+    img.onerror = () => {
+        setDrawingStatus(`${preset.toUpperCase()} VIDEO UNAVAILABLE`, 'text-red-400');
+    };
+    img.src = `/api/v1/cameras/calibration-presets/${encodeURIComponent(preset)}/reference-frame?t=${Date.now()}`;
 }
 
 function loadFallbackDemoFrame() {

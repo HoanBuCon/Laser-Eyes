@@ -1,0 +1,2135 @@
+[
+  {
+    "event_id": "5d67de07-17d1-495e-815a-5292159769ea",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 2766.7,
+    "first_seen_ms": 2766.7,
+    "last_seen_ms": 12633.3,
+    "occurrence_count": 3,
+    "peak_risk_score": 94.2,
+    "component_episode_ids": [
+      "c0975c4c-5f0d-4542-92fa-05ad0f438565",
+      "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+      "19922fc6-ec07-470a-a946-5492e0cef041",
+      "a6e9887d-baf2-4a28-8b02-9e8374ec3e40"
+    ],
+    "supporting_pattern_ids": [
+      "8e29fe8a-5df9-494f-aed3-a6aeb3afa441",
+      "f006dd1b-580c-4f33-bc0a-2ba0de4b051f",
+      "cec15e68-131c-43ba-9434-c4e8dddd1428"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\5d67de07-17d1-495e-815a-5292159769ea_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\5d67de07-17d1-495e-815a-5292159769ea_snapshot.jpg",
+    "sha256_hash": "cac3c740f5bd0d4c5af2b6c73837a056f2a7dc310a22ed73fb6bfdc367b76c77",
+    "metadata": {
+      "risk_score": 94.2,
+      "peak_risk_score": 94.2,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "c0975c4c-5f0d-4542-92fa-05ad0f438565",
+        "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+        "19922fc6-ec07-470a-a946-5492e0cef041",
+        "a6e9887d-baf2-4a28-8b02-9e8374ec3e40"
+      ],
+      "supporting_pattern_ids": [
+        "8e29fe8a-5df9-494f-aed3-a6aeb3afa441",
+        "f006dd1b-580c-4f33-bc0a-2ba0de4b051f",
+        "cec15e68-131c-43ba-9434-c4e8dddd1428"
+      ],
+      "incident_id": "5d67de07-17d1-495e-815a-5292159769ea",
+      "first_seen_ms": 2766.7,
+      "last_seen_ms": 12633.333333333334,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 12633.333333333334,
+      "sha256_hash": "cac3c740f5bd0d4c5af2b6c73837a056f2a7dc310a22ed73fb6bfdc367b76c77"
+    }
+  },
+  {
+    "event_id": "1a4411b3-cb58-4ad3-8191-2e29b721b586",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-20",
+    "actor_track_id": null,
+    "timestamp_ms": 5100.0,
+    "first_seen_ms": 5100.0,
+    "last_seen_ms": 65133.3,
+    "occurrence_count": 9,
+    "peak_risk_score": 85.3,
+    "component_episode_ids": [
+      "29d7a011-e893-40e1-9876-0d1673f219a8",
+      "62d04423-7424-4e65-ada0-4a29579cab6c",
+      "8bb51648-eb6d-4791-bbe4-d86110de1318",
+      "2d371cf6-de72-469e-b2d7-9199f230e9cb",
+      "49d033a8-0dcd-4a2b-b826-1bcf891cb8cc",
+      "e7de1488-1f90-4de1-8cfc-04146e031c3e",
+      "ab99eb8e-058a-4137-ab91-7b43c4c5cf1c",
+      "1833c0ea-afe3-4b76-957e-d9c5fbff2b3b",
+      "5d002506-e62e-4a51-8ced-c51097b4c009"
+    ],
+    "supporting_pattern_ids": [
+      "fefd9343-8d12-4bdc-96c0-87b9bac846e6",
+      "8bfc6b01-f6ff-4e3e-b687-8465837166e6",
+      "581a0db9-6974-4a98-825d-f34344c6c723",
+      "fa81b08e-a64b-40fc-a965-c3437d0458bf",
+      "13eba41d-a344-4bb5-b776-8962af17d10e",
+      "6337677b-3434-4858-b9dc-5becfbf8eb6d",
+      "9f47e541-90c0-4367-a94a-a89f89961671"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\1a4411b3-cb58-4ad3-8191-2e29b721b586_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\1a4411b3-cb58-4ad3-8191-2e29b721b586_snapshot.jpg",
+    "sha256_hash": "b80d15d09dee13a52d084a7359b23505556d72659beb2bd282afe50c128dcafb",
+    "metadata": {
+      "risk_score": 85.0,
+      "peak_risk_score": 85.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.722,
+      "component_episode_ids": [
+        "29d7a011-e893-40e1-9876-0d1673f219a8",
+        "62d04423-7424-4e65-ada0-4a29579cab6c",
+        "8bb51648-eb6d-4791-bbe4-d86110de1318",
+        "2d371cf6-de72-469e-b2d7-9199f230e9cb",
+        "49d033a8-0dcd-4a2b-b826-1bcf891cb8cc",
+        "e7de1488-1f90-4de1-8cfc-04146e031c3e",
+        "ab99eb8e-058a-4137-ab91-7b43c4c5cf1c",
+        "1833c0ea-afe3-4b76-957e-d9c5fbff2b3b",
+        "5d002506-e62e-4a51-8ced-c51097b4c009"
+      ],
+      "supporting_pattern_ids": [
+        "fefd9343-8d12-4bdc-96c0-87b9bac846e6",
+        "8bfc6b01-f6ff-4e3e-b687-8465837166e6",
+        "581a0db9-6974-4a98-825d-f34344c6c723",
+        "fa81b08e-a64b-40fc-a965-c3437d0458bf",
+        "13eba41d-a344-4bb5-b776-8962af17d10e",
+        "6337677b-3434-4858-b9dc-5becfbf8eb6d",
+        "9f47e541-90c0-4367-a94a-a89f89961671"
+      ],
+      "incident_id": "1a4411b3-cb58-4ad3-8191-2e29b721b586",
+      "first_seen_ms": 5100.0,
+      "last_seen_ms": 65133.333333333336,
+      "occurrence_count": 9,
+      "last_seen_timestamp_ms": 65133.333333333336,
+      "sha256_hash": "b80d15d09dee13a52d084a7359b23505556d72659beb2bd282afe50c128dcafb"
+    }
+  },
+  {
+    "event_id": "53399d24-30ab-4e46-91d6-edf96462bfb4",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-18",
+    "actor_track_id": null,
+    "timestamp_ms": 5666.7,
+    "first_seen_ms": 5666.7,
+    "last_seen_ms": 7766.7,
+    "occurrence_count": 2,
+    "peak_risk_score": 84.8,
+    "component_episode_ids": [
+      "e9ae121d-67fc-43f3-b0e4-9cf9ab3e3b95",
+      "e636863e-dc2e-468b-adde-081475a20657",
+      "8de66d0b-59d4-43ce-ae2a-d9a88b3e7414"
+    ],
+    "supporting_pattern_ids": [
+      "301352cb-3f25-466f-a3fc-af32f36b1dd8",
+      "32df5125-a1b9-45d5-bd8b-f631df5f992a"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\53399d24-30ab-4e46-91d6-edf96462bfb4_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\53399d24-30ab-4e46-91d6-edf96462bfb4_snapshot.jpg",
+    "sha256_hash": "9ae7f345a8c68a5f725dbe0b685917655206283a7eeb230310ef893485cec63f",
+    "metadata": {
+      "risk_score": 84.8,
+      "peak_risk_score": 84.8,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.764,
+      "component_episode_ids": [
+        "e9ae121d-67fc-43f3-b0e4-9cf9ab3e3b95",
+        "e636863e-dc2e-468b-adde-081475a20657",
+        "8de66d0b-59d4-43ce-ae2a-d9a88b3e7414"
+      ],
+      "supporting_pattern_ids": [
+        "301352cb-3f25-466f-a3fc-af32f36b1dd8",
+        "32df5125-a1b9-45d5-bd8b-f631df5f992a"
+      ],
+      "incident_id": "53399d24-30ab-4e46-91d6-edf96462bfb4",
+      "first_seen_ms": 5666.7,
+      "last_seen_ms": 7766.666666666667,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 7766.666666666667,
+      "sha256_hash": "9ae7f345a8c68a5f725dbe0b685917655206283a7eeb230310ef893485cec63f"
+    }
+  },
+  {
+    "event_id": "d625d471-db09-48ef-bf9e-ed8528df95b1",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-08",
+    "actor_track_id": null,
+    "timestamp_ms": 5766.7,
+    "first_seen_ms": 5766.7,
+    "last_seen_ms": 48533.3,
+    "occurrence_count": 6,
+    "peak_risk_score": 83.7,
+    "component_episode_ids": [
+      "1b6e969f-6b26-4663-88d0-d4764f287f2a",
+      "f32007c1-86c2-4099-9cd5-126199a87adf",
+      "0f8585f5-6873-4f10-9ee8-8325ce5307f8",
+      "36a5c8a5-6f34-43f3-bb02-f0ae5ab135a8",
+      "7ecfff45-ef7c-42f1-924d-d8a82cf348e7",
+      "c2d9e958-b221-46a2-a6ed-a3c5c894a460"
+    ],
+    "supporting_pattern_ids": [
+      "d363e982-af45-49b3-80af-5c03ae971ab4",
+      "b82dd546-f6a1-425b-8f2a-75c7540e11d9",
+      "55a65ed5-aaf2-4231-9488-390404636f22",
+      "e58b5a41-7930-4609-be2e-6af671a58ef6",
+      "cac4bb4d-1dee-48a7-8664-2fcd3749953a",
+      "a117ea01-3f72-4370-8704-c0b5f3a03658"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\d625d471-db09-48ef-bf9e-ed8528df95b1_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\d625d471-db09-48ef-bf9e-ed8528df95b1_snapshot.jpg",
+    "sha256_hash": "c182b10759e2b236b2ac8983a97929fd68d31e68002152c7e5a6ec0ab9b6c2b7",
+    "metadata": {
+      "risk_score": 83.7,
+      "peak_risk_score": 83.7,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "1b6e969f-6b26-4663-88d0-d4764f287f2a",
+        "f32007c1-86c2-4099-9cd5-126199a87adf",
+        "0f8585f5-6873-4f10-9ee8-8325ce5307f8",
+        "36a5c8a5-6f34-43f3-bb02-f0ae5ab135a8",
+        "7ecfff45-ef7c-42f1-924d-d8a82cf348e7",
+        "c2d9e958-b221-46a2-a6ed-a3c5c894a460"
+      ],
+      "supporting_pattern_ids": [
+        "d363e982-af45-49b3-80af-5c03ae971ab4",
+        "b82dd546-f6a1-425b-8f2a-75c7540e11d9",
+        "55a65ed5-aaf2-4231-9488-390404636f22",
+        "e58b5a41-7930-4609-be2e-6af671a58ef6",
+        "cac4bb4d-1dee-48a7-8664-2fcd3749953a",
+        "a117ea01-3f72-4370-8704-c0b5f3a03658"
+      ],
+      "incident_id": "d625d471-db09-48ef-bf9e-ed8528df95b1",
+      "first_seen_ms": 5766.7,
+      "last_seen_ms": 48533.333333333336,
+      "occurrence_count": 6,
+      "last_seen_timestamp_ms": 48533.333333333336,
+      "sha256_hash": "c182b10759e2b236b2ac8983a97929fd68d31e68002152c7e5a6ec0ab9b6c2b7"
+    }
+  },
+  {
+    "event_id": "d342bac2-f9e2-4cc1-8ba1-2180ae2a0ce8",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-06",
+    "actor_track_id": null,
+    "timestamp_ms": 9233.3,
+    "first_seen_ms": 9233.3,
+    "last_seen_ms": 35133.3,
+    "occurrence_count": 8,
+    "peak_risk_score": 85.6,
+    "component_episode_ids": [
+      "7fa533db-745f-4a90-a993-3c24af27d48c",
+      "b0ed90a3-e3de-4c8c-b377-82dc08a40d81",
+      "d119f4cb-5079-463b-a564-7daa86eccd2d",
+      "d6e4c7b4-9a8e-4b7d-bd24-b8c174faa6dd",
+      "afead15e-1f2c-43df-a6ad-81015614182c",
+      "60a15a32-03cd-4369-9d1c-0e9668c5647e",
+      "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+      "6afaa1c3-5db4-41d2-8c11-4f60c16b30df"
+    ],
+    "supporting_pattern_ids": [
+      "c07d1e74-740d-4376-a0cd-77d28340e61a",
+      "5f9819dc-94d4-4ade-b2a3-226ff4d651bb",
+      "224d9b78-24fa-47ef-9c33-10d07bb96908",
+      "1fd1886a-cba3-442d-85d3-944c0ca58580",
+      "d7b62bf6-2100-4a86-a3bd-8163dd5072e1",
+      "09332658-4d00-470a-b205-8b6a27229e0d"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\d342bac2-f9e2-4cc1-8ba1-2180ae2a0ce8_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\d342bac2-f9e2-4cc1-8ba1-2180ae2a0ce8_snapshot.jpg",
+    "sha256_hash": "e61cc2c502b71e5df92a748cfcb8a7f8fa855a084dac8b55c297af5f0a97df6c",
+    "metadata": {
+      "risk_score": 83.4,
+      "peak_risk_score": 85.6,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.95,
+      "component_episode_ids": [
+        "7fa533db-745f-4a90-a993-3c24af27d48c",
+        "b0ed90a3-e3de-4c8c-b377-82dc08a40d81",
+        "d119f4cb-5079-463b-a564-7daa86eccd2d",
+        "d6e4c7b4-9a8e-4b7d-bd24-b8c174faa6dd",
+        "afead15e-1f2c-43df-a6ad-81015614182c",
+        "60a15a32-03cd-4369-9d1c-0e9668c5647e",
+        "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+        "6afaa1c3-5db4-41d2-8c11-4f60c16b30df"
+      ],
+      "supporting_pattern_ids": [
+        "c07d1e74-740d-4376-a0cd-77d28340e61a",
+        "5f9819dc-94d4-4ade-b2a3-226ff4d651bb",
+        "224d9b78-24fa-47ef-9c33-10d07bb96908",
+        "1fd1886a-cba3-442d-85d3-944c0ca58580",
+        "d7b62bf6-2100-4a86-a3bd-8163dd5072e1",
+        "09332658-4d00-470a-b205-8b6a27229e0d"
+      ],
+      "incident_id": "d342bac2-f9e2-4cc1-8ba1-2180ae2a0ce8",
+      "first_seen_ms": 9233.3,
+      "last_seen_ms": 35133.333333333336,
+      "occurrence_count": 8,
+      "last_seen_timestamp_ms": 35133.333333333336,
+      "sha256_hash": "e61cc2c502b71e5df92a748cfcb8a7f8fa855a084dac8b55c297af5f0a97df6c"
+    }
+  },
+  {
+    "event_id": "34cccfc2-b4ea-4ffe-b650-6d4ce2ce7cf7",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-05",
+    "actor_track_id": null,
+    "timestamp_ms": 9833.3,
+    "first_seen_ms": 9833.3,
+    "last_seen_ms": 24966.7,
+    "occurrence_count": 4,
+    "peak_risk_score": 100.0,
+    "component_episode_ids": [
+      "6a790e85-abdf-4e29-bb12-400ccc9ebd6d",
+      "aff7a14e-53cf-4dbe-a867-ada4c2488832",
+      "c874cf8e-e096-4634-84ed-744790bb6c12",
+      "30be2dac-3434-4885-85c1-73295bfc48fa",
+      "a774f51a-6841-467e-9adf-db86dd8a4acb"
+    ],
+    "supporting_pattern_ids": [
+      "7bcd453e-d38f-496b-9bb8-7f6d366d644b",
+      "d0deeabd-321e-4f3f-b4de-addbe278f5dd",
+      "f69ab458-e036-4bbf-8056-16aa64d2a53b",
+      "4f14a91d-b6d0-4893-bdd7-2e448407ba05"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\34cccfc2-b4ea-4ffe-b650-6d4ce2ce7cf7_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\34cccfc2-b4ea-4ffe-b650-6d4ce2ce7cf7_snapshot.jpg",
+    "sha256_hash": "2e132963ef373175a18af8ae3c2940719de3809c8b2c882a33756d072d3e4649",
+    "metadata": {
+      "risk_score": 100.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "6a790e85-abdf-4e29-bb12-400ccc9ebd6d",
+        "aff7a14e-53cf-4dbe-a867-ada4c2488832",
+        "c874cf8e-e096-4634-84ed-744790bb6c12",
+        "30be2dac-3434-4885-85c1-73295bfc48fa",
+        "a774f51a-6841-467e-9adf-db86dd8a4acb"
+      ],
+      "supporting_pattern_ids": [
+        "7bcd453e-d38f-496b-9bb8-7f6d366d644b",
+        "d0deeabd-321e-4f3f-b4de-addbe278f5dd",
+        "f69ab458-e036-4bbf-8056-16aa64d2a53b",
+        "4f14a91d-b6d0-4893-bdd7-2e448407ba05"
+      ],
+      "incident_id": "34cccfc2-b4ea-4ffe-b650-6d4ce2ce7cf7",
+      "first_seen_ms": 9833.3,
+      "last_seen_ms": 24966.666666666668,
+      "occurrence_count": 4,
+      "last_seen_timestamp_ms": 24966.666666666668,
+      "sha256_hash": "2e132963ef373175a18af8ae3c2940719de3809c8b2c882a33756d072d3e4649"
+    }
+  },
+  {
+    "event_id": "c97ec5e2-4d9a-4437-84a6-6a7a53109cbe",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-18",
+    "actor_track_id": null,
+    "timestamp_ms": 10666.7,
+    "first_seen_ms": 10666.7,
+    "last_seen_ms": 31233.3,
+    "occurrence_count": 6,
+    "peak_risk_score": 100.0,
+    "component_episode_ids": [
+      "8de66d0b-59d4-43ce-ae2a-d9a88b3e7414",
+      "e9ae121d-67fc-43f3-b0e4-9cf9ab3e3b95",
+      "e636863e-dc2e-468b-adde-081475a20657",
+      "d022c4fb-75c0-43af-afab-78a934237ae6",
+      "0d6a74bd-f54e-44e6-940b-9ce748591a7d",
+      "022e4980-7561-43ba-b926-901b475dc46e",
+      "5e5582c8-fa01-45a8-b80f-c8e12455f2d0",
+      "7bc836aa-e684-4a13-9ea0-5492ef68d8ba",
+      "fd1cb47d-5cdb-478a-bb85-e706151c0706"
+    ],
+    "supporting_pattern_ids": [
+      "32df5125-a1b9-45d5-bd8b-f631df5f992a",
+      "0e1b392f-e813-49ab-a159-6d94a3a0cf4c",
+      "e7e9d077-8cc6-44a2-b5f3-93d3fe96e53f",
+      "daaf9b64-3148-4317-a12b-de55038212c5",
+      "fbb264a5-cb6a-44a4-abb1-eece9389b255"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\c97ec5e2-4d9a-4437-84a6-6a7a53109cbe_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\c97ec5e2-4d9a-4437-84a6-6a7a53109cbe_snapshot.jpg",
+    "sha256_hash": "699de8292a69081d9dbdfc08267f8a860255469398b2408c97afd6d37becd261",
+    "metadata": {
+      "risk_score": 82.3,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "8de66d0b-59d4-43ce-ae2a-d9a88b3e7414",
+        "e9ae121d-67fc-43f3-b0e4-9cf9ab3e3b95",
+        "e636863e-dc2e-468b-adde-081475a20657",
+        "d022c4fb-75c0-43af-afab-78a934237ae6",
+        "0d6a74bd-f54e-44e6-940b-9ce748591a7d",
+        "022e4980-7561-43ba-b926-901b475dc46e",
+        "5e5582c8-fa01-45a8-b80f-c8e12455f2d0",
+        "7bc836aa-e684-4a13-9ea0-5492ef68d8ba",
+        "fd1cb47d-5cdb-478a-bb85-e706151c0706"
+      ],
+      "supporting_pattern_ids": [
+        "32df5125-a1b9-45d5-bd8b-f631df5f992a",
+        "0e1b392f-e813-49ab-a159-6d94a3a0cf4c",
+        "e7e9d077-8cc6-44a2-b5f3-93d3fe96e53f",
+        "daaf9b64-3148-4317-a12b-de55038212c5",
+        "fbb264a5-cb6a-44a4-abb1-eece9389b255"
+      ],
+      "incident_id": "c97ec5e2-4d9a-4437-84a6-6a7a53109cbe",
+      "first_seen_ms": 10666.7,
+      "last_seen_ms": 31233.333333333336,
+      "occurrence_count": 6,
+      "last_seen_timestamp_ms": 31233.333333333336,
+      "sha256_hash": "699de8292a69081d9dbdfc08267f8a860255469398b2408c97afd6d37becd261"
+    }
+  },
+  {
+    "event_id": "8ff54f4a-cd25-491b-a83e-9de2a6c1dbcf",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 12633.3,
+    "first_seen_ms": 12633.3,
+    "last_seen_ms": 17766.7,
+    "occurrence_count": 3,
+    "peak_risk_score": 88.4,
+    "component_episode_ids": [
+      "a6e9887d-baf2-4a28-8b02-9e8374ec3e40",
+      "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+      "19922fc6-ec07-470a-a946-5492e0cef041",
+      "c0975c4c-5f0d-4542-92fa-05ad0f438565"
+    ],
+    "supporting_pattern_ids": [
+      "cec15e68-131c-43ba-9434-c4e8dddd1428",
+      "59314fb1-be4b-420c-acde-f72d95807f04",
+      "bc7b7fcd-0c12-47c7-a566-a0fdac36e667"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\8ff54f4a-cd25-491b-a83e-9de2a6c1dbcf_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\8ff54f4a-cd25-491b-a83e-9de2a6c1dbcf_snapshot.jpg",
+    "sha256_hash": "1bbc643c41a745cdb79ddc7f29e9433b4ae1b4d3f84c85fb653847b3c9e325c4",
+    "metadata": {
+      "risk_score": 88.4,
+      "peak_risk_score": 88.4,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.907,
+      "component_episode_ids": [
+        "a6e9887d-baf2-4a28-8b02-9e8374ec3e40",
+        "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+        "19922fc6-ec07-470a-a946-5492e0cef041",
+        "c0975c4c-5f0d-4542-92fa-05ad0f438565"
+      ],
+      "supporting_pattern_ids": [
+        "cec15e68-131c-43ba-9434-c4e8dddd1428",
+        "59314fb1-be4b-420c-acde-f72d95807f04",
+        "bc7b7fcd-0c12-47c7-a566-a0fdac36e667"
+      ],
+      "incident_id": "8ff54f4a-cd25-491b-a83e-9de2a6c1dbcf",
+      "first_seen_ms": 12633.3,
+      "last_seen_ms": 17766.666666666668,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 17766.666666666668,
+      "sha256_hash": "1bbc643c41a745cdb79ddc7f29e9433b4ae1b4d3f84c85fb653847b3c9e325c4"
+    }
+  },
+  {
+    "event_id": "72585fc9-2072-4574-a0ef-a446e68f0c02",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-07",
+    "actor_track_id": null,
+    "timestamp_ms": 15466.7,
+    "first_seen_ms": 15466.7,
+    "last_seen_ms": 20066.7,
+    "occurrence_count": 2,
+    "peak_risk_score": 100.0,
+    "component_episode_ids": [
+      "4e152a5c-13f6-495f-bace-0c60b48ee776",
+      "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+      "7e7eec10-3858-4cf6-8f96-c0e429b4af79"
+    ],
+    "supporting_pattern_ids": [
+      "7821fd05-2a64-483e-85ca-7532b401ccca",
+      "5189a4f4-34fc-4cdf-9f5d-27caa83ceba4"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\72585fc9-2072-4574-a0ef-a446e68f0c02_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\72585fc9-2072-4574-a0ef-a446e68f0c02_snapshot.jpg",
+    "sha256_hash": "b6d9e91df16a9c56090cbd7dd1e2a32f0480a6726cc410c3a36474152028c709",
+    "metadata": {
+      "risk_score": 85.6,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.784,
+      "component_episode_ids": [
+        "4e152a5c-13f6-495f-bace-0c60b48ee776",
+        "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+        "7e7eec10-3858-4cf6-8f96-c0e429b4af79"
+      ],
+      "supporting_pattern_ids": [
+        "7821fd05-2a64-483e-85ca-7532b401ccca",
+        "5189a4f4-34fc-4cdf-9f5d-27caa83ceba4"
+      ],
+      "incident_id": "72585fc9-2072-4574-a0ef-a446e68f0c02",
+      "first_seen_ms": 15466.7,
+      "last_seen_ms": 20066.666666666668,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 20066.666666666668,
+      "sha256_hash": "b6d9e91df16a9c56090cbd7dd1e2a32f0480a6726cc410c3a36474152028c709"
+    }
+  },
+  {
+    "event_id": "55244d4c-564e-477c-a89c-ec119ac723fc",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-03",
+    "actor_track_id": null,
+    "timestamp_ms": 18066.7,
+    "first_seen_ms": 18066.7,
+    "last_seen_ms": 18066.7,
+    "occurrence_count": 1,
+    "peak_risk_score": 87.8,
+    "component_episode_ids": [],
+    "supporting_pattern_ids": [],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "SUSPICIOUS_POSTURE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\55244d4c-564e-477c-a89c-ec119ac723fc_T0_SUSPICIOUS_POSTURE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\55244d4c-564e-477c-a89c-ec119ac723fc_snapshot.jpg",
+    "sha256_hash": "e58b6cffab9a80f6717d6306e25bd0f771234d03d37ae82d3948024279b97d45",
+    "metadata": {
+      "risk_score": 87.8,
+      "peak_risk_score": 87.8,
+      "primary_pattern": "SUSPICIOUS_POSTURE",
+      "supporting_cues": [],
+      "observation_quality": 0.85,
+      "component_episode_ids": [],
+      "supporting_pattern_ids": [],
+      "incident_id": "55244d4c-564e-477c-a89c-ec119ac723fc",
+      "first_seen_ms": 18066.7,
+      "last_seen_ms": 18066.7,
+      "occurrence_count": 1,
+      "sha256_hash": "e58b6cffab9a80f6717d6306e25bd0f771234d03d37ae82d3948024279b97d45"
+    }
+  },
+  {
+    "event_id": "ddbe2a71-303c-4258-a69b-03273ce4b1d1",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 18200.0,
+    "first_seen_ms": 18200.0,
+    "last_seen_ms": 27600.0,
+    "occurrence_count": 2,
+    "peak_risk_score": 81.1,
+    "component_episode_ids": [
+      "c0975c4c-5f0d-4542-92fa-05ad0f438565",
+      "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+      "19922fc6-ec07-470a-a946-5492e0cef041",
+      "8ca09a0b-fa70-4983-b9e7-7dc3122428d5"
+    ],
+    "supporting_pattern_ids": [
+      "bc7b7fcd-0c12-47c7-a566-a0fdac36e667",
+      "e84a89bb-456a-4d09-bd1a-920784ed140a"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\ddbe2a71-303c-4258-a69b-03273ce4b1d1_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\ddbe2a71-303c-4258-a69b-03273ce4b1d1_snapshot.jpg",
+    "sha256_hash": "ee74a027caa0e7072549e4b6f3588db36c82c548e1241189745ba5e91dc03612",
+    "metadata": {
+      "risk_score": 81.1,
+      "peak_risk_score": 81.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 17.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "c0975c4c-5f0d-4542-92fa-05ad0f438565",
+        "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+        "19922fc6-ec07-470a-a946-5492e0cef041",
+        "8ca09a0b-fa70-4983-b9e7-7dc3122428d5"
+      ],
+      "supporting_pattern_ids": [
+        "bc7b7fcd-0c12-47c7-a566-a0fdac36e667",
+        "e84a89bb-456a-4d09-bd1a-920784ed140a"
+      ],
+      "incident_id": "ddbe2a71-303c-4258-a69b-03273ce4b1d1",
+      "first_seen_ms": 18200.0,
+      "last_seen_ms": 27600.000000000004,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 27600.000000000004,
+      "sha256_hash": "ee74a027caa0e7072549e4b6f3588db36c82c548e1241189745ba5e91dc03612"
+    }
+  },
+  {
+    "event_id": "08fe80d3-c6a9-4778-adec-8b185837acd9",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-07",
+    "actor_track_id": null,
+    "timestamp_ms": 20466.7,
+    "first_seen_ms": 20466.7,
+    "last_seen_ms": 22566.7,
+    "occurrence_count": 2,
+    "peak_risk_score": 99.0,
+    "component_episode_ids": [
+      "7e7eec10-3858-4cf6-8f96-c0e429b4af79",
+      "4e152a5c-13f6-495f-bace-0c60b48ee776",
+      "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+      "3cfe3abe-a5eb-443d-a2be-17b193ddcd27",
+      "95e647bc-ea67-432d-91a0-11bd6ee8f7fc"
+    ],
+    "supporting_pattern_ids": [
+      "5189a4f4-34fc-4cdf-9f5d-27caa83ceba4",
+      "e67c553b-053a-4164-8ebd-eace51169067"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\08fe80d3-c6a9-4778-adec-8b185837acd9_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\08fe80d3-c6a9-4778-adec-8b185837acd9_snapshot.jpg",
+    "sha256_hash": "46d24d72c0389335412bf9c310b1c6d5902e2e531b2448f068fc3195e24b202a",
+    "metadata": {
+      "risk_score": 99.0,
+      "peak_risk_score": 99.0,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "7e7eec10-3858-4cf6-8f96-c0e429b4af79",
+        "4e152a5c-13f6-495f-bace-0c60b48ee776",
+        "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+        "3cfe3abe-a5eb-443d-a2be-17b193ddcd27",
+        "95e647bc-ea67-432d-91a0-11bd6ee8f7fc"
+      ],
+      "supporting_pattern_ids": [
+        "5189a4f4-34fc-4cdf-9f5d-27caa83ceba4",
+        "e67c553b-053a-4164-8ebd-eace51169067"
+      ],
+      "incident_id": "08fe80d3-c6a9-4778-adec-8b185837acd9",
+      "first_seen_ms": 20466.7,
+      "last_seen_ms": 22566.666666666668,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 22566.666666666668,
+      "sha256_hash": "46d24d72c0389335412bf9c310b1c6d5902e2e531b2448f068fc3195e24b202a"
+    }
+  },
+  {
+    "event_id": "52d094ac-0406-4b8d-92c2-405305365cfc",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-05",
+    "actor_track_id": null,
+    "timestamp_ms": 24966.7,
+    "first_seen_ms": 24966.7,
+    "last_seen_ms": 70066.7,
+    "occurrence_count": 8,
+    "peak_risk_score": 85.1,
+    "component_episode_ids": [
+      "aff7a14e-53cf-4dbe-a867-ada4c2488832",
+      "c874cf8e-e096-4634-84ed-744790bb6c12",
+      "30be2dac-3434-4885-85c1-73295bfc48fa",
+      "a774f51a-6841-467e-9adf-db86dd8a4acb",
+      "a97e9342-2af0-411f-a834-4c83969e4eae",
+      "cb3ad101-857f-487e-89f3-8c7986cf2e81",
+      "6a790e85-abdf-4e29-bb12-400ccc9ebd6d",
+      "81ecb598-18c7-4848-b44c-f18d318eea28",
+      "a8f4da61-a853-4763-8436-9c11c61fbf87"
+    ],
+    "supporting_pattern_ids": [
+      "4f14a91d-b6d0-4893-bdd7-2e448407ba05",
+      "e3f3bf56-8b70-4906-96cc-5da1d4de1246",
+      "cd7bd6cf-9e99-4aa8-8893-66c04cc758c6",
+      "605426b0-b6dc-41c3-a5a7-26bcfc58bbeb",
+      "f2d9046d-6ffa-4215-9254-f350ac49e44f",
+      "5ed6ecbc-cafa-4231-9afd-52d4d3d8c541",
+      "974a3562-6360-42b5-b3f6-cdf5d2e9f1fb",
+      "a4a7b8ac-e79f-48bb-be4e-6c8b274f77b1"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\52d094ac-0406-4b8d-92c2-405305365cfc_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\52d094ac-0406-4b8d-92c2-405305365cfc_snapshot.jpg",
+    "sha256_hash": "0ecbecbb91a8921a8943d652bc5cfdffa741c014c3d898f6c5623f9216d82238",
+    "metadata": {
+      "risk_score": 85.1,
+      "peak_risk_score": 85.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 4 in 25s window"
+      ],
+      "observation_quality": 0.742,
+      "component_episode_ids": [
+        "aff7a14e-53cf-4dbe-a867-ada4c2488832",
+        "c874cf8e-e096-4634-84ed-744790bb6c12",
+        "30be2dac-3434-4885-85c1-73295bfc48fa",
+        "a774f51a-6841-467e-9adf-db86dd8a4acb",
+        "a97e9342-2af0-411f-a834-4c83969e4eae",
+        "cb3ad101-857f-487e-89f3-8c7986cf2e81",
+        "6a790e85-abdf-4e29-bb12-400ccc9ebd6d",
+        "81ecb598-18c7-4848-b44c-f18d318eea28",
+        "a8f4da61-a853-4763-8436-9c11c61fbf87"
+      ],
+      "supporting_pattern_ids": [
+        "4f14a91d-b6d0-4893-bdd7-2e448407ba05",
+        "e3f3bf56-8b70-4906-96cc-5da1d4de1246",
+        "cd7bd6cf-9e99-4aa8-8893-66c04cc758c6",
+        "605426b0-b6dc-41c3-a5a7-26bcfc58bbeb",
+        "f2d9046d-6ffa-4215-9254-f350ac49e44f",
+        "5ed6ecbc-cafa-4231-9afd-52d4d3d8c541",
+        "974a3562-6360-42b5-b3f6-cdf5d2e9f1fb",
+        "a4a7b8ac-e79f-48bb-be4e-6c8b274f77b1"
+      ],
+      "incident_id": "52d094ac-0406-4b8d-92c2-405305365cfc",
+      "first_seen_ms": 24966.7,
+      "last_seen_ms": 70066.66666666667,
+      "occurrence_count": 8,
+      "last_seen_timestamp_ms": 70066.66666666667,
+      "sha256_hash": "0ecbecbb91a8921a8943d652bc5cfdffa741c014c3d898f6c5623f9216d82238"
+    }
+  },
+  {
+    "event_id": "5e696b10-cac6-438d-b9c4-404137e86e8d",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-07",
+    "actor_track_id": null,
+    "timestamp_ms": 26566.7,
+    "first_seen_ms": 26566.7,
+    "last_seen_ms": 35066.7,
+    "occurrence_count": 3,
+    "peak_risk_score": 95.3,
+    "component_episode_ids": [
+      "4e152a5c-13f6-495f-bace-0c60b48ee776",
+      "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+      "3cfe3abe-a5eb-443d-a2be-17b193ddcd27",
+      "95e647bc-ea67-432d-91a0-11bd6ee8f7fc",
+      "1bf1be16-09bf-47e6-9e6d-0947ea1dc110",
+      "6457f181-b52f-4042-bbce-bb574f9c2500"
+    ],
+    "supporting_pattern_ids": [
+      "e67c553b-053a-4164-8ebd-eace51169067",
+      "9870c83a-2f2a-418f-b6c1-97d845b1bee7",
+      "da873ea0-da73-4abe-befd-d523770f25f1"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\5e696b10-cac6-438d-b9c4-404137e86e8d_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\5e696b10-cac6-438d-b9c4-404137e86e8d_snapshot.jpg",
+    "sha256_hash": "c9276560ccab5f023bd180a5550d23426711b178ed51e10117e929276ad24ab6",
+    "metadata": {
+      "risk_score": 85.4,
+      "peak_risk_score": 95.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 4 in 25s window"
+      ],
+      "observation_quality": 0.787,
+      "component_episode_ids": [
+        "4e152a5c-13f6-495f-bace-0c60b48ee776",
+        "a16bb5a9-1e09-4c51-ad7a-239ee3a6c8f6",
+        "3cfe3abe-a5eb-443d-a2be-17b193ddcd27",
+        "95e647bc-ea67-432d-91a0-11bd6ee8f7fc",
+        "1bf1be16-09bf-47e6-9e6d-0947ea1dc110",
+        "6457f181-b52f-4042-bbce-bb574f9c2500"
+      ],
+      "supporting_pattern_ids": [
+        "e67c553b-053a-4164-8ebd-eace51169067",
+        "9870c83a-2f2a-418f-b6c1-97d845b1bee7",
+        "da873ea0-da73-4abe-befd-d523770f25f1"
+      ],
+      "incident_id": "5e696b10-cac6-438d-b9c4-404137e86e8d",
+      "first_seen_ms": 26566.7,
+      "last_seen_ms": 35066.66666666667,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 35066.66666666667,
+      "sha256_hash": "c9276560ccab5f023bd180a5550d23426711b178ed51e10117e929276ad24ab6"
+    }
+  },
+  {
+    "event_id": "cc45bb4c-9b3b-4f9f-ac83-9f43ea4256b7",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 31366.7,
+    "first_seen_ms": 31366.7,
+    "last_seen_ms": 39700.0,
+    "occurrence_count": 4,
+    "peak_risk_score": 94.7,
+    "component_episode_ids": [
+      "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+      "19922fc6-ec07-470a-a946-5492e0cef041",
+      "8ca09a0b-fa70-4983-b9e7-7dc3122428d5",
+      "40f99a8d-034a-4016-9b57-f5dcabff49e1",
+      "b706f166-bad3-47fe-8509-a6f9531ab549",
+      "a11b07f4-20d7-4fa5-aa3b-57d265ab0e1c"
+    ],
+    "supporting_pattern_ids": [
+      "e84a89bb-456a-4d09-bd1a-920784ed140a",
+      "533e2d0f-f6e8-4751-b31f-af8d9b56636a",
+      "1b549689-2a60-4907-aa78-a9450204e0b0",
+      "0df1efc4-c6b0-45d3-a956-7bd2b8e5c6c3"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\cc45bb4c-9b3b-4f9f-ac83-9f43ea4256b7_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\cc45bb4c-9b3b-4f9f-ac83-9f43ea4256b7_snapshot.jpg",
+    "sha256_hash": "770a35c683622c40253cfb32f0c7a4339cf8fae6d3161dcb217c644381520481",
+    "metadata": {
+      "risk_score": 94.7,
+      "peak_risk_score": 94.7,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 3 in 25s window"
+      ],
+      "observation_quality": 0.685,
+      "component_episode_ids": [
+        "b42d67b1-ee5f-47bc-b66d-aa2d22605843",
+        "19922fc6-ec07-470a-a946-5492e0cef041",
+        "8ca09a0b-fa70-4983-b9e7-7dc3122428d5",
+        "40f99a8d-034a-4016-9b57-f5dcabff49e1",
+        "b706f166-bad3-47fe-8509-a6f9531ab549",
+        "a11b07f4-20d7-4fa5-aa3b-57d265ab0e1c"
+      ],
+      "supporting_pattern_ids": [
+        "e84a89bb-456a-4d09-bd1a-920784ed140a",
+        "533e2d0f-f6e8-4751-b31f-af8d9b56636a",
+        "1b549689-2a60-4907-aa78-a9450204e0b0",
+        "0df1efc4-c6b0-45d3-a956-7bd2b8e5c6c3"
+      ],
+      "incident_id": "cc45bb4c-9b3b-4f9f-ac83-9f43ea4256b7",
+      "first_seen_ms": 31366.7,
+      "last_seen_ms": 39700.0,
+      "occurrence_count": 4,
+      "last_seen_timestamp_ms": 39700.0,
+      "sha256_hash": "770a35c683622c40253cfb32f0c7a4339cf8fae6d3161dcb217c644381520481"
+    }
+  },
+  {
+    "event_id": "b6212612-f096-4202-8a56-f246af61b04a",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-16",
+    "actor_track_id": null,
+    "timestamp_ms": 33533.3,
+    "first_seen_ms": 33533.3,
+    "last_seen_ms": 48566.7,
+    "occurrence_count": 7,
+    "peak_risk_score": 94.3,
+    "component_episode_ids": [
+      "974c8236-b45f-48cc-ab1e-0904e7de378e",
+      "8dd14951-66ad-4c93-a38c-e68dfe0f238b",
+      "5dceb9d6-660c-444e-9fb1-ea21baa99284",
+      "386267ba-0877-4ef7-80f6-d4cc95359d19",
+      "01adf28e-dc9d-4f15-b571-2f92c1edfd8f",
+      "fb85cabc-4d50-4986-83f0-bf043bd336a5",
+      "955054d1-8eec-46a0-9b85-9eb1bbabd87e"
+    ],
+    "supporting_pattern_ids": [
+      "99122d2b-39e3-4b82-bda1-0fa4220bdfff",
+      "772366c1-7898-4483-8e72-34e03fb062a4",
+      "38cc606b-374f-41f2-8db5-da913d0ce3bb",
+      "be4ee2eb-570e-4dbf-aab6-b8b02908876a",
+      "6a752f6c-8690-42e5-8a0b-cfa69f5b243a"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\b6212612-f096-4202-8a56-f246af61b04a_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\b6212612-f096-4202-8a56-f246af61b04a_snapshot.jpg",
+    "sha256_hash": "d811a73be6a56df61a71ca946f971caeba9a77cceb2ed8e92cc3a6d387241f73",
+    "metadata": {
+      "risk_score": 80.6,
+      "peak_risk_score": 94.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.749,
+      "component_episode_ids": [
+        "974c8236-b45f-48cc-ab1e-0904e7de378e",
+        "8dd14951-66ad-4c93-a38c-e68dfe0f238b",
+        "5dceb9d6-660c-444e-9fb1-ea21baa99284",
+        "386267ba-0877-4ef7-80f6-d4cc95359d19",
+        "01adf28e-dc9d-4f15-b571-2f92c1edfd8f",
+        "fb85cabc-4d50-4986-83f0-bf043bd336a5",
+        "955054d1-8eec-46a0-9b85-9eb1bbabd87e"
+      ],
+      "supporting_pattern_ids": [
+        "99122d2b-39e3-4b82-bda1-0fa4220bdfff",
+        "772366c1-7898-4483-8e72-34e03fb062a4",
+        "38cc606b-374f-41f2-8db5-da913d0ce3bb",
+        "be4ee2eb-570e-4dbf-aab6-b8b02908876a",
+        "6a752f6c-8690-42e5-8a0b-cfa69f5b243a"
+      ],
+      "incident_id": "b6212612-f096-4202-8a56-f246af61b04a",
+      "first_seen_ms": 33533.3,
+      "last_seen_ms": 48566.66666666667,
+      "occurrence_count": 7,
+      "last_seen_timestamp_ms": 48566.66666666667,
+      "sha256_hash": "d811a73be6a56df61a71ca946f971caeba9a77cceb2ed8e92cc3a6d387241f73"
+    }
+  },
+  {
+    "event_id": "42139258-fabe-4250-88e6-1c89cd9ac2fd",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-18",
+    "actor_track_id": null,
+    "timestamp_ms": 34333.3,
+    "first_seen_ms": 34333.3,
+    "last_seen_ms": 61166.7,
+    "occurrence_count": 7,
+    "peak_risk_score": 88.8,
+    "component_episode_ids": [
+      "0d6a74bd-f54e-44e6-940b-9ce748591a7d",
+      "022e4980-7561-43ba-b926-901b475dc46e",
+      "5e5582c8-fa01-45a8-b80f-c8e12455f2d0",
+      "7bc836aa-e684-4a13-9ea0-5492ef68d8ba",
+      "fd1cb47d-5cdb-478a-bb85-e706151c0706",
+      "a718a818-1201-44fd-b663-0f78a8416ae6",
+      "188d6819-9876-446e-b9c7-538c423af115",
+      "ed70c51d-9528-4f36-8164-2c2d06455516",
+      "f485f93f-bc79-4c15-b649-47804b999129",
+      "0dfc0ee0-4065-4a12-84ce-bc2d6ca57a92"
+    ],
+    "supporting_pattern_ids": [
+      "fbb264a5-cb6a-44a4-abb1-eece9389b255",
+      "6624e3d2-c74f-44b1-9456-884a744bdf2f",
+      "b4d9e8ff-b0af-4a86-a864-bb3388067861",
+      "87a3a57b-4804-434f-9f32-6569fad854d8",
+      "9e88cf2b-f191-48cb-ac9f-5120c8cde102"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\42139258-fabe-4250-88e6-1c89cd9ac2fd_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\42139258-fabe-4250-88e6-1c89cd9ac2fd_snapshot.jpg",
+    "sha256_hash": "8b655e25039469b647939330a0f8d3b8ee441e9a637362e4c302dd5311c04422",
+    "metadata": {
+      "risk_score": 83.8,
+      "peak_risk_score": 88.8,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 5 in 25s window"
+      ],
+      "observation_quality": 0.815,
+      "component_episode_ids": [
+        "0d6a74bd-f54e-44e6-940b-9ce748591a7d",
+        "022e4980-7561-43ba-b926-901b475dc46e",
+        "5e5582c8-fa01-45a8-b80f-c8e12455f2d0",
+        "7bc836aa-e684-4a13-9ea0-5492ef68d8ba",
+        "fd1cb47d-5cdb-478a-bb85-e706151c0706",
+        "a718a818-1201-44fd-b663-0f78a8416ae6",
+        "188d6819-9876-446e-b9c7-538c423af115",
+        "ed70c51d-9528-4f36-8164-2c2d06455516",
+        "f485f93f-bc79-4c15-b649-47804b999129",
+        "0dfc0ee0-4065-4a12-84ce-bc2d6ca57a92"
+      ],
+      "supporting_pattern_ids": [
+        "fbb264a5-cb6a-44a4-abb1-eece9389b255",
+        "6624e3d2-c74f-44b1-9456-884a744bdf2f",
+        "b4d9e8ff-b0af-4a86-a864-bb3388067861",
+        "87a3a57b-4804-434f-9f32-6569fad854d8",
+        "9e88cf2b-f191-48cb-ac9f-5120c8cde102"
+      ],
+      "incident_id": "42139258-fabe-4250-88e6-1c89cd9ac2fd",
+      "first_seen_ms": 34333.3,
+      "last_seen_ms": 61166.66666666667,
+      "occurrence_count": 7,
+      "last_seen_timestamp_ms": 61166.66666666667,
+      "sha256_hash": "8b655e25039469b647939330a0f8d3b8ee441e9a637362e4c302dd5311c04422"
+    }
+  },
+  {
+    "event_id": "f2ca332f-dfae-4053-bbf0-c8c98495ab65",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-07",
+    "actor_track_id": null,
+    "timestamp_ms": 35066.7,
+    "first_seen_ms": 35066.7,
+    "last_seen_ms": 52566.7,
+    "occurrence_count": 3,
+    "peak_risk_score": 95.3,
+    "component_episode_ids": [
+      "6457f181-b52f-4042-bbce-bb574f9c2500",
+      "95e647bc-ea67-432d-91a0-11bd6ee8f7fc",
+      "1bf1be16-09bf-47e6-9e6d-0947ea1dc110",
+      "bc97c5fd-c812-450b-a03d-29586fe84e24",
+      "96b61dc8-9395-4090-b044-badd7fe08ab9"
+    ],
+    "supporting_pattern_ids": [
+      "da873ea0-da73-4abe-befd-d523770f25f1",
+      "e0bcb465-699b-4b73-9457-3d99aa1a15fa",
+      "c3d03651-5d2e-4291-8343-25db879668cc"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\f2ca332f-dfae-4053-bbf0-c8c98495ab65_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\f2ca332f-dfae-4053-bbf0-c8c98495ab65_snapshot.jpg",
+    "sha256_hash": "6c546797aa1b0cc96ca508e39d4a286d5662da3c3fa55a2333f36954a51964a7",
+    "metadata": {
+      "risk_score": 95.3,
+      "peak_risk_score": 95.3,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 6.4s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "6457f181-b52f-4042-bbce-bb574f9c2500",
+        "95e647bc-ea67-432d-91a0-11bd6ee8f7fc",
+        "1bf1be16-09bf-47e6-9e6d-0947ea1dc110",
+        "bc97c5fd-c812-450b-a03d-29586fe84e24",
+        "96b61dc8-9395-4090-b044-badd7fe08ab9"
+      ],
+      "supporting_pattern_ids": [
+        "da873ea0-da73-4abe-befd-d523770f25f1",
+        "e0bcb465-699b-4b73-9457-3d99aa1a15fa",
+        "c3d03651-5d2e-4291-8343-25db879668cc"
+      ],
+      "incident_id": "f2ca332f-dfae-4053-bbf0-c8c98495ab65",
+      "first_seen_ms": 35066.7,
+      "last_seen_ms": 52566.66666666667,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 52566.66666666667,
+      "sha256_hash": "6c546797aa1b0cc96ca508e39d4a286d5662da3c3fa55a2333f36954a51964a7"
+    }
+  },
+  {
+    "event_id": "08c89e7d-1eca-463b-b8a4-c944a6e60e98",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-06",
+    "actor_track_id": null,
+    "timestamp_ms": 38466.7,
+    "first_seen_ms": 38466.7,
+    "last_seen_ms": 40100.0,
+    "occurrence_count": 2,
+    "peak_risk_score": 80.9,
+    "component_episode_ids": [
+      "d6e4c7b4-9a8e-4b7d-bd24-b8c174faa6dd",
+      "afead15e-1f2c-43df-a6ad-81015614182c",
+      "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+      "6afaa1c3-5db4-41d2-8c11-4f60c16b30df",
+      "da89d225-d6a5-46e8-b639-015bf5e2cc64"
+    ],
+    "supporting_pattern_ids": [
+      "09332658-4d00-470a-b205-8b6a27229e0d",
+      "a3c36187-1a3d-4398-a6a5-37df8ad68196"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\08c89e7d-1eca-463b-b8a4-c944a6e60e98_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\08c89e7d-1eca-463b-b8a4-c944a6e60e98_snapshot.jpg",
+    "sha256_hash": "3ddc10fa64b85601f531042f37c5653b8b42730aac587747ab87632956879049",
+    "metadata": {
+      "risk_score": 80.9,
+      "peak_risk_score": 80.9,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 4 in 25s window"
+      ],
+      "observation_quality": 0.853,
+      "component_episode_ids": [
+        "d6e4c7b4-9a8e-4b7d-bd24-b8c174faa6dd",
+        "afead15e-1f2c-43df-a6ad-81015614182c",
+        "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+        "6afaa1c3-5db4-41d2-8c11-4f60c16b30df",
+        "da89d225-d6a5-46e8-b639-015bf5e2cc64"
+      ],
+      "supporting_pattern_ids": [
+        "09332658-4d00-470a-b205-8b6a27229e0d",
+        "a3c36187-1a3d-4398-a6a5-37df8ad68196"
+      ],
+      "incident_id": "08c89e7d-1eca-463b-b8a4-c944a6e60e98",
+      "first_seen_ms": 38466.7,
+      "last_seen_ms": 40100.0,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 40100.0,
+      "sha256_hash": "3ddc10fa64b85601f531042f37c5653b8b42730aac587747ab87632956879049"
+    }
+  },
+  {
+    "event_id": "dbce0bee-ab94-4a52-b4e9-fe297cbc0890",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 39700.0,
+    "first_seen_ms": 39700.0,
+    "last_seen_ms": 48466.7,
+    "occurrence_count": 3,
+    "peak_risk_score": 96.3,
+    "component_episode_ids": [
+      "a11b07f4-20d7-4fa5-aa3b-57d265ab0e1c",
+      "b706f166-bad3-47fe-8509-a6f9531ab549",
+      "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+      "88c7a653-a022-4960-bb61-ab2647c1c014"
+    ],
+    "supporting_pattern_ids": [
+      "0df1efc4-c6b0-45d3-a956-7bd2b8e5c6c3",
+      "956e51e5-e3a0-4839-843c-7e6f3090be18",
+      "755bc8a7-d7b8-4fcf-83eb-c76d5f26e137"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\dbce0bee-ab94-4a52-b4e9-fe297cbc0890_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\dbce0bee-ab94-4a52-b4e9-fe297cbc0890_snapshot.jpg",
+    "sha256_hash": "bc5c7ebdc52babdcb3f1ca0e73be3ade44dd74c6175b3c6c787e7dee9b4ce1d9",
+    "metadata": {
+      "risk_score": 84.5,
+      "peak_risk_score": 96.3,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.961,
+      "component_episode_ids": [
+        "a11b07f4-20d7-4fa5-aa3b-57d265ab0e1c",
+        "b706f166-bad3-47fe-8509-a6f9531ab549",
+        "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+        "88c7a653-a022-4960-bb61-ab2647c1c014"
+      ],
+      "supporting_pattern_ids": [
+        "0df1efc4-c6b0-45d3-a956-7bd2b8e5c6c3",
+        "956e51e5-e3a0-4839-843c-7e6f3090be18",
+        "755bc8a7-d7b8-4fcf-83eb-c76d5f26e137"
+      ],
+      "incident_id": "dbce0bee-ab94-4a52-b4e9-fe297cbc0890",
+      "first_seen_ms": 39700.0,
+      "last_seen_ms": 48466.66666666667,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 48466.66666666667,
+      "sha256_hash": "bc5c7ebdc52babdcb3f1ca0e73be3ade44dd74c6175b3c6c787e7dee9b4ce1d9"
+    }
+  },
+  {
+    "event_id": "21ce7a29-f4a1-4617-9224-3c9c551dba7b",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-03",
+    "actor_track_id": null,
+    "timestamp_ms": 41866.7,
+    "first_seen_ms": 41866.7,
+    "last_seen_ms": 41866.7,
+    "occurrence_count": 1,
+    "peak_risk_score": 87.8,
+    "component_episode_ids": [],
+    "supporting_pattern_ids": [],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "SUSPICIOUS_POSTURE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\21ce7a29-f4a1-4617-9224-3c9c551dba7b_T0_SUSPICIOUS_POSTURE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\21ce7a29-f4a1-4617-9224-3c9c551dba7b_snapshot.jpg",
+    "sha256_hash": "89d8c8a2d1ac95661311e72877296993c80ef04b43a3447d770d193d0b2c9039",
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 87.8,
+      "primary_pattern": "SUSPICIOUS_POSTURE",
+      "supporting_cues": [],
+      "observation_quality": 0.85,
+      "component_episode_ids": [],
+      "supporting_pattern_ids": [],
+      "incident_id": "21ce7a29-f4a1-4617-9224-3c9c551dba7b",
+      "first_seen_ms": 41866.7,
+      "last_seen_ms": 41866.7,
+      "occurrence_count": 1,
+      "sha256_hash": "89d8c8a2d1ac95661311e72877296993c80ef04b43a3447d770d193d0b2c9039"
+    }
+  },
+  {
+    "event_id": "e748219d-2117-4252-bbb6-024f77e2506e",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-06",
+    "actor_track_id": null,
+    "timestamp_ms": 43466.7,
+    "first_seen_ms": 43466.7,
+    "last_seen_ms": 61200.0,
+    "occurrence_count": 8,
+    "peak_risk_score": 99.0,
+    "component_episode_ids": [
+      "da89d225-d6a5-46e8-b639-015bf5e2cc64",
+      "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+      "6afaa1c3-5db4-41d2-8c11-4f60c16b30df",
+      "c9b8fc38-da4b-4e08-bab5-bb80cab7be7d",
+      "61b62254-3a91-41ac-90d4-40fa6866d060",
+      "c0f93e17-f5c7-4a0d-9809-feee59e4bccd",
+      "5adfca4f-67bd-45a0-97e8-273bd3886136",
+      "966e8ed5-6c0a-412d-b350-400bc18aef79",
+      "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9",
+      "513c8488-429d-4710-a596-29f84d1fe400"
+    ],
+    "supporting_pattern_ids": [
+      "a3c36187-1a3d-4398-a6a5-37df8ad68196",
+      "bb668995-f256-4087-bbbb-399d1c66a387",
+      "20d98b46-0f7f-4486-82b4-314f74053044",
+      "4adf3424-02ff-4edf-b54a-f850f4c776e0",
+      "71dead46-c1d9-4aa4-a28c-9461932d320b",
+      "35c88a8d-5709-4c12-9e2c-7ad75a02f1e4"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\e748219d-2117-4252-bbb6-024f77e2506e_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\e748219d-2117-4252-bbb6-024f77e2506e_snapshot.jpg",
+    "sha256_hash": "6ffd82d9cf68c000666ae29554eb804312e2a7c54743cf251bea6f2922bfae39",
+    "metadata": {
+      "risk_score": 86.5,
+      "peak_risk_score": 99.0,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.955,
+      "component_episode_ids": [
+        "da89d225-d6a5-46e8-b639-015bf5e2cc64",
+        "5fe9b06f-1d2b-47e4-96ea-d6af02c6cb36",
+        "6afaa1c3-5db4-41d2-8c11-4f60c16b30df",
+        "c9b8fc38-da4b-4e08-bab5-bb80cab7be7d",
+        "61b62254-3a91-41ac-90d4-40fa6866d060",
+        "c0f93e17-f5c7-4a0d-9809-feee59e4bccd",
+        "5adfca4f-67bd-45a0-97e8-273bd3886136",
+        "966e8ed5-6c0a-412d-b350-400bc18aef79",
+        "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9",
+        "513c8488-429d-4710-a596-29f84d1fe400"
+      ],
+      "supporting_pattern_ids": [
+        "a3c36187-1a3d-4398-a6a5-37df8ad68196",
+        "bb668995-f256-4087-bbbb-399d1c66a387",
+        "20d98b46-0f7f-4486-82b4-314f74053044",
+        "4adf3424-02ff-4edf-b54a-f850f4c776e0",
+        "71dead46-c1d9-4aa4-a28c-9461932d320b",
+        "35c88a8d-5709-4c12-9e2c-7ad75a02f1e4"
+      ],
+      "incident_id": "e748219d-2117-4252-bbb6-024f77e2506e",
+      "first_seen_ms": 43466.7,
+      "last_seen_ms": 61200.00000000001,
+      "occurrence_count": 8,
+      "last_seen_timestamp_ms": 61200.00000000001,
+      "sha256_hash": "6ffd82d9cf68c000666ae29554eb804312e2a7c54743cf251bea6f2922bfae39"
+    }
+  },
+  {
+    "event_id": "1d7f3848-310a-4707-972f-6968c21238f7",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-21",
+    "actor_track_id": null,
+    "timestamp_ms": 44333.3,
+    "first_seen_ms": 44333.3,
+    "last_seen_ms": 64733.3,
+    "occurrence_count": 5,
+    "peak_risk_score": 86.2,
+    "component_episode_ids": [
+      "0e698680-98e5-4538-84f6-0a89f682314d",
+      "bef4ebbc-fe32-4ecb-881b-1e94ea8e96f9",
+      "4e8c5420-7e76-4897-9f51-9edf6d96e9b1",
+      "92d8defc-22bf-4372-9519-d1467f68330c",
+      "8195f6a1-fd16-4de7-b704-8d01479b4020",
+      "73f0a3d3-9256-4022-8229-b80a146ba8e3",
+      "4471d519-cf1a-4384-b779-698a53029ca7",
+      "78c1beb5-1268-49b6-a9a9-ab13b6d2608b",
+      "b0af1bcf-3a23-41a6-9134-a53f25be3f52",
+      "0506ea7a-e3d3-4342-bf15-267da5547da6",
+      "4705317d-1a18-4b3e-bae4-15685281531f"
+    ],
+    "supporting_pattern_ids": [
+      "6010823c-0fbc-4377-9b7f-ad1959ebb12e",
+      "fa508b88-4a8f-4468-bec1-4c11b18d0300",
+      "6909eb7a-9678-4be2-ae75-feb9657575bf",
+      "e772107e-d5ff-44f3-9f86-14198e35a95e"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\1d7f3848-310a-4707-972f-6968c21238f7_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\1d7f3848-310a-4707-972f-6968c21238f7_snapshot.jpg",
+    "sha256_hash": "4070bdc1ed98de150c4be0054ffabbf74ad9a725fc5b2993129e860319eb24be",
+    "metadata": {
+      "risk_score": 81.6,
+      "peak_risk_score": 86.2,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 4 in 25s window"
+      ],
+      "observation_quality": 0.788,
+      "component_episode_ids": [
+        "0e698680-98e5-4538-84f6-0a89f682314d",
+        "bef4ebbc-fe32-4ecb-881b-1e94ea8e96f9",
+        "4e8c5420-7e76-4897-9f51-9edf6d96e9b1",
+        "92d8defc-22bf-4372-9519-d1467f68330c",
+        "8195f6a1-fd16-4de7-b704-8d01479b4020",
+        "73f0a3d3-9256-4022-8229-b80a146ba8e3",
+        "4471d519-cf1a-4384-b779-698a53029ca7",
+        "78c1beb5-1268-49b6-a9a9-ab13b6d2608b",
+        "b0af1bcf-3a23-41a6-9134-a53f25be3f52",
+        "0506ea7a-e3d3-4342-bf15-267da5547da6",
+        "4705317d-1a18-4b3e-bae4-15685281531f"
+      ],
+      "supporting_pattern_ids": [
+        "6010823c-0fbc-4377-9b7f-ad1959ebb12e",
+        "fa508b88-4a8f-4468-bec1-4c11b18d0300",
+        "6909eb7a-9678-4be2-ae75-feb9657575bf",
+        "e772107e-d5ff-44f3-9f86-14198e35a95e"
+      ],
+      "incident_id": "1d7f3848-310a-4707-972f-6968c21238f7",
+      "first_seen_ms": 44333.3,
+      "last_seen_ms": 64733.333333333336,
+      "occurrence_count": 5,
+      "last_seen_timestamp_ms": 64733.333333333336,
+      "sha256_hash": "4070bdc1ed98de150c4be0054ffabbf74ad9a725fc5b2993129e860319eb24be"
+    }
+  },
+  {
+    "event_id": "7a1cff0c-1f0d-4289-a348-237ef23b23bb",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 48466.7,
+    "first_seen_ms": 48466.7,
+    "last_seen_ms": 58066.7,
+    "occurrence_count": 4,
+    "peak_risk_score": 96.3,
+    "component_episode_ids": [
+      "88c7a653-a022-4960-bb61-ab2647c1c014",
+      "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+      "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32",
+      "ac541d93-dd38-4672-ba35-7a9ad1979c80"
+    ],
+    "supporting_pattern_ids": [
+      "755bc8a7-d7b8-4fcf-83eb-c76d5f26e137",
+      "b3bd4029-47d8-4053-891a-f36f9624ef95",
+      "b7d67fcf-6178-4957-8ffd-7550b84aa8dd"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\7a1cff0c-1f0d-4289-a348-237ef23b23bb_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\7a1cff0c-1f0d-4289-a348-237ef23b23bb_snapshot.jpg",
+    "sha256_hash": "b0fd871d2df61355e2798ff8264938c69a93e481f716e39014a2b293230f1754",
+    "metadata": {
+      "risk_score": 96.3,
+      "peak_risk_score": 96.3,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 3.1s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "88c7a653-a022-4960-bb61-ab2647c1c014",
+        "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+        "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32",
+        "ac541d93-dd38-4672-ba35-7a9ad1979c80"
+      ],
+      "supporting_pattern_ids": [
+        "755bc8a7-d7b8-4fcf-83eb-c76d5f26e137",
+        "b3bd4029-47d8-4053-891a-f36f9624ef95",
+        "b7d67fcf-6178-4957-8ffd-7550b84aa8dd"
+      ],
+      "incident_id": "7a1cff0c-1f0d-4289-a348-237ef23b23bb",
+      "first_seen_ms": 48466.7,
+      "last_seen_ms": 58066.66666666667,
+      "occurrence_count": 4,
+      "last_seen_timestamp_ms": 58066.66666666667,
+      "sha256_hash": "b0fd871d2df61355e2798ff8264938c69a93e481f716e39014a2b293230f1754"
+    }
+  },
+  {
+    "event_id": "3b66fea9-80dc-4253-9b4b-9838944a4c24",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-15",
+    "actor_track_id": null,
+    "timestamp_ms": 50400.0,
+    "first_seen_ms": 50400.0,
+    "last_seen_ms": 61466.7,
+    "occurrence_count": 3,
+    "peak_risk_score": 100.0,
+    "component_episode_ids": [
+      "f5bda610-7bc6-478d-99d6-8f6b3aa2fc53",
+      "e84b393d-c4be-4ab0-8115-998affe13db9",
+      "c90b231d-a1c7-462b-977d-610f43a0d46d",
+      "86a5601e-fa87-44e8-b8a1-6906ecce1323",
+      "6a31aa9e-2358-4a32-b6f5-227e1bfcae4d",
+      "c8160722-479c-4b99-869e-e52e5e46355c",
+      "29a24049-2fef-4851-be3e-db26c01503ec",
+      "f00c655d-2b43-47d0-a19f-3a5d8216efa0"
+    ],
+    "supporting_pattern_ids": [
+      "c7b06cac-7365-4a08-af1b-490d4b16a941",
+      "4585ea1b-8ca8-4d42-a898-b0c53b552386",
+      "de54b5f2-4766-4b42-89dd-ffd6908ed9a1"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\3b66fea9-80dc-4253-9b4b-9838944a4c24_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\3b66fea9-80dc-4253-9b4b-9838944a4c24_snapshot.jpg",
+    "sha256_hash": "c7c21fdd679bcbed62603fed432517e03f4917010d136c84b06d058ac80ce39d",
+    "metadata": {
+      "risk_score": 100.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "f5bda610-7bc6-478d-99d6-8f6b3aa2fc53",
+        "e84b393d-c4be-4ab0-8115-998affe13db9",
+        "c90b231d-a1c7-462b-977d-610f43a0d46d",
+        "86a5601e-fa87-44e8-b8a1-6906ecce1323",
+        "6a31aa9e-2358-4a32-b6f5-227e1bfcae4d",
+        "c8160722-479c-4b99-869e-e52e5e46355c",
+        "29a24049-2fef-4851-be3e-db26c01503ec",
+        "f00c655d-2b43-47d0-a19f-3a5d8216efa0"
+      ],
+      "supporting_pattern_ids": [
+        "c7b06cac-7365-4a08-af1b-490d4b16a941",
+        "4585ea1b-8ca8-4d42-a898-b0c53b552386",
+        "de54b5f2-4766-4b42-89dd-ffd6908ed9a1"
+      ],
+      "incident_id": "3b66fea9-80dc-4253-9b4b-9838944a4c24",
+      "first_seen_ms": 50400.0,
+      "last_seen_ms": 61466.66666666667,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 61466.66666666667,
+      "sha256_hash": "c7c21fdd679bcbed62603fed432517e03f4917010d136c84b06d058ac80ce39d"
+    }
+  },
+  {
+    "event_id": "14d7dea6-09a8-4ea2-8a76-9b9c3810e165",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-16",
+    "actor_track_id": null,
+    "timestamp_ms": 51333.3,
+    "first_seen_ms": 51333.3,
+    "last_seen_ms": 65500.0,
+    "occurrence_count": 3,
+    "peak_risk_score": 92.2,
+    "component_episode_ids": [
+      "955054d1-8eec-46a0-9b85-9eb1bbabd87e",
+      "386267ba-0877-4ef7-80f6-d4cc95359d19",
+      "01adf28e-dc9d-4f15-b571-2f92c1edfd8f",
+      "fb85cabc-4d50-4986-83f0-bf043bd336a5",
+      "2cbbc86f-604b-417c-8655-3fb3d9046201",
+      "1a5a50f0-9ef7-4010-9fe5-83c7814fd6d8"
+    ],
+    "supporting_pattern_ids": [
+      "6a752f6c-8690-42e5-8a0b-cfa69f5b243a",
+      "93d5b089-fdc3-4975-aba1-a217f21bff84",
+      "2dc53797-6cff-437e-a126-4878f5b38d6d"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\14d7dea6-09a8-4ea2-8a76-9b9c3810e165_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\14d7dea6-09a8-4ea2-8a76-9b9c3810e165_snapshot.jpg",
+    "sha256_hash": "30d79914e3b6ae88f5a900c6b0a8f959484f82409d696e0330990d15dd907bae",
+    "metadata": {
+      "risk_score": 92.2,
+      "peak_risk_score": 92.2,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 5.9s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "955054d1-8eec-46a0-9b85-9eb1bbabd87e",
+        "386267ba-0877-4ef7-80f6-d4cc95359d19",
+        "01adf28e-dc9d-4f15-b571-2f92c1edfd8f",
+        "fb85cabc-4d50-4986-83f0-bf043bd336a5",
+        "2cbbc86f-604b-417c-8655-3fb3d9046201",
+        "1a5a50f0-9ef7-4010-9fe5-83c7814fd6d8"
+      ],
+      "supporting_pattern_ids": [
+        "6a752f6c-8690-42e5-8a0b-cfa69f5b243a",
+        "93d5b089-fdc3-4975-aba1-a217f21bff84",
+        "2dc53797-6cff-437e-a126-4878f5b38d6d"
+      ],
+      "incident_id": "14d7dea6-09a8-4ea2-8a76-9b9c3810e165",
+      "first_seen_ms": 51333.3,
+      "last_seen_ms": 65500.00000000001,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 65500.00000000001,
+      "sha256_hash": "30d79914e3b6ae88f5a900c6b0a8f959484f82409d696e0330990d15dd907bae"
+    }
+  },
+  {
+    "event_id": "972a7b88-4b26-459c-8a2b-3ae10f8f2b7a",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-08",
+    "actor_track_id": null,
+    "timestamp_ms": 55833.3,
+    "first_seen_ms": 55833.3,
+    "last_seen_ms": 68533.3,
+    "occurrence_count": 3,
+    "peak_risk_score": 95.3,
+    "component_episode_ids": [
+      "7ecfff45-ef7c-42f1-924d-d8a82cf348e7",
+      "c2d9e958-b221-46a2-a6ed-a3c5c894a460",
+      "1ed741e5-e068-49a0-9328-73b8a1d640d5",
+      "5dc45362-cb1a-43b2-a99e-e6d8b40c6f96"
+    ],
+    "supporting_pattern_ids": [
+      "a117ea01-3f72-4370-8704-c0b5f3a03658",
+      "878e408d-1676-445b-b589-3a5f5b104cca",
+      "4d82b68f-4f1d-4e3b-bbc0-34b18b811b2c"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\972a7b88-4b26-459c-8a2b-3ae10f8f2b7a_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\972a7b88-4b26-459c-8a2b-3ae10f8f2b7a_snapshot.jpg",
+    "sha256_hash": "1ce4bf3b9d74c2ef4ffc7ca265287bdcd1dc3b9f37cb1cec6124831db4353c19",
+    "metadata": {
+      "risk_score": 95.3,
+      "peak_risk_score": 95.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.839,
+      "component_episode_ids": [
+        "7ecfff45-ef7c-42f1-924d-d8a82cf348e7",
+        "c2d9e958-b221-46a2-a6ed-a3c5c894a460",
+        "1ed741e5-e068-49a0-9328-73b8a1d640d5",
+        "5dc45362-cb1a-43b2-a99e-e6d8b40c6f96"
+      ],
+      "supporting_pattern_ids": [
+        "a117ea01-3f72-4370-8704-c0b5f3a03658",
+        "878e408d-1676-445b-b589-3a5f5b104cca",
+        "4d82b68f-4f1d-4e3b-bbc0-34b18b811b2c"
+      ],
+      "incident_id": "972a7b88-4b26-459c-8a2b-3ae10f8f2b7a",
+      "first_seen_ms": 55833.3,
+      "last_seen_ms": 68533.33333333334,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 68533.33333333334,
+      "sha256_hash": "1ce4bf3b9d74c2ef4ffc7ca265287bdcd1dc3b9f37cb1cec6124831db4353c19"
+    }
+  },
+  {
+    "event_id": "87dbdea0-b08c-4102-9655-60e3df13aee6",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-18",
+    "actor_track_id": null,
+    "timestamp_ms": 61166.7,
+    "first_seen_ms": 61166.7,
+    "last_seen_ms": 61233.3,
+    "occurrence_count": 2,
+    "peak_risk_score": 88.8,
+    "component_episode_ids": [
+      "0dfc0ee0-4065-4a12-84ce-bc2d6ca57a92",
+      "a718a818-1201-44fd-b663-0f78a8416ae6",
+      "188d6819-9876-446e-b9c7-538c423af115",
+      "f485f93f-bc79-4c15-b649-47804b999129",
+      "3019e3f6-5478-404d-b617-7d1a077d80bd",
+      "a4c4377a-d344-4404-a0d5-2a229283a2bb",
+      "54bb7a37-5e82-41c5-bfb0-c122fa07e18c"
+    ],
+    "supporting_pattern_ids": [
+      "9e88cf2b-f191-48cb-ac9f-5120c8cde102",
+      "c093ee31-1e54-49e8-ab3e-58b30d833496"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\87dbdea0-b08c-4102-9655-60e3df13aee6_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\87dbdea0-b08c-4102-9655-60e3df13aee6_snapshot.jpg",
+    "sha256_hash": "ec0edcbe92f7f9957713b79c49087a0082713d2b3012e14e37c363f58ecfe90c",
+    "metadata": {
+      "risk_score": 88.8,
+      "peak_risk_score": 88.8,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "0dfc0ee0-4065-4a12-84ce-bc2d6ca57a92",
+        "a718a818-1201-44fd-b663-0f78a8416ae6",
+        "188d6819-9876-446e-b9c7-538c423af115",
+        "f485f93f-bc79-4c15-b649-47804b999129",
+        "3019e3f6-5478-404d-b617-7d1a077d80bd",
+        "a4c4377a-d344-4404-a0d5-2a229283a2bb",
+        "54bb7a37-5e82-41c5-bfb0-c122fa07e18c"
+      ],
+      "supporting_pattern_ids": [
+        "9e88cf2b-f191-48cb-ac9f-5120c8cde102",
+        "c093ee31-1e54-49e8-ab3e-58b30d833496"
+      ],
+      "incident_id": "87dbdea0-b08c-4102-9655-60e3df13aee6",
+      "first_seen_ms": 61166.7,
+      "last_seen_ms": 61233.333333333336,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 61233.333333333336,
+      "sha256_hash": "ec0edcbe92f7f9957713b79c49087a0082713d2b3012e14e37c363f58ecfe90c"
+    }
+  },
+  {
+    "event_id": "8f874e1a-d9e7-4644-9995-cfd2f0100af2",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-03",
+    "actor_track_id": null,
+    "timestamp_ms": 62733.3,
+    "first_seen_ms": 62733.3,
+    "last_seen_ms": 62733.3,
+    "occurrence_count": 1,
+    "peak_risk_score": 87.8,
+    "component_episode_ids": [],
+    "supporting_pattern_ids": [],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "SUSPICIOUS_POSTURE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\8f874e1a-d9e7-4644-9995-cfd2f0100af2_T0_SUSPICIOUS_POSTURE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\8f874e1a-d9e7-4644-9995-cfd2f0100af2_snapshot.jpg",
+    "sha256_hash": "e55325e338652e525c83c28d31c11cb557b2c5dd14aca0395724882ebcd81408",
+    "metadata": {
+      "risk_score": 83.5,
+      "peak_risk_score": 87.8,
+      "primary_pattern": "SUSPICIOUS_POSTURE",
+      "supporting_cues": [],
+      "observation_quality": 0.85,
+      "component_episode_ids": [],
+      "supporting_pattern_ids": [],
+      "incident_id": "8f874e1a-d9e7-4644-9995-cfd2f0100af2",
+      "first_seen_ms": 62733.3,
+      "last_seen_ms": 62733.3,
+      "occurrence_count": 1,
+      "sha256_hash": "e55325e338652e525c83c28d31c11cb557b2c5dd14aca0395724882ebcd81408"
+    }
+  },
+  {
+    "event_id": "ad9eb6d9-1767-42ef-9d63-3d3fb1b09b4a",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 62900.0,
+    "first_seen_ms": 62900.0,
+    "last_seen_ms": 67633.3,
+    "occurrence_count": 3,
+    "peak_risk_score": 85.2,
+    "component_episode_ids": [
+      "ac541d93-dd38-4672-ba35-7a9ad1979c80",
+      "1a018750-e934-4e12-91d0-6ecda5fba0e4",
+      "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+      "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32"
+    ],
+    "supporting_pattern_ids": [
+      "b7d67fcf-6178-4957-8ffd-7550b84aa8dd",
+      "2be79f7b-e188-4289-8756-0b032c037057",
+      "3db0f7ec-5634-467f-8462-71e58faa53c5"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\ad9eb6d9-1767-42ef-9d63-3d3fb1b09b4a_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\ad9eb6d9-1767-42ef-9d63-3d3fb1b09b4a_snapshot.jpg",
+    "sha256_hash": "6acfa557fb1a17f3faa871c1847082b5dca14354a61048b8baf6bef5eff673a8",
+    "metadata": {
+      "risk_score": 85.2,
+      "peak_risk_score": 85.2,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.959,
+      "component_episode_ids": [
+        "ac541d93-dd38-4672-ba35-7a9ad1979c80",
+        "1a018750-e934-4e12-91d0-6ecda5fba0e4",
+        "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+        "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32"
+      ],
+      "supporting_pattern_ids": [
+        "b7d67fcf-6178-4957-8ffd-7550b84aa8dd",
+        "2be79f7b-e188-4289-8756-0b032c037057",
+        "3db0f7ec-5634-467f-8462-71e58faa53c5"
+      ],
+      "incident_id": "ad9eb6d9-1767-42ef-9d63-3d3fb1b09b4a",
+      "first_seen_ms": 62900.0,
+      "last_seen_ms": 67633.33333333334,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 67633.33333333334,
+      "sha256_hash": "6acfa557fb1a17f3faa871c1847082b5dca14354a61048b8baf6bef5eff673a8"
+    }
+  },
+  {
+    "event_id": "e34a90c3-e5e6-471b-b819-1aaa7a83f9f4",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-06",
+    "actor_track_id": null,
+    "timestamp_ms": 64100.0,
+    "first_seen_ms": 64100.0,
+    "last_seen_ms": 65933.3,
+    "occurrence_count": 3,
+    "peak_risk_score": 84.3,
+    "component_episode_ids": [
+      "513c8488-429d-4710-a596-29f84d1fe400",
+      "c9b8fc38-da4b-4e08-bab5-bb80cab7be7d",
+      "c0f93e17-f5c7-4a0d-9809-feee59e4bccd",
+      "5adfca4f-67bd-45a0-97e8-273bd3886136",
+      "966e8ed5-6c0a-412d-b350-400bc18aef79",
+      "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9"
+    ],
+    "supporting_pattern_ids": [
+      "35c88a8d-5709-4c12-9e2c-7ad75a02f1e4",
+      "ff80e967-8148-4ddf-9ba7-03e96651153f",
+      "86cd349a-bacb-459a-9fcb-4651567581d3"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\e34a90c3-e5e6-471b-b819-1aaa7a83f9f4_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\e34a90c3-e5e6-471b-b819-1aaa7a83f9f4_snapshot.jpg",
+    "sha256_hash": "df6d7c3207a5ce140c965c8af52bd3d56f0cde54ed924656b5d80919a501e72b",
+    "metadata": {
+      "risk_score": 84.3,
+      "peak_risk_score": 84.3,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "513c8488-429d-4710-a596-29f84d1fe400",
+        "c9b8fc38-da4b-4e08-bab5-bb80cab7be7d",
+        "c0f93e17-f5c7-4a0d-9809-feee59e4bccd",
+        "5adfca4f-67bd-45a0-97e8-273bd3886136",
+        "966e8ed5-6c0a-412d-b350-400bc18aef79",
+        "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9"
+      ],
+      "supporting_pattern_ids": [
+        "35c88a8d-5709-4c12-9e2c-7ad75a02f1e4",
+        "ff80e967-8148-4ddf-9ba7-03e96651153f",
+        "86cd349a-bacb-459a-9fcb-4651567581d3"
+      ],
+      "incident_id": "e34a90c3-e5e6-471b-b819-1aaa7a83f9f4",
+      "first_seen_ms": 64100.0,
+      "last_seen_ms": 65933.33333333334,
+      "occurrence_count": 3,
+      "last_seen_timestamp_ms": 65933.33333333334,
+      "sha256_hash": "df6d7c3207a5ce140c965c8af52bd3d56f0cde54ed924656b5d80919a501e72b"
+    }
+  },
+  {
+    "event_id": "77854416-74fe-4dd9-95c7-e3cf156e4c39",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-14",
+    "actor_track_id": null,
+    "timestamp_ms": 67066.7,
+    "first_seen_ms": 67066.7,
+    "last_seen_ms": 67066.7,
+    "occurrence_count": 1,
+    "peak_risk_score": 89.2,
+    "component_episode_ids": [
+      "0a73bc33-df12-48b1-886f-fd3b065b0cda"
+    ],
+    "supporting_pattern_ids": [
+      "30cf51cf-7036-4a88-909e-e4615cfff70c"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\77854416-74fe-4dd9-95c7-e3cf156e4c39_T0_MULTI_PERSON_DWELL_NEAR_SEAT.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\77854416-74fe-4dd9-95c7-e3cf156e4c39_snapshot.jpg",
+    "sha256_hash": "8e11dc0fd097c8e311744b64622aa3667d6c0bda34d09d461ce2c68c7d8ea012",
+    "metadata": {
+      "risk_score": 89.2,
+      "peak_risk_score": 89.2,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "0a73bc33-df12-48b1-886f-fd3b065b0cda"
+      ],
+      "supporting_pattern_ids": [
+        "30cf51cf-7036-4a88-909e-e4615cfff70c"
+      ],
+      "incident_id": "77854416-74fe-4dd9-95c7-e3cf156e4c39",
+      "first_seen_ms": 67066.7,
+      "last_seen_ms": 67066.7,
+      "occurrence_count": 1,
+      "sha256_hash": "8e11dc0fd097c8e311744b64622aa3667d6c0bda34d09d461ce2c68c7d8ea012"
+    }
+  },
+  {
+    "event_id": "a2a93445-0a18-4d91-9c35-920f86636b0d",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-15",
+    "actor_track_id": null,
+    "timestamp_ms": 69300.0,
+    "first_seen_ms": 69300.0,
+    "last_seen_ms": 71466.7,
+    "occurrence_count": 2,
+    "peak_risk_score": 96.1,
+    "component_episode_ids": [
+      "86a5601e-fa87-44e8-b8a1-6906ecce1323",
+      "6a31aa9e-2358-4a32-b6f5-227e1bfcae4d",
+      "c8160722-479c-4b99-869e-e52e5e46355c",
+      "29a24049-2fef-4851-be3e-db26c01503ec",
+      "f00c655d-2b43-47d0-a19f-3a5d8216efa0",
+      "ae0e383c-198e-4cb9-9815-f9b091521f22",
+      "61741b44-740b-452f-b8cf-d80bdf91e313"
+    ],
+    "supporting_pattern_ids": [
+      "de54b5f2-4766-4b42-89dd-ffd6908ed9a1",
+      "74072dcf-6dd9-45b6-8685-d62996b8facb"
+    ],
+    "severity": "HIGH",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\a2a93445-0a18-4d91-9c35-920f86636b0d_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\a2a93445-0a18-4d91-9c35-920f86636b0d_snapshot.jpg",
+    "sha256_hash": "37291dfb4f724b4a5f8d60545b8b4767f055ea962bd05fe9e4433c01bf4db709",
+    "metadata": {
+      "risk_score": 96.1,
+      "peak_risk_score": 96.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 5 in 25s window"
+      ],
+      "observation_quality": 0.803,
+      "component_episode_ids": [
+        "86a5601e-fa87-44e8-b8a1-6906ecce1323",
+        "6a31aa9e-2358-4a32-b6f5-227e1bfcae4d",
+        "c8160722-479c-4b99-869e-e52e5e46355c",
+        "29a24049-2fef-4851-be3e-db26c01503ec",
+        "f00c655d-2b43-47d0-a19f-3a5d8216efa0",
+        "ae0e383c-198e-4cb9-9815-f9b091521f22",
+        "61741b44-740b-452f-b8cf-d80bdf91e313"
+      ],
+      "supporting_pattern_ids": [
+        "de54b5f2-4766-4b42-89dd-ffd6908ed9a1",
+        "74072dcf-6dd9-45b6-8685-d62996b8facb"
+      ],
+      "incident_id": "a2a93445-0a18-4d91-9c35-920f86636b0d",
+      "first_seen_ms": 69300.0,
+      "last_seen_ms": 71466.66666666667,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 71466.66666666667,
+      "sha256_hash": "37291dfb4f724b4a5f8d60545b8b4767f055ea962bd05fe9e4433c01bf4db709"
+    }
+  },
+  {
+    "event_id": "c7e859c6-6a20-446d-9c77-b6754ec7de26",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-12",
+    "actor_track_id": null,
+    "timestamp_ms": 69433.3,
+    "first_seen_ms": 69433.3,
+    "last_seen_ms": 69433.3,
+    "occurrence_count": 1,
+    "peak_risk_score": 81.8,
+    "component_episode_ids": [
+      "9890b022-d25b-496b-9ada-850f844f6224",
+      "2563e1cc-675a-4026-8be0-5b82391de8f9",
+      "0d106833-f7ba-40ce-9d0b-36fc2efb50b2",
+      "855c0790-332d-43ff-a7c2-7c86609f3b35",
+      "7baf794f-66b1-4545-8a54-1f00e16459f2",
+      "ad80c400-0a8d-4509-9089-9b9492224725"
+    ],
+    "supporting_pattern_ids": [
+      "7278639b-62f8-4bf5-9c92-8f222a10c5d3"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\c7e859c6-6a20-446d-9c77-b6754ec7de26_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\c7e859c6-6a20-446d-9c77-b6754ec7de26_snapshot.jpg",
+    "sha256_hash": "c7f95343a12b772867ab45acb0bc3b404123002329f71ef6f47f88a2bda4deb6",
+    "metadata": {
+      "risk_score": 81.8,
+      "peak_risk_score": 81.8,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 6 in 25s window"
+      ],
+      "observation_quality": 0.867,
+      "component_episode_ids": [
+        "9890b022-d25b-496b-9ada-850f844f6224",
+        "2563e1cc-675a-4026-8be0-5b82391de8f9",
+        "0d106833-f7ba-40ce-9d0b-36fc2efb50b2",
+        "855c0790-332d-43ff-a7c2-7c86609f3b35",
+        "7baf794f-66b1-4545-8a54-1f00e16459f2",
+        "ad80c400-0a8d-4509-9089-9b9492224725"
+      ],
+      "supporting_pattern_ids": [
+        "7278639b-62f8-4bf5-9c92-8f222a10c5d3"
+      ],
+      "incident_id": "c7e859c6-6a20-446d-9c77-b6754ec7de26",
+      "first_seen_ms": 69433.3,
+      "last_seen_ms": 69433.3,
+      "occurrence_count": 1,
+      "sha256_hash": "c7f95343a12b772867ab45acb0bc3b404123002329f71ef6f47f88a2bda4deb6"
+    }
+  },
+  {
+    "event_id": "e6165e41-bd26-4fa7-9929-b8c69079af87",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-09",
+    "actor_track_id": null,
+    "timestamp_ms": 69733.3,
+    "first_seen_ms": 69733.3,
+    "last_seen_ms": 69733.3,
+    "occurrence_count": 1,
+    "peak_risk_score": 96.3,
+    "component_episode_ids": [
+      "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+      "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32"
+    ],
+    "supporting_pattern_ids": [
+      "3db0f7ec-5634-467f-8462-71e58faa53c5"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\e6165e41-bd26-4fa7-9929-b8c69079af87_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\e6165e41-bd26-4fa7-9929-b8c69079af87_snapshot.jpg",
+    "sha256_hash": "2de915b99c92f37cd0c434aae4bd1d8db13fc6466bd5b121b226601643315058",
+    "metadata": {
+      "risk_score": 82.8,
+      "peak_risk_score": 96.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.722,
+      "component_episode_ids": [
+        "091d83ef-edc0-4125-8eb6-0ec9d98d1277",
+        "c80c54bf-b3f6-41d4-b120-3a87f2dbfa32"
+      ],
+      "supporting_pattern_ids": [
+        "3db0f7ec-5634-467f-8462-71e58faa53c5"
+      ],
+      "incident_id": "e6165e41-bd26-4fa7-9929-b8c69079af87",
+      "first_seen_ms": 69733.3,
+      "last_seen_ms": 69733.3,
+      "occurrence_count": 1,
+      "sha256_hash": "2de915b99c92f37cd0c434aae4bd1d8db13fc6466bd5b121b226601643315058"
+    }
+  },
+  {
+    "event_id": "36c04ac1-963c-4987-a934-6379de7a52e5",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-06",
+    "actor_track_id": null,
+    "timestamp_ms": 71133.3,
+    "first_seen_ms": 71133.3,
+    "last_seen_ms": 71133.3,
+    "occurrence_count": 1,
+    "peak_risk_score": 99.0,
+    "component_episode_ids": [
+      "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9"
+    ],
+    "supporting_pattern_ids": [
+      "86cd349a-bacb-459a-9fcb-4651567581d3"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "NEIGHBOR_ORIENTED_LEAN",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\36c04ac1-963c-4987-a934-6379de7a52e5_T0_NEIGHBOR_ORIENTED_LEAN.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\36c04ac1-963c-4987-a934-6379de7a52e5_snapshot.jpg",
+    "sha256_hash": "cd81d45e58fc5440faaf61ac702441b1f8e35cb112f19e6461b3bfaa3680b2d3",
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 99.0,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.944,
+      "component_episode_ids": [
+        "c12b8b3e-df8b-4e40-9c21-b574e5c17bd9"
+      ],
+      "supporting_pattern_ids": [
+        "86cd349a-bacb-459a-9fcb-4651567581d3"
+      ],
+      "incident_id": "36c04ac1-963c-4987-a934-6379de7a52e5",
+      "first_seen_ms": 71133.3,
+      "last_seen_ms": 71133.3,
+      "occurrence_count": 1,
+      "sha256_hash": "cd81d45e58fc5440faaf61ac702441b1f8e35cb112f19e6461b3bfaa3680b2d3"
+    }
+  },
+  {
+    "event_id": "5a93f6d1-a59f-44d1-95d6-d62f446c3339",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": "CAM-CALIB-01",
+    "seat_code": "SEAT-ROOM-CALIB-01-18",
+    "actor_track_id": null,
+    "timestamp_ms": 71200.0,
+    "first_seen_ms": 71200.0,
+    "last_seen_ms": 71233.3,
+    "occurrence_count": 2,
+    "peak_risk_score": 84.3,
+    "component_episode_ids": [
+      "a718a818-1201-44fd-b663-0f78a8416ae6",
+      "188d6819-9876-446e-b9c7-538c423af115",
+      "f485f93f-bc79-4c15-b649-47804b999129",
+      "3019e3f6-5478-404d-b617-7d1a077d80bd",
+      "a4c4377a-d344-4404-a0d5-2a229283a2bb",
+      "54bb7a37-5e82-41c5-bfb0-c122fa07e18c"
+    ],
+    "supporting_pattern_ids": [
+      "c093ee31-1e54-49e8-ab3e-58b30d833496",
+      "7e70448e-996e-49a7-bfc2-21eca7382907"
+    ],
+    "severity": "MEDIUM",
+    "status": "FLAGGED_FOR_REVIEW",
+    "title": "REPEATED_NEIGHBOR_GLANCE",
+    "description": "",
+    "evidence_clip_path": "data\\optimization\\after\\india\\evidence\\5a93f6d1-a59f-44d1-95d6-d62f446c3339_T0_REPEATED_NEIGHBOR_GLANCE.mp4",
+    "evidence_snapshot_path": "data\\optimization\\after\\india\\evidence\\5a93f6d1-a59f-44d1-95d6-d62f446c3339_snapshot.jpg",
+    "sha256_hash": "5131cef91d366f4bf47cbe48d09b010c5803ffc83d46c77e00d23fedbb2c8c37",
+    "metadata": {
+      "risk_score": 84.3,
+      "peak_risk_score": 84.3,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 6 in 25s window"
+      ],
+      "observation_quality": 0.837,
+      "component_episode_ids": [
+        "a718a818-1201-44fd-b663-0f78a8416ae6",
+        "188d6819-9876-446e-b9c7-538c423af115",
+        "f485f93f-bc79-4c15-b649-47804b999129",
+        "3019e3f6-5478-404d-b617-7d1a077d80bd",
+        "a4c4377a-d344-4404-a0d5-2a229283a2bb",
+        "54bb7a37-5e82-41c5-bfb0-c122fa07e18c"
+      ],
+      "supporting_pattern_ids": [
+        "c093ee31-1e54-49e8-ab3e-58b30d833496",
+        "7e70448e-996e-49a7-bfc2-21eca7382907"
+      ],
+      "incident_id": "5a93f6d1-a59f-44d1-95d6-d62f446c3339",
+      "first_seen_ms": 71200.0,
+      "last_seen_ms": 71233.33333333334,
+      "occurrence_count": 2,
+      "last_seen_timestamp_ms": 71233.33333333334,
+      "sha256_hash": "5131cef91d366f4bf47cbe48d09b010c5803ffc83d46c77e00d23fedbb2c8c37"
+    }
+  }
+]

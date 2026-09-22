@@ -95,6 +95,9 @@ class BehaviorPatternEngine:
         self._seen_episode_ids: Dict[str, Set[str]] = {}
         # Emitted pattern cooldown tracking: (seat_id, pattern_type) -> last_emitted_timestamp_ms
         self._pattern_cooldowns: Dict[Tuple[str, str], float] = {}
+        # Stable evidence identity prevents the same component episodes from
+        # being re-emitted with a fresh UUID after a time-only cooldown.
+        self._emitted_evidence_keys: Dict[Tuple[str, str, Tuple[str, ...]], float] = {}
 
     def ingest_episodes(
         self,
@@ -169,7 +172,26 @@ class BehaviorPatternEngine:
         if below_desk_pattern:
             detected_patterns.append(below_desk_pattern)
 
-        return detected_patterns
+        for key, expiry in list(self._emitted_evidence_keys.items()):
+            if timestamp_ms > expiry:
+                del self._emitted_evidence_keys[key]
+
+        unique_patterns: List[BehaviorPattern] = []
+        for pattern in detected_patterns:
+            evidence_key = (
+                pattern.pattern_type,
+                pattern.seat_id,
+                tuple(sorted(pattern.component_episode_ids)),
+            )
+            if evidence_key in self._emitted_evidence_keys:
+                continue
+            self._emitted_evidence_keys[evidence_key] = timestamp_ms + self.glance_rolling_window_ms
+            pattern.metadata["evidence_identity"] = "|".join(
+                [pattern.pattern_type, pattern.seat_id, *evidence_key[2]]
+            )
+            unique_patterns.append(pattern)
+
+        return unique_patterns
 
     def _evaluate_repeated_glances(
         self,
@@ -190,9 +212,13 @@ class BehaviorPatternEngine:
             return None
 
         seat_id = seat_context.seat_id
-        all_recent = self._episode_history.get(seat_id, []) + [
-            ep for ep in active_episodes if ep.seat_id == seat_id and ep.state in (EpisodeState.ACTIVE, EpisodeState.ENDING)
-        ]
+        ep_dict: Dict[str, TemporalEpisode] = {}
+        for ep in self._episode_history.get(seat_id, []):
+            ep_dict[ep.episode_id] = ep
+        for ep in active_episodes:
+            if ep.seat_id == seat_id and ep.state in (EpisodeState.ACTIVE, EpisodeState.ENDING):
+                ep_dict[ep.episode_id] = ep
+        all_recent = list(ep_dict.values())
 
         # Check Left glances (strictly requires configured left neighbor)
         left_neighbor = seat_context.neighbors.left_neighbor_id
@@ -312,7 +338,7 @@ class BehaviorPatternEngine:
             pattern_type=PatternType.NEIGHBOR_ORIENTED_LEAN.value,
             start_timestamp_ms=target_ep.start_timestamp_ms,
             end_timestamp_ms=timestamp_ms,
-            confidence=target_ep.confidence * (1.15 if has_head_turn else 1.0),
+            confidence=min(1.0, target_ep.confidence * (1.15 if has_head_turn else 1.0)),
             quality=target_ep.quality,
             primary_direction=direction,
             target_neighbor_id=target_neighbor,

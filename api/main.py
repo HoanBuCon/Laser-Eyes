@@ -9,18 +9,24 @@ Implements SRS v1.0 specifications:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import os
+import secrets
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
+from api.realtime import realtime_manager
+from classroom_monitor.demo.runtime import DemoRuntime
 from api.routes import (
     cameras,
     data_workbench,
+    demo,
     events,
     inference,
     rooms,
@@ -40,61 +46,82 @@ logging.basicConfig(
 logger = logging.getLogger("VigilAPI")
 
 
-class ConnectionManager:
-    """Manages active WebSocket connections for realtime dashboard notifications."""
-
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
-
-    async def broadcast(self, message: dict):
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_json(message)
-            except Exception:
-                self.disconnect(connection)
-
-
-ws_manager = ConnectionManager()
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown hooks."""
     logger.info("Initializing VIGIL AI database schema...")
     init_db()
+    loop = asyncio.get_running_loop()
+    realtime_manager.set_event_loop(loop)
+    runtime = DemoRuntime.get_instance()
+
+    def publish_event(_event, payload):
+        realtime_manager.broadcast_threadsafe({"type": "REVIEW_INCIDENT", "event": payload})
+
+    def publish_status(status):
+        payload = status.to_dict() if hasattr(status, "to_dict") else dict(status)
+        realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": payload})
+
+    runtime.register_event_callback(publish_event)
+    runtime.register_status_callback(publish_status)
     logger.info("VIGIL AI Enterprise Proctoring Server is ready!")
-    yield
-    logger.info("Shutting down VIGIL AI server...")
+    try:
+        yield
+    finally:
+        runtime.unregister_event_callback(publish_event)
+        runtime.unregister_status_callback(publish_status)
+        realtime_manager.clear_event_loop(loop)
+        logger.info("Shutting down VIGIL AI server...")
 
 
 app = FastAPI(
-    title="VIGIL AI — Exam Cheating Surveillance API",
-    description="Enterprise Multi-Room AI Proctoring and Cheating Detection REST API (SRS v1.0).",
-    version="2.5.0",
+    title="VIGIL AI — AI-Assisted Exam Monitoring API",
+    description="Enterprise Multi-Room AI Proctoring and Review Incident Management REST API (SRS v2.0).",
+    version="2.6.0",
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc",
 )
 
-# Enable CORS for web dashboards and external microservices
+@app.get("/favicon.ico", include_in_schema=False)
+def favicon():
+    """Silence browser default favicon requests."""
+    return Response(status_code=204)
+
+
+def _cors_origins() -> list[str]:
+    configured = os.getenv("VIGIL_CORS_ORIGINS", "")
+    if configured.strip():
+        return [origin.strip() for origin in configured.split(",") if origin.strip()]
+    return ["http://127.0.0.1:8000", "http://localhost:8000"]
+
+
+@app.middleware("http")
+async def protect_network_demo(request: Request, call_next):
+    """Require the opt-in demo token for API calls when one is configured."""
+    token = os.getenv("VIGIL_DEMO_TOKEN")
+    if token and request.url.path.startswith(("/api/", "/demo/")):
+        supplied = request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+        if not supplied or not secrets.compare_digest(supplied, token):
+            return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
+    return await call_next(request)
+
+
+# Dashboard origins are explicit. Credentials are not needed by this prototype.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Register demo router at root as well for direct dashboard convenience
+app.include_router(demo.router)
+
 # Register API Routers under /api/v1 (SRS standard) and /api (legacy compatibility)
 for prefix in ["/api/v1", "/api"]:
+    app.include_router(demo.router, prefix=prefix)
     app.include_router(sites.router, prefix=prefix)
     app.include_router(rooms.router, prefix=prefix)
     app.include_router(cameras.router, prefix=prefix)
@@ -111,7 +138,7 @@ for prefix in ["/api/v1", "/api"]:
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
     """Service liveness probe."""
-    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.5.0"}
+    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0"}
 
 
 @app.get("/ready", tags=["Health"])
@@ -122,9 +149,15 @@ def readiness_check():
 
 
 @app.websocket("/ws/events")
+@app.websocket("/ws/demo")
 async def websocket_events_endpoint(websocket: WebSocket):
-    """WebSocket stream for real-time proctoring event notifications."""
-    await ws_manager.connect(websocket)
+    """WebSocket stream for real-time proctoring event notifications & live demo telemetry."""
+    token = os.getenv("VIGIL_DEMO_TOKEN")
+    supplied = websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
+    if token and (not supplied or not secrets.compare_digest(supplied, token)):
+        await websocket.close(code=1008, reason="Valid demo token required")
+        return
+    await realtime_manager.connect(websocket)
     try:
         while True:
             # Keep connection open and receive optional client ping
@@ -132,7 +165,7 @@ async def websocket_events_endpoint(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_text("pong")
     except WebSocketDisconnect:
-        ws_manager.disconnect(websocket)
+        realtime_manager.disconnect(websocket)
 
 
 # Mount Dashboard Static Directory
@@ -147,6 +180,14 @@ if dashboard_dir.exists():
         if index_file.exists():
             return FileResponse(str(index_file))
         return {"message": "Dashboard index.html not found, please visit /docs"}
+
+    @app.get("/demo", tags=["Dashboard"])
+    def serve_demo_page():
+        """Serve the Unified Competition Demo Page."""
+        demo_file = dashboard_dir / "demo.html"
+        if demo_file.exists():
+            return FileResponse(str(demo_file))
+        return {"message": "Competition demo page demo.html not found, please visit /docs"}
 
     @app.get("/calibration", tags=["Dashboard"])
     def serve_calibration_tool():
@@ -163,4 +204,3 @@ if dashboard_dir.exists():
         if workbench_file.exists():
             return FileResponse(str(workbench_file))
         return {"message": "Data Workbench data_workbench.html not found, please visit /docs"}
-

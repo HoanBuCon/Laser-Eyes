@@ -110,6 +110,71 @@ def test_p0_04_05_seat_roi_mapping_and_identity_stability():
     assert mgr.occupancies["SEAT_01"].state == SeatState.OCCUPIED
 
 
+@pytest.mark.parametrize("reverse_order", [False, True])
+def test_overlapping_seat_rois_choose_best_match_independent_of_config_order(reverse_order):
+    """A detection in overlapping ROIs maps by geometry, never YAML order."""
+    broad = {
+        "id": "S-BROAD",
+        "room_id": "ROOM_A101",
+        "seat_code": "SEAT_BROAD",
+        "polygon_json": [[0, 0], [100, 0], [100, 100], [0, 100]],
+    }
+    precise = {
+        "id": "S-PRECISE",
+        "room_id": "ROOM_A101",
+        "seat_code": "SEAT_PRECISE",
+        "polygon_json": [[40, 40], [80, 40], [80, 80], [40, 80]],
+    }
+    definitions = [precise, broad] if reverse_order else [broad, precise]
+    mgr = SeatManager(room_id="ROOM_A101")
+    mgr.load_seats(definitions)
+
+    # Bottom-center anchor is approximately (60, 60), inside both polygons
+    # but relatively deeper inside the more precise seat ROI.
+    det = Detection(0, "person", 0.92, (50, 40, 70, 64), frame_index=1)
+    mapped, unmapped = mgr.map_detections_to_seats(
+        [det], timestamp_ms=1000.0, frame_w=100, frame_h=100
+    )
+
+    assert mgr.get_seat_for_detection(det, frame_w=100, frame_h=100) == "SEAT_PRECISE"
+    assert mapped["SEAT_PRECISE"] is det
+    assert mapped["SEAT_BROAD"] is None
+    assert unmapped == []
+
+
+def test_overlapping_roi_resolution_preserves_multiple_person_candidates():
+    """Best-match assignment must retain the multiple-person-near-seat signal."""
+    mgr = SeatManager(room_id="ROOM_A101")
+    mgr.load_seats([
+        {
+            "id": "S-BROAD",
+            "room_id": "ROOM_A101",
+            "seat_code": "SEAT_BROAD",
+            "polygon_json": [[0, 0], [100, 0], [100, 100], [0, 100]],
+        },
+        {
+            "id": "S-PRECISE",
+            "room_id": "ROOM_A101",
+            "seat_code": "SEAT_PRECISE",
+            "polygon_json": [[40, 40], [80, 40], [80, 80], [40, 80]],
+        },
+    ])
+    detections = [
+        Detection(0, "person", 0.91, (48, 40, 68, 64), frame_index=1),
+        Detection(0, "person", 0.95, (52, 40, 72, 64), frame_index=1),
+    ]
+
+    mapped, unmapped = mgr.map_detections_to_seats(
+        detections, timestamp_ms=1000.0, frame_w=100, frame_h=100
+    )
+
+    occupancy = mgr.occupancies["SEAT_PRECISE"]
+    assert occupancy.state == SeatState.MULTIPLE_PERSON
+    assert len(occupancy.candidate_detections) == 2
+    assert mapped["SEAT_PRECISE"] is detections[1]
+    assert unmapped == []
+
+
 # ==============================================================================
 # 3. P0-06: Suspicious Behavior Signals & Unknown-Safe Handling
 # ==============================================================================

@@ -120,16 +120,32 @@ class SeatDefinition:
         frame_h: Optional[int] = None,
     ) -> bool:
         """Check if 2D point is inside this seat polygon with automatic normalized scaling support."""
-        if len(self.polygon) < 3:
+        poly = self.polygon_for_frame(pt=pt, frame_w=frame_w, frame_h=frame_h)
+        if len(poly) < 3:
             return False
-        poly = self.polygon
+        res = cv2.pointPolygonTest(poly, (float(pt[0]), float(pt[1])), False)
+        return res >= 0
+
+    def polygon_for_frame(
+        self,
+        *,
+        pt: Optional[Tuple[float, float]] = None,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> np.ndarray:
+        """Return the polygon in the same coordinate space as a frame point."""
+        if len(self.polygon) < 3:
+            return self.polygon.astype(np.float32)
+        poly = self.polygon.astype(np.float32)
         # If polygon is normalized (0.0 to 1.0) and point is in pixel coordinate space (> 1.0)
-        if poly.size > 0 and np.max(poly) <= 1.05 and (pt[0] > 1.05 or pt[1] > 1.05):
+        point_is_pixels = pt is not None and (pt[0] > 1.05 or pt[1] > 1.05)
+        if poly.size > 0 and np.max(poly) <= 1.05 and (
+            point_is_pixels or frame_w is not None or frame_h is not None
+        ):
             w = frame_w if frame_w else 1280
             h = frame_h if frame_h else 720
             poly = poly * np.array([w, h], dtype=np.float32)
-        res = cv2.pointPolygonTest(poly.astype(np.float32), (float(pt[0]), float(pt[1])), False)
-        return res >= 0
+        return poly
 
 
 # Backward compatibility alias
@@ -196,20 +212,82 @@ class SeatManager:
         frame_w: Optional[int] = None,
         frame_h: Optional[int] = None,
     ) -> Optional[str]:
-        """Find the matching seat_code for a single detection using bottom-center anchor point-in-polygon."""
+        """Find the best matching seat for a detection, including overlapping ROIs."""
         x1, y1, x2, y2 = detection.bbox
         ac_x = (x1 + x2) / 2.0
         ac_y = y2 - (y2 - y1) * 0.15
-        for s_code, s_def in self.seats.items():
-            if s_def.contains_point((ac_x, ac_y), frame_w=frame_w, frame_h=frame_h):
-                return s_code
-        return None
+        match = self._best_seat_for_point(
+            (ac_x, ac_y), frame_w=frame_w, frame_h=frame_h
+        )
+        if match is not None:
+            return match
+        return self._best_seat_for_point(
+            detection.center, frame_w=frame_w, frame_h=frame_h
+        )
+
+    @staticmethod
+    def _point_match_score(
+        seat: SeatDefinition,
+        point: Tuple[float, float],
+        *,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> Optional[Tuple[float, float]]:
+        """Score a point inside a seat ROI without favoring physically larger ROIs.
+
+        The first component is signed interior depth normalized by the square
+        root of polygon area.  The second favors the polygon whose centroid is
+        closer on the same normalized scale.  ``None`` means outside the ROI.
+        """
+        poly = seat.polygon_for_frame(pt=point, frame_w=frame_w, frame_h=frame_h)
+        if len(poly) < 3:
+            return None
+        signed_distance = float(
+            cv2.pointPolygonTest(poly, (float(point[0]), float(point[1])), True)
+        )
+        if signed_distance < 0.0:
+            return None
+
+        area_scale = max(float(np.sqrt(abs(cv2.contourArea(poly)))), 1.0)
+        moments = cv2.moments(poly)
+        if abs(moments["m00"]) > 1e-9:
+            center_x = float(moments["m10"] / moments["m00"])
+            center_y = float(moments["m01"] / moments["m00"])
+        else:
+            center_x, center_y = np.mean(poly, axis=0).tolist()
+        centroid_distance = float(
+            np.hypot(point[0] - center_x, point[1] - center_y)
+        )
+        return signed_distance / area_scale, -(centroid_distance / area_scale)
+
+    def _best_seat_for_point(
+        self,
+        point: Tuple[float, float],
+        *,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> Optional[str]:
+        """Choose the strongest containing ROI independently of config order."""
+        candidates: List[Tuple[float, float, str]] = []
+        for seat_code, seat_def in self.seats.items():
+            score = self._point_match_score(
+                seat_def, point, frame_w=frame_w, frame_h=frame_h
+            )
+            if score is not None:
+                candidates.append((score[0], score[1], seat_code))
+        if not candidates:
+            return None
+        # Negated numeric fields select the highest score; seat_code provides
+        # a stable final tie-break instead of YAML/dictionary insertion order.
+        return sorted(candidates, key=lambda item: (-item[0], -item[1], item[2]))[0][2]
 
     def map_detections_to_seats(
         self,
         detections: List[Detection],
         timestamp_ms: float,
         frame_idx: int = 0,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
     ) -> Tuple[Dict[str, Optional[Detection]], List[Detection]]:
         """Map person detections to stable Seat IDs.
 
@@ -231,20 +309,16 @@ class SeatManager:
             # Secondary anchor: bbox centroid
             centroid = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
-            matched_seat_code: Optional[str] = None
-
-            # Test bottom-center anchor first
-            for seat_code, seat_def in self.seats.items():
-                if seat_def.contains_point(bottom_center):
-                    matched_seat_code = seat_code
-                    break
+            # Test all containing ROIs and choose the strongest spatial match.
+            matched_seat_code = self._best_seat_for_point(
+                bottom_center, frame_w=frame_w, frame_h=frame_h
+            )
 
             # Fallback to centroid if bottom-center did not match
             if not matched_seat_code:
-                for seat_code, seat_def in self.seats.items():
-                    if seat_def.contains_point(centroid):
-                        matched_seat_code = seat_code
-                        break
+                matched_seat_code = self._best_seat_for_point(
+                    centroid, frame_w=frame_w, frame_h=frame_h
+                )
 
             if matched_seat_code:
                 self.occupancies[matched_seat_code].candidate_detections.append(det)

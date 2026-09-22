@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import secrets
 import sys
 
 import uvicorn
@@ -24,6 +26,70 @@ logging.basicConfig(
     datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("VigilServer")
+
+CALIBRATION_SOURCES = (
+    {
+        "room_code": "ROOM-CALIB-01",
+        "room_name": "India Classroom Calibration",
+        "capacity": 21,
+        "camera_name": "VIGIL India Calibration Video",
+        "source_uri": "demo_video/india_classroom.mp4",
+        "resolution": "1280x720",
+    },
+    {
+        "room_code": "ROOM-STUDENT-01",
+        "room_name": "Student Classroom Calibration",
+        "capacity": 12,
+        "camera_name": "VIGIL Student Calibration Video",
+        "source_uri": "demo_video/student_classroom.mp4",
+        "resolution": "640x352",
+    },
+)
+
+
+def ensure_calibration_sources(db) -> None:
+    """Idempotently expose both competition videos to the calibration UI."""
+    site = db.query(ExamSite).order_by(ExamSite.created_at.asc()).first()
+    if site is None:
+        site = ExamSite(name="VIGIL Competition Demo")
+        db.add(site)
+        db.flush()
+
+    for spec in CALIBRATION_SOURCES:
+        room = (
+            db.query(ExamRoom)
+            .filter(ExamRoom.room_code == spec["room_code"])
+            .first()
+        )
+        if room is None:
+            room = ExamRoom(
+                site_id=site.id,
+                room_code=spec["room_code"],
+                name=spec["room_name"],
+                capacity=spec["capacity"],
+                description="Competition video Seat ROI calibration workspace",
+            )
+            db.add(room)
+            db.flush()
+
+        camera = (
+            db.query(Camera)
+            .filter(
+                Camera.room_id == room.id,
+                Camera.name == spec["camera_name"],
+            )
+            .first()
+        )
+        if camera is None:
+            camera = Camera(room_id=room.id, name=spec["camera_name"])
+            db.add(camera)
+        camera.source_uri = spec["source_uri"]
+        camera.rtsp_url_protected = spec["source_uri"]
+        camera.resolution = spec["resolution"]
+        camera.position = "competition_video"
+        camera.enabled = True
+        camera.status = "online" if os.path.isfile(spec["source_uri"]) else "error"
+    db.commit()
 
 
 def seed_initial_demo_data() -> None:
@@ -84,6 +150,7 @@ def seed_initial_demo_data() -> None:
             db.add(sess)
             db.commit()
             logger.info("Successfully initialized default demonstration entities!")
+        ensure_calibration_sources(db)
     except Exception as exc:
         logger.warning("Could not seed demo data: %s", exc)
         db.rollback()
@@ -93,10 +160,22 @@ def seed_initial_demo_data() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="VIGIL AI Enterprise Server Launcher")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Binding host IP")
+    parser.add_argument("--host", type=str, default="127.0.0.1", help="Binding host IP (localhost by default)")
     parser.add_argument("--port", type=int, default=8000, help="Listening port")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument(
+        "--demo-token",
+        default=os.getenv("VIGIL_DEMO_TOKEN"),
+        help="Required lightweight API token when binding beyond localhost",
+    )
     args = parser.parse_args()
+
+    loopback_hosts = {"127.0.0.1", "localhost", "::1"}
+    if args.host not in loopback_hosts and not args.demo_token:
+        parser.error("A --demo-token (or VIGIL_DEMO_TOKEN) is required for LAN/public binding")
+    os.environ["VIGIL_BIND_HOST"] = args.host
+    if args.demo_token:
+        os.environ["VIGIL_DEMO_TOKEN"] = args.demo_token
 
     # 1. Initialize DB Schema
     logger.info("Initializing schema tables...")
@@ -109,9 +188,12 @@ def main() -> None:
     print("\n" + "=" * 70)
     print("      🚀 VIGIL AI ENTERPRISE EXAM PROCTORING SERVER RUNNING")
     print("=" * 70)
-    print(f"  * Web Dashboard : http://localhost:{args.port}/")
-    print(f"  * REST API Docs : http://localhost:{args.port}/docs")
-    print(f"  * ReDoc Schema  : http://localhost:{args.port}/redoc")
+    print(f"  * Web Demo (ICTU) : http://localhost:{args.port}/demo")
+    print(f"  * Web Dashboard   : http://localhost:{args.port}/")
+    print(f"  * REST API Docs   : http://localhost:{args.port}/docs")
+    print(f"  * ReDoc Schema    : http://localhost:{args.port}/redoc")
+    if args.demo_token:
+        print("  * Network access  : protected by X-Vigil-Demo-Token")
     print("=" * 70 + "\n")
 
     # 4. Start Uvicorn Server

@@ -1,0 +1,2900 @@
+[
+  {
+    "pattern_id": "f8cf83f6-dce8-4a15-84ba-7c413990f776",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 166.7,
+    "end_timestamp_ms": 1266.7,
+    "confidence": 0.431,
+    "quality": 0.974,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "e0a79e59-2055-48c3-8943-c01452d00aaa"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "596a44bd-1de5-4b2d-a9b5-6794a372c8ab",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 1133.3,
+    "end_timestamp_ms": 2133.3,
+    "confidence": 0.863,
+    "quality": 0.931,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "3392eda2-e08f-4fe2-a59d-f4f52addcf05"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "8651256e-34e6-4aa4-90f9-a0f4cb5286ab",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2300.0,
+    "confidence": 0.37,
+    "quality": 0.57,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-19",
+    "component_episode_ids": [
+      "c4038deb-8642-420a-8983-4a54f8315c24",
+      "f634b52b-ca78-4e68-97cc-3b91995515e0"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "86138030-4346-4480-8dfc-616b286abdd3",
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c32d9b37-9437-4842-b5f1-9a8b8f48e708"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "edc489c5-2578-4c6b-84c9-d0759b183c3a",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "33518f85-0140-4f0b-bda7-85f57bd2bd5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e9e3c764-71bf-4b38-a314-5bb2a803503e",
+    "seat_id": "SEAT-ROOM-CALIB-01-14",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "92cd6488-016a-4aaf-8fd9-9b2b0dc74c55"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9db1c7b1-f1eb-46bc-8233-f8488ebbd179",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 2566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c917e612-b001-4276-ace8-2f09524fa465"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9a53ed5b-4596-472d-aeb0-d4152bd9a2f0",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 300.0,
+    "end_timestamp_ms": 2800.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "3827fdc9-73b3-4aec-b7ea-dfb7f57b63f2"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "1fd52b9b-f415-40c9-93d5-39fd3a484832",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 1866.7,
+    "end_timestamp_ms": 2900.0,
+    "confidence": 0.628,
+    "quality": 0.933,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "b378f0e5-0f16-4f2f-841f-c745037dd5a2"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d051c5ad-ea64-4d62-8dab-9023311387c1",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 3500.0,
+    "confidence": 0.534,
+    "quality": 0.605,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5fb4e7ec-3d15-4343-9d5b-9fd6963c8615",
+      "9178cf63-2d9e-41a8-a1f2-6b852e57ad29"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "79d23756-f2b1-420e-b329-2760642f224f",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 1133.3,
+    "end_timestamp_ms": 3633.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "92f6bb9a-2118-4eb1-b99c-f56dce6aa135"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "04d89ac9-a636-403b-a5e4-ed3c046c9b34",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 1133.3,
+    "end_timestamp_ms": 3633.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "480e2629-8ca6-4c82-8d4d-b158936b9bbb"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "0cc41c87-0a84-45ee-95c5-9150b6de64dd",
+    "seat_id": "SEAT-ROOM-CALIB-01-12",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 3700.0,
+    "confidence": 0.622,
+    "quality": 0.614,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "ba366241-4bbb-4e79-a1cc-a6112ca3bdc2",
+      "8ebb0e74-2189-4401-9f94-1dac790b74ca"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "de8e6db6-0463-467e-a37e-b3c386671452",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 4700.0,
+    "confidence": 0.582,
+    "quality": 0.652,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-08",
+    "component_episode_ids": [
+      "fa1f0606-f96f-41b0-acb6-751be08e1441",
+      "990b31e4-7431-4219-8389-ce3b15802228"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "847ab20e-14f7-4147-8417-ede62e597173",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 866.7,
+    "end_timestamp_ms": 4900.0,
+    "confidence": 0.833,
+    "quality": 0.779,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "7726d238-880f-4dc1-a7de-ba52b46f5773",
+      "64961bd9-5cb5-448f-a23e-5551af243f74"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "4ae8b590-9fc2-4624-8a32-6d844093bacd",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 5300.0,
+    "end_timestamp_ms": 7800.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "e5edb0ad-8bd1-45af-95ef-6a61a5cfcc28"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "4f015ee1-5dc3-4bd7-a2ca-a7f0367a7b93",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 8066.7,
+    "end_timestamp_ms": 9266.7,
+    "confidence": 0.392,
+    "quality": 0.917,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "b2008991-c467-46b2-bafe-2f81430a970a"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "89041173-7623-4fce-bba9-74cdd56df381",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 9700.0,
+    "confidence": 0.758,
+    "quality": 0.637,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "c6e55481-ff17-488a-a47a-69d4cd53b9e7",
+      "dbdd671f-141e-4e93-bb6d-17817718ca04"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "f9d5ce09-1598-45a5-9a88-62e927e667e5",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 7366.7,
+    "end_timestamp_ms": 9866.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "04b13a8f-aff8-450f-8067-b32136067e24"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "16412007-a9f9-4622-a039-94f76994cbfb",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1500.0,
+    "end_timestamp_ms": 10100.0,
+    "confidence": 0.791,
+    "quality": 0.493,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "75447c3e-871b-46b7-a654-e5efa8771edf",
+      "9430eddb-061c-4548-a806-9042c0305e03"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d739d995-1599-4941-b6d3-d9c969d10288",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 10066.7,
+    "end_timestamp_ms": 12100.0,
+    "confidence": 0.804,
+    "quality": 0.613,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "335dd260-ccee-4bcc-9609-e109280ef2f8",
+      "c86592db-b4b5-47a0-84b3-280d3383a2ef"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "31a4256c-0442-4300-805b-8f8b0cf454d0",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 12300.0,
+    "confidence": 0.425,
+    "quality": 0.545,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-19",
+    "component_episode_ids": [
+      "c4038deb-8642-420a-8983-4a54f8315c24",
+      "f634b52b-ca78-4e68-97cc-3b91995515e0"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "0c1506e2-3060-4017-a8e8-2a009c2025a8",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 11533.3,
+    "end_timestamp_ms": 12533.3,
+    "confidence": 0.669,
+    "quality": 0.937,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "02013c00-82eb-4637-99fa-f984f18927bc"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9769c2d7-c8b2-4452-854a-bf806d85a20f",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 12233.3,
+    "end_timestamp_ms": 13233.3,
+    "confidence": 1.026,
+    "quality": 0.964,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "1f2486e2-cca4-4257-af96-d78ce33bcd46"
+    ],
+    "supporting_cues": [
+      "Corroborated by concurrent HEAD_TURN_LEFT"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "72f1f191-e554-4f3f-8466-34a45b9022d5",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 13500.0,
+    "confidence": 0.454,
+    "quality": 0.651,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5fb4e7ec-3d15-4343-9d5b-9fd6963c8615",
+      "9178cf63-2d9e-41a8-a1f2-6b852e57ad29",
+      "bdc36703-954d-4910-a1a6-c2bf32394e79",
+      "b1eacdd4-9bce-4364-b35c-8af3b91bcc35"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a17c21b8-1166-4e73-b46b-2d8096916ead",
+    "seat_id": "SEAT-ROOM-CALIB-01-12",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 13700.0,
+    "confidence": 0.6,
+    "quality": 0.614,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "ba366241-4bbb-4e79-a1cc-a6112ca3bdc2",
+      "8ebb0e74-2189-4401-9f94-1dac790b74ca",
+      "14974fb1-018d-4054-aa04-7c926c6372bd"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "fee03e8d-344f-4b87-a8d0-c679d5ca7389",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 666.7,
+    "end_timestamp_ms": 14700.0,
+    "confidence": 0.744,
+    "quality": 0.708,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "f1dbabf5-3948-4535-b1d6-d1ce61657c49",
+      "fe81b4fc-d357-4ef5-a807-bee102de2d99",
+      "715bf84a-579b-4ae2-9a82-b729d7a1c119"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "afca3b15-0848-469d-96c0-111a821722e2",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 5300.0,
+    "end_timestamp_ms": 14866.7,
+    "confidence": 0.393,
+    "quality": 0.523,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "62d09ce5-5837-42e6-b718-a7e2c2b439f0",
+      "00ea1e2b-3f99-4dc7-843b-d0b28f72de91"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "210e1876-cbb1-4209-b1d5-a007f7cae032",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9500.0,
+    "end_timestamp_ms": 14900.0,
+    "confidence": 0.511,
+    "quality": 0.539,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "1eb9f81d-42d2-44e3-859e-7af99c5b629b",
+      "c91599fc-e26b-462f-88cb-c53120d5dd0a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "75950b2d-c95f-496f-a277-3fc52a6c50c8",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 14900.0,
+    "confidence": 0.653,
+    "quality": 0.58,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5dfa4604-430e-4171-806a-bec0175f971e",
+      "48c4a6cc-461b-4819-9e26-dff6ff40cc8f"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9dfcc105-57f5-4f4d-8617-d7dea68bc9f4",
+    "seat_id": "SEAT-ROOM-CALIB-01-11",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 15033.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "0bc49240-1e8f-4ef0-84b8-af3a88cc2a41"
+    ],
+    "supporting_cues": [
+      "Empty duration: 15.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "700612b8-8e67-4168-8097-99e57c5d75b2",
+    "seat_id": "SEAT-ROOM-CALIB-01-19",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 15033.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "eec9b9b9-eb75-4807-ba96-8ddf351f8662"
+    ],
+    "supporting_cues": [
+      "Empty duration: 15.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9c44387f-bdc6-42a0-afca-c7e92223d819",
+    "seat_id": "SEAT-ROOM-CALIB-01-10",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 15000.0,
+    "end_timestamp_ms": 16333.3,
+    "confidence": 0.251,
+    "quality": 0.745,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-09",
+    "component_episode_ids": [
+      "82b1d449-d522-48a2-928a-e2f60edc7c2f"
+    ],
+    "supporting_cues": [
+      "Corroborated by concurrent HEAD_TURN_LEFT"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "b31fe4da-5f8f-495f-971c-3bdbd736ecbd",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 8600.0,
+    "end_timestamp_ms": 16500.0,
+    "confidence": 0.268,
+    "quality": 0.504,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "d6808fa7-3176-4561-ab34-634c0f76e7df",
+      "b121daef-4f88-4005-b8cc-5003ae545d97"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "dd0a5767-c278-4833-bad7-3e7212979054",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 8066.7,
+    "end_timestamp_ms": 17300.0,
+    "confidence": 0.413,
+    "quality": 0.95,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "b2008991-c467-46b2-bafe-2f81430a970a"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9106e412-9b89-4842-972b-18661bcba6a3",
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 17566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c32d9b37-9437-4842-b5f1-9a8b8f48e708"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "ec5f67b5-2e3b-404b-b7ea-144e00c00ff8",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 17566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "33518f85-0140-4f0b-bda7-85f57bd2bd5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d9b9322d-4aa1-43ad-b9a8-5a34096da2c2",
+    "seat_id": "SEAT-ROOM-CALIB-01-14",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 17566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "92cd6488-016a-4aaf-8fd9-9b2b0dc74c55"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3357f682-457f-4c33-98ab-fbb32cbe2220",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 5833.3,
+    "end_timestamp_ms": 17566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "435083f1-014d-4e51-aea4-3f3552d9b42d"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 11.7s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "5ae2e83b-b5dc-4e16-beb6-150f9b9d31b6",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 300.0,
+    "end_timestamp_ms": 17800.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "3827fdc9-73b3-4aec-b7ea-dfb7f57b63f2"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a7997833-86ca-49d7-9095-ac0429dd6171",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 19700.0,
+    "confidence": 0.768,
+    "quality": 0.646,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "c6e55481-ff17-488a-a47a-69d4cd53b9e7",
+      "dbdd671f-141e-4e93-bb6d-17817718ca04",
+      "ea8ccb42-6c5c-4d7c-b2cb-1bdc7a3ddafd",
+      "adf11a87-eeed-4d39-b95a-f9fd16f19caa"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a4ee45c5-de1e-4d92-8f12-03dd2ab1c388",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 19833.3,
+    "confidence": 0.444,
+    "quality": 0.596,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "73e26e91-4446-41f9-ab71-0c9911be667a",
+      "49d89939-b36c-4cbb-9bfb-4c404f4043a1"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2f669c88-eac1-4538-a80e-e4b4eb4a8d60",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 17600.0,
+    "end_timestamp_ms": 20100.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c76f50ca-4fb8-4c1e-abde-e2fb145db66e"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "97fcbdca-ac72-4165-8e29-ea752ce9db10",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1500.0,
+    "end_timestamp_ms": 20100.0,
+    "confidence": 0.762,
+    "quality": 0.516,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "75447c3e-871b-46b7-a654-e5efa8771edf",
+      "9430eddb-061c-4548-a806-9042c0305e03"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "51581f52-230b-47ac-a019-78d050c75cd0",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 12233.3,
+    "end_timestamp_ms": 21233.3,
+    "confidence": 0.87,
+    "quality": 0.957,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "1f2486e2-cca4-4257-af96-d78ce33bcd46"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "5b9102d5-9731-4605-b487-05b07e8f547c",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 10066.7,
+    "end_timestamp_ms": 22100.0,
+    "confidence": 0.806,
+    "quality": 0.623,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "335dd260-ccee-4bcc-9609-e109280ef2f8",
+      "c86592db-b4b5-47a0-84b3-280d3383a2ef"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c71affb6-aaf6-4c37-8f22-f956626c87b1",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 22300.0,
+    "confidence": 0.428,
+    "quality": 0.543,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-19",
+    "component_episode_ids": [
+      "c4038deb-8642-420a-8983-4a54f8315c24",
+      "f634b52b-ca78-4e68-97cc-3b91995515e0"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "708b02b2-1bd6-48c5-8fea-fc6b4a13cf71",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 23500.0,
+    "confidence": 0.461,
+    "quality": 0.668,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5fb4e7ec-3d15-4343-9d5b-9fd6963c8615",
+      "9178cf63-2d9e-41a8-a1f2-6b852e57ad29",
+      "bdc36703-954d-4910-a1a6-c2bf32394e79",
+      "b1eacdd4-9bce-4364-b35c-8af3b91bcc35",
+      "2b0b1822-860c-4cfb-9cff-00f720290b15"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "686c6202-d1b5-449b-bd4e-86a2e4868bf4",
+    "seat_id": "SEAT-ROOM-CALIB-01-12",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 23700.0,
+    "confidence": 0.617,
+    "quality": 0.622,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "ba366241-4bbb-4e79-a1cc-a6112ca3bdc2",
+      "8ebb0e74-2189-4401-9f94-1dac790b74ca",
+      "14974fb1-018d-4054-aa04-7c926c6372bd",
+      "136361f7-bf6b-47d3-893b-975db2343d5f"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2e3befcc-12e9-4b63-82b5-2b9b4e6565fa",
+    "seat_id": "SEAT-ROOM-CALIB-01-22",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 21866.7,
+    "end_timestamp_ms": 24366.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "abe16457-a676-4d8d-a3ab-9b970e793b4b"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a568a2e1-697c-469f-9bf2-c0081da91f99",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 666.7,
+    "end_timestamp_ms": 24700.0,
+    "confidence": 0.726,
+    "quality": 0.688,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "f1dbabf5-3948-4535-b1d6-d1ce61657c49",
+      "fe81b4fc-d357-4ef5-a807-bee102de2d99",
+      "715bf84a-579b-4ae2-9a82-b729d7a1c119",
+      "30cd0044-ef26-4066-9b3c-5d9169d71e24"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "23d27957-036e-41f6-bcf3-b532f95d16d4",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 7366.7,
+    "end_timestamp_ms": 24866.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "04b13a8f-aff8-450f-8067-b32136067e24"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 17.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "bfb2ec46-7419-4f8b-80c8-8c53906cbc87",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 5300.0,
+    "end_timestamp_ms": 24866.7,
+    "confidence": 0.385,
+    "quality": 0.516,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "62d09ce5-5837-42e6-b718-a7e2c2b439f0",
+      "00ea1e2b-3f99-4dc7-843b-d0b28f72de91"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "12097031-37b4-4a07-9662-d02a08e92bae",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9500.0,
+    "end_timestamp_ms": 24900.0,
+    "confidence": 0.539,
+    "quality": 0.568,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "1eb9f81d-42d2-44e3-859e-7af99c5b629b",
+      "c91599fc-e26b-462f-88cb-c53120d5dd0a",
+      "c5c76788-5b1d-4cac-a37a-b42b2a34a96a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "03789f86-4530-40d1-95bb-4219264e882a",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 24900.0,
+    "confidence": 0.56,
+    "quality": 0.551,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5dfa4604-430e-4171-806a-bec0175f971e",
+      "48c4a6cc-461b-4819-9e26-dff6ff40cc8f",
+      "5fbe2429-320a-4e16-82ba-bbf5a4a803e0",
+      "eba9826c-5793-4897-bab1-e8b45296eb79"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "b3fb4c32-4e54-406b-83de-6fe734740063",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 19066.7,
+    "end_timestamp_ms": 25300.0,
+    "confidence": 0.768,
+    "quality": 0.903,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "8a8f0773-4aca-4894-979e-180911d4c290"
+    ],
+    "supporting_cues": [
+      "Corroborated by concurrent HEAD_TURN_LEFT"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c7147ceb-f636-4d91-8401-bbbfddc43aa2",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 8600.0,
+    "end_timestamp_ms": 26500.0,
+    "confidence": 0.387,
+    "quality": 0.525,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "d6808fa7-3176-4561-ab34-634c0f76e7df",
+      "b121daef-4f88-4005-b8cc-5003ae545d97",
+      "c0388375-b7df-4d7b-b87d-d8bc04e8b9f7",
+      "9955129b-58f8-462c-a3d0-f45d779deb8a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d8054cf5-2b24-462e-80c2-a738803da272",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 22000.0,
+    "end_timestamp_ms": 28400.0,
+    "confidence": 0.843,
+    "quality": 0.857,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "597ebd25-0e1d-40b6-b6a8-c45fd2a296f9",
+      "40fc37ed-bda8-4789-aa60-906d21cb1cad"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "feaee6dd-4de0-430f-814a-ee7d4cb31286",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 12233.3,
+    "end_timestamp_ms": 29233.3,
+    "confidence": 0.866,
+    "quality": 0.95,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "1f2486e2-cca4-4257-af96-d78ce33bcd46"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "da10d693-a41b-4dce-ad1d-fd83ba58a98f",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1066.7,
+    "end_timestamp_ms": 29700.0,
+    "confidence": 0.753,
+    "quality": 0.644,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "c6e55481-ff17-488a-a47a-69d4cd53b9e7",
+      "dbdd671f-141e-4e93-bb6d-17817718ca04",
+      "ea8ccb42-6c5c-4d7c-b2cb-1bdc7a3ddafd",
+      "adf11a87-eeed-4d39-b95a-f9fd16f19caa"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "b3f00248-6539-4868-a821-b00a81d2456c",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 29833.3,
+    "confidence": 0.498,
+    "quality": 0.604,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "73e26e91-4446-41f9-ab71-0c9911be667a",
+      "49d89939-b36c-4cbb-9bfb-4c404f4043a1",
+      "55c0abfc-314d-489d-b5f4-c7e2cdb47a2c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "047a6364-d72f-42b0-b610-4fb6059f6a9a",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1500.0,
+    "end_timestamp_ms": 30100.0,
+    "confidence": 0.564,
+    "quality": 0.531,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "75447c3e-871b-46b7-a654-e5efa8771edf",
+      "9430eddb-061c-4548-a806-9042c0305e03",
+      "51180c41-ed71-4df5-a72e-e67de59df771"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2a320530-11a7-44c8-a544-237b033dec78",
+    "seat_id": "SEAT-ROOM-CALIB-01-10",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 29900.0,
+    "end_timestamp_ms": 31033.3,
+    "confidence": 0.324,
+    "quality": 0.774,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-09",
+    "component_episode_ids": [
+      "a44c32f8-45de-4810-8143-9a0e241e191a"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "97c86953-7709-4440-b980-5ed736d1b5f0",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 10066.7,
+    "end_timestamp_ms": 32100.0,
+    "confidence": 0.806,
+    "quality": 0.623,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "335dd260-ccee-4bcc-9609-e109280ef2f8",
+      "c86592db-b4b5-47a0-84b3-280d3383a2ef"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "b034804f-7a3a-43cd-bab8-2ffe633bf94f",
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 32566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c32d9b37-9437-4842-b5f1-9a8b8f48e708"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 32.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9dd26af2-c09f-4a4c-822a-f148b9dee319",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 32566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "33518f85-0140-4f0b-bda7-85f57bd2bd5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 32.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "92edade4-bea6-40f3-b8fe-0f7336486675",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9600.0,
+    "end_timestamp_ms": 33500.0,
+    "confidence": 0.455,
+    "quality": 0.727,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "bdc36703-954d-4910-a1a6-c2bf32394e79",
+      "b1eacdd4-9bce-4364-b35c-8af3b91bcc35",
+      "2b0b1822-860c-4cfb-9cff-00f720290b15",
+      "e968442e-6fb6-4c29-951c-8e1dacc4cc05",
+      "1f4592c3-344e-4846-9897-b67cd060da42",
+      "9c4eb999-cef7-427e-a343-d174edbe8361"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "1d09b4d2-dbe2-4276-851e-c567e113f5fe",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 31000.0,
+    "end_timestamp_ms": 33500.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "732f7428-407e-40f7-9fd7-42680b3708fb"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "1b59cd0d-8dd2-4629-a114-8ded31ea96fd",
+    "seat_id": "SEAT-ROOM-CALIB-01-12",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 7500.0,
+    "end_timestamp_ms": 33700.0,
+    "confidence": 0.619,
+    "quality": 0.632,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "14974fb1-018d-4054-aa04-7c926c6372bd",
+      "136361f7-bf6b-47d3-893b-975db2343d5f"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "abd2d532-13a6-4cd3-b358-35c47667c768",
+    "seat_id": "SEAT-ROOM-CALIB-01-14",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 31333.3,
+    "end_timestamp_ms": 33833.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "47f6035b-f42c-4d55-a31b-0118f11b24c8"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3d30c889-6ea4-4749-b52f-16d698f599a4",
+    "seat_id": "SEAT-ROOM-CALIB-01-15",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 24533.3,
+    "end_timestamp_ms": 34266.7,
+    "confidence": 0.666,
+    "quality": 0.737,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "062f270f-c58d-468c-b92b-530b115890cb",
+      "a238d5f9-e4ed-4f2b-b774-bdfd3f0036fa"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d0c2a0df-e793-4d26-9e6d-f43e35dc0245",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9700.0,
+    "end_timestamp_ms": 34700.0,
+    "confidence": 0.723,
+    "quality": 0.662,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "fe81b4fc-d357-4ef5-a807-bee102de2d99",
+      "715bf84a-579b-4ae2-9a82-b729d7a1c119",
+      "30cd0044-ef26-4066-9b3c-5d9169d71e24"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "5bcf138d-822f-4978-923e-8a14bd1ee42f",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9500.0,
+    "end_timestamp_ms": 34900.0,
+    "confidence": 0.55,
+    "quality": 0.57,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "1eb9f81d-42d2-44e3-859e-7af99c5b629b",
+      "c91599fc-e26b-462f-88cb-c53120d5dd0a",
+      "c5c76788-5b1d-4cac-a37a-b42b2a34a96a",
+      "21faf4fe-66ea-40dd-b586-b2b35c2701f0",
+      "2ce9497a-e776-4fa3-a4cc-5553b79ef216"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "b34bb413-7eb6-4a2e-a67c-d1c117a6abad",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 14500.0,
+    "end_timestamp_ms": 34900.0,
+    "confidence": 0.531,
+    "quality": 0.587,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "48c4a6cc-461b-4819-9e26-dff6ff40cc8f",
+      "5fbe2429-320a-4e16-82ba-bbf5a4a803e0",
+      "eba9826c-5793-4897-bab1-e8b45296eb79",
+      "2c793507-be9a-497a-b24e-c7bee357be27",
+      "120dc50b-53c8-45f0-875c-f59c006a46a0"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "5177b564-23a7-467a-8d02-a420cc0771d1",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 14466.7,
+    "end_timestamp_ms": 34900.0,
+    "confidence": 0.359,
+    "quality": 0.57,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "00ea1e2b-3f99-4dc7-843b-d0b28f72de91",
+      "72db524f-337c-4510-ae97-8ef7e4529234",
+      "23d3681a-dc61-441a-a62d-76b5c5768668"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "7a953658-cfd9-4ce9-9151-b814c582e155",
+    "seat_id": "SEAT-ROOM-CALIB-01-11",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 35066.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "0bc49240-1e8f-4ef0-84b8-af3a88cc2a41"
+    ],
+    "supporting_cues": [
+      "Empty duration: 35.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "31adc582-8f7d-46b1-a131-0ceb0eda875f",
+    "seat_id": "SEAT-ROOM-CALIB-01-19",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 35066.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "eec9b9b9-eb75-4807-ba96-8ddf351f8662"
+    ],
+    "supporting_cues": [
+      "Empty duration: 35.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a1bc0e90-b53d-4071-a263-83a2c61b50e6",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 29833.3,
+    "end_timestamp_ms": 35100.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "8b09488f-82e5-4ac4-9ffb-c7e37c556579"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 5.3s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "ec79ee39-f812-4a77-99bc-95533dfbd02b",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33666.7,
+    "end_timestamp_ms": 36166.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "f10df2c2-e8f6-40cc-8532-b738d23f5de2"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "45330bad-bd11-47bb-bd99-552f2a2d5f70",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 16066.7,
+    "end_timestamp_ms": 36500.0,
+    "confidence": 0.368,
+    "quality": 0.541,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "b121daef-4f88-4005-b8cc-5003ae545d97",
+      "c0388375-b7df-4d7b-b87d-d8bc04e8b9f7",
+      "9955129b-58f8-462c-a3d0-f45d779deb8a",
+      "f94ad0c5-1d70-4481-861f-b2c5dc3487f5",
+      "0dea1402-974c-49c4-9e22-5cd3701ad762",
+      "e6b9a578-9e71-447b-a311-ea674350fa0a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e9314c8c-623e-48d6-83dc-3e63e91862d2",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 33366.7,
+    "end_timestamp_ms": 37233.3,
+    "confidence": 0.837,
+    "quality": 0.916,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "50b722db-0854-47a3-b709-fa76964e47f3"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "73fdad53-aa92-4862-8292-faf4b5e6826b",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 22000.0,
+    "end_timestamp_ms": 38400.0,
+    "confidence": 0.81,
+    "quality": 0.866,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "597ebd25-0e1d-40b6-b6a8-c45fd2a296f9",
+      "40fc37ed-bda8-4789-aa60-906d21cb1cad",
+      "c0243c91-64f5-457a-8536-9a9fe098b67d"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "dd3c8403-eaf8-4d05-8930-5efb8141dd7c",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 37666.7,
+    "end_timestamp_ms": 39700.0,
+    "confidence": 0.572,
+    "quality": 0.958,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "d17f675a-61aa-4c82-8901-62db58f635c1"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "64b4c0dd-3ce8-46fd-bf7f-aa5a8555ff3e",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 12900.0,
+    "end_timestamp_ms": 39700.0,
+    "confidence": 0.504,
+    "quality": 0.561,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "adf11a87-eeed-4d39-b95a-f9fd16f19caa",
+      "051360bd-b520-4504-83f6-8bcb815ebfcc",
+      "fd3f62de-8326-4c1a-bbaf-347b93e533dd"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2a04719f-bb82-41f2-bb27-3cc4ba0f123b",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 39833.3,
+    "confidence": 0.482,
+    "quality": 0.602,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "73e26e91-4446-41f9-ab71-0c9911be667a",
+      "49d89939-b36c-4cbb-9bfb-4c404f4043a1",
+      "55c0abfc-314d-489d-b5f4-c7e2cdb47a2c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "985c70c1-aa99-47b8-947d-cc7990dd28c2",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 7366.7,
+    "end_timestamp_ms": 39900.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "04b13a8f-aff8-450f-8067-b32136067e24"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 32.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "2b7217c6-34d1-4469-83f6-9337c7bf2ecb",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 39100.0,
+    "end_timestamp_ms": 40100.0,
+    "confidence": 0.246,
+    "quality": 0.956,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "3a2d2516-6b9a-424c-ac8b-6fca23c83578"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "0d719852-bd4a-4596-808c-312e5dc8740e",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9700.0,
+    "end_timestamp_ms": 40100.0,
+    "confidence": 0.346,
+    "quality": 0.507,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "9430eddb-061c-4548-a806-9042c0305e03",
+      "51180c41-ed71-4df5-a72e-e67de59df771",
+      "30d41829-a9c0-49d0-9569-a46e9ada1a03",
+      "2a0c8a6b-21e8-487a-8c86-0ee137e43d0c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "fe6b9c10-1510-4e2f-8a77-186569fbdaa5",
+    "seat_id": "SEAT-ROOM-CALIB-01-22",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 40266.7,
+    "end_timestamp_ms": 42766.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "e716e5ed-aeb1-489a-8ab5-16c3c4de41b8"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "914a3815-f62b-4156-9532-1d0502218af7",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 40500.0,
+    "end_timestamp_ms": 43000.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "30be1982-afcd-4a62-93ef-6d45a307b6a4"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "a166e02b-628f-4519-a1fc-96191a57c48c",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 24000.0,
+    "end_timestamp_ms": 43500.0,
+    "confidence": 0.453,
+    "quality": 0.728,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "e968442e-6fb6-4c29-951c-8e1dacc4cc05",
+      "1f4592c3-344e-4846-9897-b67cd060da42",
+      "9c4eb999-cef7-427e-a343-d174edbe8361",
+      "1c54fbbb-f0a5-4249-87f6-2ea50388c47e"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "de13b17e-577d-4094-83f5-8622c591b19c",
+    "seat_id": "SEAT-ROOM-CALIB-01-15",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 24533.3,
+    "end_timestamp_ms": 44266.7,
+    "confidence": 0.722,
+    "quality": 0.723,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "062f270f-c58d-468c-b92b-530b115890cb",
+      "a238d5f9-e4ed-4f2b-b774-bdfd3f0036fa",
+      "48624a99-4191-46b0-935d-750388eff51d"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d020f9f4-c856-4a2d-8ebd-b63f9c93a6d5",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 20200.0,
+    "end_timestamp_ms": 44700.0,
+    "confidence": 0.691,
+    "quality": 0.645,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-08",
+    "component_episode_ids": [
+      "5d323e43-6da2-452d-9b38-315ce4d52e9f",
+      "2f1c7b94-b05c-482a-a65b-8f046f4401bd",
+      "70a3cc6b-e9ba-42aa-ab69-3394ff5ef491"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "965d56df-33e5-46a6-944e-24d926373b15",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 26700.0,
+    "end_timestamp_ms": 44900.0,
+    "confidence": 0.568,
+    "quality": 0.572,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "21faf4fe-66ea-40dd-b586-b2b35c2701f0",
+      "2ce9497a-e776-4fa3-a4cc-5553b79ef216"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "88239835-cbef-4692-8e86-89ebb8eac098",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 16966.7,
+    "end_timestamp_ms": 44900.0,
+    "confidence": 0.495,
+    "quality": 0.556,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "5fbe2429-320a-4e16-82ba-bbf5a4a803e0",
+      "eba9826c-5793-4897-bab1-e8b45296eb79",
+      "2c793507-be9a-497a-b24e-c7bee357be27",
+      "120dc50b-53c8-45f0-875c-f59c006a46a0",
+      "77f05c21-ad30-440b-afb1-e8b4beee8fc5"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "6920647d-5650-459f-af1c-4e2b12df6c37",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 25266.7,
+    "end_timestamp_ms": 44900.0,
+    "confidence": 0.339,
+    "quality": 0.575,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "72db524f-337c-4510-ae97-8ef7e4529234",
+      "23d3681a-dc61-441a-a62d-76b5c5768668"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "beb5320e-257e-4902-bc3f-25ae66d02cd2",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 33366.7,
+    "end_timestamp_ms": 45233.3,
+    "confidence": 0.849,
+    "quality": 0.913,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "50b722db-0854-47a3-b709-fa76964e47f3"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e7bb14e6-ac55-4eb5-8550-3960855987f1",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 23600.0,
+    "end_timestamp_ms": 46500.0,
+    "confidence": 0.371,
+    "quality": 0.536,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "9955129b-58f8-462c-a3d0-f45d779deb8a",
+      "f94ad0c5-1d70-4481-861f-b2c5dc3487f5",
+      "0dea1402-974c-49c4-9e22-5cd3701ad762",
+      "e6b9a578-9e71-447b-a311-ea674350fa0a",
+      "b516f5ed-9b5f-438f-895b-f3a599fa262f"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "4a4e7dbf-ae4c-49e2-8e42-2cd015f92d51",
+    "seat_id": "SEAT-ROOM-CALIB-01-10",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 45666.7,
+    "end_timestamp_ms": 47133.3,
+    "confidence": 0.313,
+    "quality": 0.953,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-09",
+    "component_episode_ids": [
+      "9717feac-a069-41ae-8f53-ecda4d41ac6f"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "f3b872d0-9602-4cfd-870c-ba5beac8a199",
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 47566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c32d9b37-9437-4842-b5f1-9a8b8f48e708"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 47.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "84fc79bb-a17e-4651-b188-b028bceccbb7",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 47566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "33518f85-0140-4f0b-bda7-85f57bd2bd5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 47.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "f138c4ef-1c9b-4af6-8757-adff4e3a5a4d",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 44033.3,
+    "end_timestamp_ms": 48100.0,
+    "confidence": 0.619,
+    "quality": 0.964,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "087dc201-2bdb-4595-81f7-c666a74ec65c"
+    ],
+    "supporting_cues": [
+      "Corroborated by concurrent HEAD_TURN_LEFT"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "437f2333-7cad-487c-aab9-70aa1189631d",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 22000.0,
+    "end_timestamp_ms": 48400.0,
+    "confidence": 0.803,
+    "quality": 0.861,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "597ebd25-0e1d-40b6-b6a8-c45fd2a296f9",
+      "40fc37ed-bda8-4789-aa60-906d21cb1cad",
+      "c0243c91-64f5-457a-8536-9a9fe098b67d",
+      "6798cda0-3ce1-4e85-b441-51b807a6e89f",
+      "b2385fab-789f-41fb-9304-d2eab10edc7a",
+      "b1265a2f-fcf6-47b6-8f5a-8cad148bbf82"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "cf222de4-1526-4a01-b220-59691337f057",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 45400.0,
+    "end_timestamp_ms": 48500.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "362889b8-1c7d-47fe-bf6f-58affa400f28"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 3.1s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "5117aacf-7291-4860-973a-9e5e8d32b622",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 1900.0,
+    "end_timestamp_ms": 49500.0,
+    "confidence": 0.485,
+    "quality": 0.532,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-19",
+    "component_episode_ids": [
+      "f634b52b-ca78-4e68-97cc-3b91995515e0",
+      "117dbe4a-21be-4d80-bb2c-8c4f05d216b6"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "59936103-03bb-414e-878f-61a3d9b7db08",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 40866.7,
+    "end_timestamp_ms": 49700.0,
+    "confidence": 0.505,
+    "quality": 0.637,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "7d1d5b92-3b2d-4c10-874c-5e895a140db9",
+      "9ffbc4a6-1d96-4dd9-8e76-34c0f61dd70a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "989f081b-eb36-4e73-9200-97c47838d766",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 22900.0,
+    "end_timestamp_ms": 49833.3,
+    "confidence": 0.333,
+    "quality": 0.585,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "55c0abfc-314d-489d-b5f4-c7e2cdb47a2c",
+      "69c2da94-e604-42a0-ba03-13507d25f1b8",
+      "bd8ca36b-e3c8-484d-84c9-7d52b5de385b"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "0a526583-af93-42f3-b2b5-32ff0f11040a",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 9700.0,
+    "end_timestamp_ms": 50100.0,
+    "confidence": 0.329,
+    "quality": 0.498,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "9430eddb-061c-4548-a806-9042c0305e03",
+      "51180c41-ed71-4df5-a72e-e67de59df771",
+      "30d41829-a9c0-49d0-9569-a46e9ada1a03",
+      "2a0c8a6b-21e8-487a-8c86-0ee137e43d0c",
+      "621126d6-2b27-4811-8f0f-64c97bb4d91b"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "567859b6-175a-4ca5-820f-a7ed6408f5df",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 49133.3,
+    "end_timestamp_ms": 50133.3,
+    "confidence": 0.54,
+    "quality": 0.983,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "a8ec414c-7d41-4c6f-9c30-07647935a7d0"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "653e6761-a0c0-4a01-9077-6d8c604cd01d",
+    "seat_id": "SEAT-ROOM-CALIB-01-15",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 47933.3,
+    "end_timestamp_ms": 50433.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "fc790fd1-ce20-417c-8bd2-29d4c3d57e5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "50d9fd57-ae0a-42c4-8f9d-2642c4e2eda0",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 33366.7,
+    "end_timestamp_ms": 53233.3,
+    "confidence": 0.846,
+    "quality": 0.907,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "50b722db-0854-47a3-b709-fa76964e47f3"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "600d8fe7-5901-4012-87de-8876d605740a",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 50966.7,
+    "end_timestamp_ms": 53466.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "da888d56-7ac1-46b3-9ff6-36724643dc93"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "f46acebf-9735-4584-b849-e4ebb88f04e7",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 27000.0,
+    "end_timestamp_ms": 53500.0,
+    "confidence": 0.461,
+    "quality": 0.698,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "1f4592c3-344e-4846-9897-b67cd060da42",
+      "9c4eb999-cef7-427e-a343-d174edbe8361",
+      "1c54fbbb-f0a5-4249-87f6-2ea50388c47e",
+      "9e4f2801-5de0-416d-b733-e1937c4b40b4",
+      "ec45da9e-7d9b-4878-8b55-a5140f3dbe59",
+      "9aabfd99-e762-431c-8ae4-d0f4c16e7f1c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "8afd78c8-4e43-4b1b-bbf7-2837646bc9cb",
+    "seat_id": "SEAT-ROOM-CALIB-01-15",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33866.7,
+    "end_timestamp_ms": 54266.7,
+    "confidence": 0.728,
+    "quality": 0.692,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "a238d5f9-e4ed-4f2b-b774-bdfd3f0036fa",
+      "48624a99-4191-46b0-935d-750388eff51d",
+      "18884bfd-3714-46b9-9aa4-f9e8895d6af1",
+      "20d05689-8ff1-4882-bdb6-fd466951d545"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "36b5bbe3-1715-4d86-8eff-7e1ce9a38745",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 26700.0,
+    "end_timestamp_ms": 54900.0,
+    "confidence": 0.568,
+    "quality": 0.572,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "21faf4fe-66ea-40dd-b586-b2b35c2701f0",
+      "2ce9497a-e776-4fa3-a4cc-5553b79ef216"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e3835173-dd35-415f-af45-0077de2cb3b0",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 7366.7,
+    "end_timestamp_ms": 54900.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "04b13a8f-aff8-450f-8067-b32136067e24"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 47.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d0a26cb9-d02e-4fe7-a73c-2cdec508688d",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 28400.0,
+    "end_timestamp_ms": 54900.0,
+    "confidence": 0.517,
+    "quality": 0.531,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "2c793507-be9a-497a-b24e-c7bee357be27",
+      "120dc50b-53c8-45f0-875c-f59c006a46a0",
+      "77f05c21-ad30-440b-afb1-e8b4beee8fc5",
+      "3e1e54bd-481d-4fc1-b9e8-bdc8f6ba06df",
+      "eb61a1eb-03a5-4df6-9d7a-d07d21347e4b"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "0a93565d-cf7d-4b1d-ae1c-18e75a9ceff9",
+    "seat_id": "SEAT-ROOM-CALIB-01-11",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 55066.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "0bc49240-1e8f-4ef0-84b8-af3a88cc2a41"
+    ],
+    "supporting_cues": [
+      "Empty duration: 55.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d1dc62cf-d354-4bcb-98a2-2f287fbf711b",
+    "seat_id": "SEAT-ROOM-CALIB-01-19",
+    "pattern_type": "SEAT_LEFT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 55066.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "eec9b9b9-eb75-4807-ba96-8ddf351f8662"
+    ],
+    "supporting_cues": [
+      "Empty duration: 55.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "bb2a48ad-51e5-419d-9bf8-11e44545a637",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33800.0,
+    "end_timestamp_ms": 56500.0,
+    "confidence": 0.348,
+    "quality": 0.521,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "e6b9a578-9e71-447b-a311-ea674350fa0a",
+      "b516f5ed-9b5f-438f-895b-f3a599fa262f",
+      "b473a5c3-8d0a-46f3-ad32-4e2890c8ee8b",
+      "1c5d614f-e7b3-4093-8647-b62d4a783162",
+      "7e2b3798-537c-42f6-9114-012dcb7393f6"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "fe7078e3-0765-4941-8f14-694b572b7349",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 56733.3,
+    "end_timestamp_ms": 57733.3,
+    "confidence": 0.512,
+    "quality": 0.968,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "b97307a9-d3df-48d8-bd50-893c6524be9c"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e1b61648-18c1-460a-a08d-2a19f1aa2b8c",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 56466.7,
+    "end_timestamp_ms": 58133.3,
+    "confidence": 0.679,
+    "quality": 0.959,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-11",
+    "component_episode_ids": [
+      "34e988e1-b81c-4592-9781-b8cfa35c68c6"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "6f6f6895-2250-47f3-a812-dd589b4b020c",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 32200.0,
+    "end_timestamp_ms": 58400.0,
+    "confidence": 0.79,
+    "quality": 0.862,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "c0243c91-64f5-457a-8536-9a9fe098b67d",
+      "6798cda0-3ce1-4e85-b441-51b807a6e89f",
+      "b2385fab-789f-41fb-9304-d2eab10edc7a",
+      "b1265a2f-fcf6-47b6-8f5a-8cad148bbf82"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "04b50134-b74b-4239-b177-6d4cb0e59a4c",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 28600.0,
+    "end_timestamp_ms": 59100.0,
+    "confidence": 0.611,
+    "quality": 0.75,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-08",
+    "component_episode_ids": [
+      "70a3cc6b-e9ba-42aa-ab69-3394ff5ef491",
+      "1c5ae71e-0ad9-462e-83a6-65c6b50e02c7"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c47fec0e-a476-4397-bc28-01a76b81a6b9",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 47900.0,
+    "end_timestamp_ms": 59500.0,
+    "confidence": 0.579,
+    "quality": 0.533,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "a94e4f0f-d36f-405d-874e-31348907a0cd",
+      "dbf08685-19ad-4178-be85-ade364213706"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "22bf86c1-107d-409a-8c8e-594be0645d90",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 40866.7,
+    "end_timestamp_ms": 59700.0,
+    "confidence": 0.505,
+    "quality": 0.637,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "7d1d5b92-3b2d-4c10-874c-5e895a140db9",
+      "9ffbc4a6-1d96-4dd9-8e76-34c0f61dd70a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "293f082b-19b4-456c-aef7-3e17fc4744bd",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 22900.0,
+    "end_timestamp_ms": 59833.3,
+    "confidence": 0.363,
+    "quality": 0.594,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "55c0abfc-314d-489d-b5f4-c7e2cdb47a2c",
+      "69c2da94-e604-42a0-ba03-13507d25f1b8",
+      "bd8ca36b-e3c8-484d-84c9-7d52b5de385b",
+      "9611fb3f-da4f-4a2e-96f0-c4b0a65d4e4b",
+      "726bd472-ed43-4d45-b595-8332038b90c7",
+      "9b15a022-b6fd-4442-91fc-f3bfb64a4e39"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "bf4e77c0-59b0-4f85-a864-c51bd24318e9",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33133.3,
+    "end_timestamp_ms": 60100.0,
+    "confidence": 0.366,
+    "quality": 0.463,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "2a0c8a6b-21e8-487a-8c86-0ee137e43d0c",
+      "621126d6-2b27-4811-8f0f-64c97bb4d91b"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "fd55741c-c2ec-4319-9a45-1241efc3d1e7",
+    "seat_id": "SEAT-ROOM-CALIB-01-10",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 59800.0,
+    "end_timestamp_ms": 60966.7,
+    "confidence": 0.357,
+    "quality": 0.928,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-09",
+    "component_episode_ids": [
+      "0a662dbf-5b9b-45cd-89f3-54c0e2f80924"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "1d4f8037-e0ce-4bd5-8422-6dda0467552a",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 58700.0,
+    "end_timestamp_ms": 61200.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "1c68bba7-315a-4902-a221-398e6a88ffc3"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "7bdb3a35-7fab-401e-863a-653e3d869763",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 58733.3,
+    "end_timestamp_ms": 61233.3,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "0f63bac8-0e39-410c-a50b-bf4fbf52b5cd"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3b80a37f-617b-45a2-a25e-30f4d89b0850",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 58266.7,
+    "end_timestamp_ms": 61466.7,
+    "confidence": 0.312,
+    "quality": 0.524,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "3ca6b981-c765-4a09-83fd-7e6de73caf36",
+      "a2b3f97b-22de-4bae-842a-aefc251e43c5"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "7db77793-d42e-44bc-8735-434af1e4f11e",
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 62566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "c32d9b37-9437-4842-b5f1-9a8b8f48e708"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 62.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "52008355-9f23-4f71-b8ea-cc6c685a0a4b",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 33.3,
+    "end_timestamp_ms": 62566.7,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "33518f85-0140-4f0b-bda7-85f57bd2bd5f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 62.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "d7eb4db1-1906-47e4-96c4-20de6522d81b",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 62333.3,
+    "end_timestamp_ms": 63333.3,
+    "confidence": 0.833,
+    "quality": 0.913,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "b80b982a-1e80-465e-b688-f708151c5f03"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "f5b37bce-f532-417c-a7f1-d631f3e3850d",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 40700.0,
+    "end_timestamp_ms": 63500.0,
+    "confidence": 0.494,
+    "quality": 0.651,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "1c54fbbb-f0a5-4249-87f6-2ea50388c47e",
+      "9e4f2801-5de0-416d-b733-e1937c4b40b4",
+      "ec45da9e-7d9b-4878-8b55-a5140f3dbe59",
+      "9aabfd99-e762-431c-8ae4-d0f4c16e7f1c",
+      "b4dd37d0-7cb8-4258-99c8-068e70700094"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "14aaa658-f657-4f9d-a153-0719c245629f",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 52466.7,
+    "end_timestamp_ms": 63500.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "bbbbda20-b99d-4517-b112-e68ea452712f"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 11.0s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3f8f2020-3198-47cd-a2c1-a6a469263482",
+    "seat_id": "SEAT-ROOM-CALIB-01-15",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33866.7,
+    "end_timestamp_ms": 64266.7,
+    "confidence": 0.68,
+    "quality": 0.669,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "a238d5f9-e4ed-4f2b-b774-bdfd3f0036fa",
+      "48624a99-4191-46b0-935d-750388eff51d",
+      "18884bfd-3714-46b9-9aa4-f9e8895d6af1",
+      "20d05689-8ff1-4882-bdb6-fd466951d545",
+      "17e802d5-ce14-4d34-9f23-3bf0ea87fdda"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "35499c64-0dd3-4369-aa60-0be308f91ce1",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 59300.0,
+    "end_timestamp_ms": 64900.0,
+    "confidence": 0.642,
+    "quality": 0.764,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-07",
+    "component_episode_ids": [
+      "7eb2aa46-fe2d-431d-957e-51184dafbfe1",
+      "332696a4-1c73-482a-af84-22023f3a546d",
+      "202800bb-d42f-4633-b25b-483b80e790bb",
+      "c697b5dd-6b8d-4684-954a-b1ce09a72f0e"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c9689cec-442d-44ab-a990-5ed05616137e",
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 40700.0,
+    "end_timestamp_ms": 64900.0,
+    "confidence": 0.529,
+    "quality": 0.511,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "77f05c21-ad30-440b-afb1-e8b4beee8fc5",
+      "3e1e54bd-481d-4fc1-b9e8-bdc8f6ba06df",
+      "eb61a1eb-03a5-4df6-9d7a-d07d21347e4b",
+      "aa13eb02-3fb5-4ef7-abc7-1b158db2db18",
+      "e0d07749-383f-4b83-aa89-5f47c283410e",
+      "5dbf9da8-083a-4561-aa00-8f26f6a0b159"
+    ],
+    "supporting_cues": [
+      "Glance Count: 6 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "9f72b31a-4204-4cf4-ab7a-16350ebae781",
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 56733.3,
+    "end_timestamp_ms": 65766.7,
+    "confidence": 0.395,
+    "quality": 0.944,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "b97307a9-d3df-48d8-bd50-893c6524be9c"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "7ec4d45a-ff2d-4f01-98fe-659b039b71cf",
+    "seat_id": "SEAT-ROOM-CALIB-01-21",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 43800.0,
+    "end_timestamp_ms": 66500.0,
+    "confidence": 0.344,
+    "quality": 0.518,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-20",
+    "component_episode_ids": [
+      "b516f5ed-9b5f-438f-895b-f3a599fa262f",
+      "b473a5c3-8d0a-46f3-ad32-4e2890c8ee8b",
+      "1c5d614f-e7b3-4093-8647-b62d4a783162",
+      "7e2b3798-537c-42f6-9114-012dcb7393f6",
+      "82ac6705-2d54-452c-bf64-46accbe49fb8"
+    ],
+    "supporting_cues": [
+      "Glance Count: 5 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "838c4f1d-fa59-491d-823a-ca07b1fcd4df",
+    "seat_id": "SEAT-ROOM-CALIB-01-14",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 64600.0,
+    "end_timestamp_ms": 67100.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "73b53905-94a6-4779-a828-defad1811341"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 2.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e531c029-722e-4625-b280-4113b9832dfb",
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 45900.0,
+    "end_timestamp_ms": 68400.0,
+    "confidence": 0.789,
+    "quality": 0.871,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-15",
+    "component_episode_ids": [
+      "b2385fab-789f-41fb-9304-d2eab10edc7a",
+      "b1265a2f-fcf6-47b6-8f5a-8cad148bbf82"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "efd1ccef-d171-40bd-a975-0ee895df83fd",
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 28600.0,
+    "end_timestamp_ms": 69100.0,
+    "confidence": 0.594,
+    "quality": 0.741,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-08",
+    "component_episode_ids": [
+      "70a3cc6b-e9ba-42aa-ab69-3394ff5ef491",
+      "1c5ae71e-0ad9-462e-83a6-65c6b50e02c7",
+      "8eaedd2e-8ecc-422d-9d92-d0ca5570cc59",
+      "6105fd7e-36f9-4cf9-ae55-6c1882a3fadb"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e9a9c633-7f8c-40de-bacf-b6129f93e363",
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 47900.0,
+    "end_timestamp_ms": 69500.0,
+    "confidence": 0.579,
+    "quality": 0.533,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "a94e4f0f-d36f-405d-874e-31348907a0cd",
+      "dbf08685-19ad-4178-be85-ade364213706"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "19a9206d-c2c1-4fa3-9f3c-8498a58a8bd2",
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 46800.0,
+    "end_timestamp_ms": 69700.0,
+    "confidence": 0.438,
+    "quality": 0.625,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-17",
+    "component_episode_ids": [
+      "84ba8d16-ddfc-498a-8842-c7b112d72066",
+      "dd7b6536-6303-4490-bf92-a0f5c4b09cae",
+      "57d065c6-59d6-4e8c-b3af-a345c97351eb",
+      "3c54ca5c-94c4-461e-a3e0-c127073365ef"
+    ],
+    "supporting_cues": [
+      "Glance Count: 4 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "af1f9bdb-c295-4dfe-bd5a-99371c897552",
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 47900.0,
+    "end_timestamp_ms": 69866.7,
+    "confidence": 0.351,
+    "quality": 0.599,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-12",
+    "component_episode_ids": [
+      "bd8ca36b-e3c8-484d-84c9-7d52b5de385b",
+      "9611fb3f-da4f-4a2e-96f0-c4b0a65d4e4b",
+      "726bd472-ed43-4d45-b595-8332038b90c7",
+      "9b15a022-b6fd-4442-91fc-f3bfb64a4e39",
+      "9a661908-81d5-43a6-a779-1a0293ab290b",
+      "5897a646-5559-4533-9619-c4dc220cd299",
+      "2dd1fbf2-8a67-4bb3-a280-d1d302a7257c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 7 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "cedbcdc7-9dcd-4329-9933-ec21d5df968c",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "start_timestamp_ms": 7366.7,
+    "end_timestamp_ms": 69900.0,
+    "confidence": 1.0,
+    "quality": 1.0,
+    "primary_direction": null,
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "04b13a8f-aff8-450f-8067-b32136067e24"
+    ],
+    "supporting_cues": [
+      "Dwell duration: 62.5s"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3e9eb24d-8b62-48de-8ab3-e892ceb4075b",
+    "seat_id": "SEAT-ROOM-CALIB-01-05",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 69066.7,
+    "end_timestamp_ms": 70066.7,
+    "confidence": 0.775,
+    "quality": 0.948,
+    "primary_direction": "RIGHT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-10",
+    "component_episode_ids": [
+      "7a8f00e3-4269-40d6-96eb-0dacf276fa2e"
+    ],
+    "supporting_cues": [
+      "Corroborated by concurrent HEAD_TURN_RIGHT"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "ede134a7-aded-4691-a384-67cbe65d84db",
+    "seat_id": "SEAT-ROOM-CALIB-01-20",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 65133.3,
+    "end_timestamp_ms": 70100.0,
+    "confidence": 0.377,
+    "quality": 0.699,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-21",
+    "component_episode_ids": [
+      "ef4303c9-5db6-4515-8baa-c80c1005f801",
+      "3f8e0ee6-6afe-4ea0-a26d-bafae9cfada3"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "775e23fa-eb67-4997-98da-380961cfdb41",
+    "seat_id": "SEAT-ROOM-CALIB-01-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 66700.0,
+    "end_timestamp_ms": 70633.3,
+    "confidence": 0.343,
+    "quality": 0.533,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-06",
+    "component_episode_ids": [
+      "cc5c9638-4453-412a-ba48-91bb106b813c",
+      "896dbb5b-639e-40f5-8aea-4620647b96f9"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "71f76b00-bd08-4098-b913-6ab41e8527d7",
+    "seat_id": "SEAT-ROOM-CALIB-01-17",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 58266.7,
+    "end_timestamp_ms": 71466.7,
+    "confidence": 0.328,
+    "quality": 0.524,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-ROOM-CALIB-01-16",
+    "component_episode_ids": [
+      "3ca6b981-c765-4a09-83fd-7e6de73caf36",
+      "a2b3f97b-22de-4bae-842a-aefc251e43c5",
+      "325af069-576f-4e77-bd92-625681964d67"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  }
+]

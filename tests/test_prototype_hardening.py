@@ -121,15 +121,24 @@ def test_case_p01_occupancy_occlusion_protection():
 # CASE P2: True Empty Seat Timeout
 # ==============================================================================
 def test_case_p02_true_empty_seat_timeout():
-    """Case P2: Prolonged true EMPTY state triggers SEAT_EMPTY episode."""
+    """Case P2: An observed OCCUPIED→EMPTY transition triggers SEAT_EMPTY."""
     extractor = ObservationExtractor()
     ep_engine = TemporalEpisodeEngine(min_persistence_ms=500.0)
     ctx = SeatContext(seat_id="SEAT-01")
 
-    # Simulate 4 seconds of genuine EMPTY state
+    occupied = extractor.extract(
+        detection=_create_mock_detection(),
+        seat_context=ctx,
+        timestamp_ms=0.0,
+        occupancy_state=SeatState.OCCUPIED,
+        nearby_person_count=1,
+    )
+    ep_engine.process_observations(occupied, 0.0)
+
+    # Simulate 4 seconds of genuine EMPTY state after prior occupancy.
     last_eps = []
     for step in range(40):
-        t_ms = step * 100.0
+        t_ms = 100.0 + step * 100.0
         obs = extractor.extract(
             detection=None,
             seat_context=ctx,

@@ -48,6 +48,8 @@ class VideoClipJob:
     post_frames: List[BufferedFrame] = field(default_factory=list)
     is_completed: bool = False
     saved_file_path: Optional[str] = None
+    status: str = "PENDING"
+    error_message: Optional[str] = None
 
 
 class EvidenceVideoBuffer:
@@ -112,8 +114,6 @@ class EvidenceVideoBuffer:
                 job.post_frames.append(buffered_frame)
                 if len(job.post_frames) >= job.target_post_frames:
                     if self.async_write and self._executor is not None:
-                        job.is_completed = True
-                        job.saved_file_path = str(job.output_path)
                         fut = self._executor.submit(self._write_clip_to_disk, job)
                         self._futures.append(fut)
                     else:
@@ -170,6 +170,8 @@ class EvidenceVideoBuffer:
         """Concatenate pre- and post-event frames and encode to MP4."""
         all_frames = job.pre_frames + job.post_frames
         if not all_frames:
+            job.status = "FAILED"
+            job.error_message = "No frames were available for evidence encoding"
             return None
 
         job.output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -180,6 +182,8 @@ class EvidenceVideoBuffer:
 
         if not writer.isOpened():
             logger.error("Failed to initialize VideoWriter for clip: %s", job.output_path)
+            job.status = "FAILED"
+            job.error_message = "VideoWriter could not be initialized"
             return None
 
         try:
@@ -203,10 +207,20 @@ class EvidenceVideoBuffer:
                     cv2.LINE_AA,
                 )
                 writer.write(frame_to_write)
+        except Exception as exc:
+            job.status = "FAILED"
+            job.error_message = str(exc)
+            raise
         finally:
             writer.release()
 
+        if not job.output_path.is_file() or job.output_path.stat().st_size <= 0:
+            job.status = "FAILED"
+            job.error_message = "Encoder completed without a non-empty output file"
+            return None
         job.saved_file_path = str(job.output_path)
+        job.status = "READY"
+        job.is_completed = True
         logger.info("Saved 10s evidence clip (%d frames): %s", len(all_frames), job.output_path)
         return job.saved_file_path
 
@@ -242,7 +256,9 @@ class EvidenceVideoBuffer:
 
     def reset(self) -> None:
         """Clear ring buffer, cancel active jobs, and flush executor."""
+        # ``flush_all`` owns the lock while detaching active jobs.  Calling it
+        # from inside this lock deadlocks because the lock is intentionally not
+        # re-entrant.
+        self.flush_all()
         with self._lock:
             self._ring_buffer.clear()
-            self._active_jobs.clear()
-            self.flush_all()

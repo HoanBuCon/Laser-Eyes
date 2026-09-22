@@ -234,6 +234,13 @@ def test_favicon_endpoint_is_quiet():
     assert response.status_code == 204
 
 
+def test_cli_and_web_adapters_share_canonical_srs_v2_pipeline():
+    import classroom_monitor.demo.runner as cli_adapter
+    import classroom_monitor.demo.runtime as web_adapter
+
+    assert cli_adapter.SRSv2Pipeline is web_adapter.SRSv2Pipeline
+
+
 def _write_video(path: Path, *, frames: int = 6, fps: float = 10.0) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (96, 64))
@@ -268,6 +275,7 @@ def test_live_worker_crosses_first_incident_and_persists_evidence(tmp_path: Path
 
     class FakeDetector:
         inference_mode = "MOCK"
+        model_path = Path("controlled-test-double")
         capability_health = {"pose": "MOCK", "pose_model": "controlled-test-double", "pose_error": ""}
 
         def __init__(self, *args, **kwargs):
@@ -276,7 +284,7 @@ def test_live_worker_crosses_first_incident_and_persists_evidence(tmp_path: Path
         def ensure_available(self):
             return None
 
-        def detect(self, frame):
+        def detect(self, frame, frame_index=0):
             return [detection]
 
     occupancy = SimpleNamespace(

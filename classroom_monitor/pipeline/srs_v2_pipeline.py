@@ -104,6 +104,8 @@ class SRSv2Pipeline:
             detections=detections,
             timestamp_ms=timestamp_ms,
             frame_idx=frame_idx,
+            frame_w=frame.shape[1],
+            frame_h=frame.shape[0],
         )
         started = time.perf_counter()
         requests: List[Dict[str, Any]] = []

@@ -1,0 +1,184 @@
+/*
+ * VIGIL Classroom global design tokens.
+ * Source of truth: exam_monitor/theme.py (VIGIL Local / Gaze).
+ */
+
+:root,
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces */
+  --vigil-bg: #090a0c;
+  --vigil-surface: #111318;
+  --vigil-surface-alt: #171a20;
+  --vigil-surface-hover: #20242b;
+  --vigil-sidebar: #0d0f12;
+  --vigil-video-bg: #050506;
+  --vigil-overlay: rgb(0 0 0 / 72%);
+
+  /* Borders and dividers */
+  --vigil-border: #2a2e36;
+  --vigil-border-subtle: rgb(255 255 255 / 6%);
+  --vigil-border-strong: #3a404a;
+  --vigil-focus-ring: rgb(215 255 95 / 28%);
+
+  /* Typography */
+  --vigil-text: #f5f7fa;
+  --vigil-text-muted: #9aa2af;
+  --vigil-text-dim: #68717e;
+  --vigil-text-inverse: #08090b;
+  --vigil-white: #ffffff;
+  --vigil-black: #000000;
+
+  /* Primary action */
+  --vigil-primary: #f7f8fa;
+  --vigil-primary-text: #08090b;
+  --vigil-primary-hover: #e9edf2;
+  --vigil-primary-pressed: #d9dee6;
+
+  /* Observable states; these colors do not represent a cheating verdict. */
+  --vigil-good: #d7ff5f;
+  --vigil-good-dim: #273018;
+  --vigil-warning: #f4c95d;
+  --vigil-warning-dim: #332b18;
+  --vigil-danger: #ff6b6b;
+  --vigil-danger-dim: #351c20;
+  --vigil-danger-hover: #46242a;
+  --vigil-info: #a9b7c9;
+  --vigil-info-dim: #202833;
+
+  /* Secondary data visualization accents */
+  --vigil-accent-blue: #82aee0;
+  --vigil-accent-cyan: #89cfd4;
+  --vigil-accent-purple: #b9a7e8;
+
+  --vigil-shadow-sm: 0 1px 2px rgb(0 0 0 / 35%);
+  --vigil-shadow-md: 0 8px 24px rgb(0 0 0 / 32%);
+  --vigil-shadow-lg: 0 18px 48px rgb(0 0 0 / 42%);
+  --vigil-shadow-focus: 0 0 0 3px var(--vigil-focus-ring);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --vigil-bg: #f4f6f8;
+  --vigil-surface: #ffffff;
+  --vigil-surface-alt: #f0f3f6;
+  --vigil-surface-hover: #e3e8ee;
+  --vigil-sidebar: #fbfcfe;
+  --vigil-video-bg: #0a0b0d;
+  --vigil-overlay: rgb(1 1 1 / 55%);
+
+  --vigil-border: #d8dee6;
+  --vigil-border-subtle: rgb(22 26 32 / 8%);
+  --vigil-border-strong: #b8c1cc;
+  --vigil-focus-ring: rgb(22 132 91 / 22%);
+
+  --vigil-text: #161a20;
+  --vigil-text-muted: #596575;
+  --vigil-text-dim: #7a8696;
+  --vigil-text-inverse: #f8fafc;
+  --vigil-white: #fffefe;
+  --vigil-black: #010101;
+
+  --vigil-primary: #111827;
+  --vigil-primary-text: #f8fafc;
+  --vigil-primary-hover: #273244;
+  --vigil-primary-pressed: #354156;
+
+  --vigil-good: #16845b;
+  --vigil-good-dim: #e7f5ef;
+  --vigil-warning: #a96500;
+  --vigil-warning-dim: #fff2d8;
+  --vigil-danger: #d63f4b;
+  --vigil-danger-dim: #fcecef;
+  --vigil-danger-hover: #f7dde2;
+  --vigil-info: #3f6f9f;
+  --vigil-info-dim: #e8f0f8;
+
+  --vigil-accent-blue: #3f6f9f;
+  --vigil-accent-cyan: #2f7880;
+  --vigil-accent-purple: #695b91;
+
+  --vigil-shadow-sm: 0 1px 2px rgb(16 24 40 / 8%);
+  --vigil-shadow-md: 0 8px 24px rgb(16 24 40 / 12%);
+  --vigil-shadow-lg: 0 18px 48px rgb(16 24 40 / 16%);
+  --vigil-shadow-focus: 0 0 0 3px var(--vigil-focus-ring);
+}
+
+:root {
+  /* Font families mirror Segoe UI and Cascadia Mono from VIGIL Local. */
+  --vigil-font-sans: "Segoe UI", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --vigil-font-mono: "Cascadia Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
+
+  --vigil-font-size-2xs: 0.6875rem;
+  --vigil-font-size-xs: 0.75rem;
+  --vigil-font-size-sm: 0.875rem;
+  --vigil-font-size-md: 1rem;
+  --vigil-font-size-lg: 1.25rem;
+  --vigil-font-size-xl: 1.5rem;
+  --vigil-line-height-tight: 1.25;
+  --vigil-line-height-body: 1.5;
+  --vigil-font-regular: 400;
+  --vigil-font-medium: 600;
+  --vigil-font-bold: 700;
+
+  /* Four-pixel spacing grid. */
+  --vigil-space-0: 0;
+  --vigil-space-1: 0.25rem;
+  --vigil-space-2: 0.5rem;
+  --vigil-space-3: 0.75rem;
+  --vigil-space-4: 1rem;
+  --vigil-space-5: 1.25rem;
+  --vigil-space-6: 1.5rem;
+  --vigil-space-8: 2rem;
+  --vigil-space-10: 2.5rem;
+  --vigil-space-12: 3rem;
+
+  --vigil-radius-xs: 0.25rem;
+  --vigil-radius-sm: 0.375rem;
+  --vigil-radius-md: 0.625rem;
+  --vigil-radius-lg: 0.875rem;
+  --vigil-radius-pill: 999px;
+
+  --vigil-header-height: 4rem;
+  --vigil-sidebar-width: 18rem;
+  --vigil-content-max: 90rem;
+
+  --vigil-duration-fast: 120ms;
+  --vigil-duration-normal: 180ms;
+  --vigil-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  --vigil-z-base: 0;
+  --vigil-z-sticky: 20;
+  --vigil-z-dropdown: 30;
+  --vigil-z-modal: 50;
+  --vigil-z-toast: 60;
+
+  /* Compatibility aliases used during the incremental Classroom rebuild. */
+  --bg-primary: var(--vigil-bg);
+  --bg-secondary: var(--vigil-surface-alt);
+  --bg-card: var(--vigil-surface);
+  --bg-card-hover: var(--vigil-surface-hover);
+  --border-color: var(--vigil-border);
+  --border-active: var(--vigil-info);
+  --text-main: var(--vigil-text);
+  --text-primary: var(--vigil-text);
+  --text-secondary: var(--vigil-text-muted);
+  --text-muted: var(--vigil-text-dim);
+  --accent-blue: var(--vigil-accent-blue);
+  --accent-cyan: var(--vigil-accent-cyan);
+  --accent-green: var(--vigil-good);
+  --accent-amber: var(--vigil-warning);
+  --accent-orange: var(--vigil-warning);
+  --accent-red: var(--vigil-danger);
+  --accent-rose: var(--vigil-danger);
+  --accent-purple: var(--vigil-accent-purple);
+  --font-mono: var(--vigil-font-mono);
+  --radius-sm: var(--vigil-radius-sm);
+  --radius-md: var(--vigil-radius-md);
+  --radius-lg: var(--vigil-radius-lg);
+  --shadow-sm: var(--vigil-shadow-sm);
+  --shadow-md: var(--vigil-shadow-md);
+  --shadow-lg: var(--vigil-shadow-lg);
+}

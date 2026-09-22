@@ -1,22 +1,22 @@
 /* VIGIL AI Enterprise Dashboard Stylesheet */
 
 :root {
-  --bg-primary: #0b0f19;
-  --bg-card: rgba(18, 24, 38, 0.85);
-  --border-color: rgba(255, 255, 255, 0.08);
-  --accent-cyan: #06b6d4;
-  --accent-blue: #3b82f6;
-  --accent-red: #ef4444;
-  --accent-orange: #f97316;
-  --accent-green: #10b981;
-  --text-main: #f3f4f6;
-  --text-muted: #9ca3af;
+  --bg-primary: var(--vigil-bg);
+  --bg-card: color-mix(in srgb, var(--vigil-surface) 92%, transparent);
+  --border-color: var(--vigil-border);
+  --accent-cyan: var(--vigil-accent-cyan);
+  --accent-blue: var(--vigil-accent-blue);
+  --accent-red: var(--vigil-danger);
+  --accent-orange: var(--vigil-warning);
+  --accent-green: var(--vigil-good);
+  --text-main: var(--vigil-text);
+  --text-muted: var(--vigil-text-muted);
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--vigil-font-sans);
   min-height: 100vh;
 }
 

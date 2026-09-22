@@ -1,27 +1,27 @@
 /* VIGIL AI — Human Data Operations Workbench Stylesheet */
 :root {
-  --bg-primary: #0a0e17;
-  --bg-secondary: #111827;
-  --bg-card: #1a2234;
-  --bg-card-hover: #222d44;
-  --border-color: #2a3752;
-  --border-active: #3b82f6;
-  --text-primary: #f3f4f6;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  --accent-blue: #3b82f6;
-  --accent-cyan: #06b6d4;
-  --accent-green: #10b981;
-  --accent-amber: #f59e0b;
-  --accent-rose: #f43f5e;
-  --accent-purple: #8b5cf6;
-  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -2px rgba(0, 0, 0, 0.4);
+  --bg-primary: var(--vigil-bg);
+  --bg-secondary: var(--vigil-surface-alt);
+  --bg-card: var(--vigil-surface);
+  --bg-card-hover: var(--vigil-surface-hover);
+  --border-color: var(--vigil-border);
+  --border-active: var(--vigil-info);
+  --text-primary: var(--vigil-text);
+  --text-secondary: var(--vigil-text-muted);
+  --text-muted: var(--vigil-text-dim);
+  --accent-blue: var(--vigil-accent-blue);
+  --accent-cyan: var(--vigil-accent-cyan);
+  --accent-green: var(--vigil-good);
+  --accent-amber: var(--vigil-warning);
+  --accent-rose: var(--vigil-danger);
+  --accent-purple: var(--vigil-accent-purple);
+  --font-mono: var(--vigil-font-mono);
+  --radius-sm: var(--vigil-radius-sm);
+  --radius-md: var(--vigil-radius-md);
+  --radius-lg: var(--vigil-radius-lg);
+  --shadow-sm: var(--vigil-shadow-sm);
+  --shadow-md: var(--vigil-shadow-md);
+  --shadow-lg: var(--vigil-shadow-lg);
 }
 
 * {
@@ -33,7 +33,7 @@
 body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--vigil-font-sans);
   line-height: 1.5;
   min-height: 100vh;
   display: flex;

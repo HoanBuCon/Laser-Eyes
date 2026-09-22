@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import secrets
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -26,8 +27,10 @@ from api.dependencies import get_db
 from api.realtime import realtime_manager
 from classroom_monitor.demo.config import DEMO_PRESETS, get_demo_config
 from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState
-from storage.db_models import DetectionEvent, EventReview
-from storage.repositories import EventRepository, ReviewRepository
+from classroom_monitor.async_evidence_writer import compute_file_sha256
+from classroom_monitor.contracts import HashStatus
+from storage.db_models import DetectionEvent
+from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
 
 logger = logging.getLogger("DemoRouter")
 router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"])
@@ -40,6 +43,7 @@ class DemoStartRequest(BaseModel):
     show_window: bool = Field(False, description="Open local OpenCV GUI window")
     max_frames: Optional[int] = Field(None, description="Max frames to process (for quick validation)")
     stride: int = Field(1, description="Frame subsampling stride")
+    allow_mock: bool = Field(False, description="Explicitly allow visibly-labelled synthetic pose inference")
 
 
 class HumanReviewRequest(BaseModel):
@@ -95,14 +99,18 @@ def start_demo(payload: DemoStartRequest) -> Dict[str, Any]:
         )
 
     runtime = DemoRuntime.get_instance()
-    res = runtime.start(
-        preset=preset_clean,
-        mode=mode_clean,
-        debug_overlay=payload.debug_overlay,
-        show_window=payload.show_window,
-        max_frames=payload.max_frames,
-        stride=payload.stride,
-    )
+    try:
+        res = runtime.start(
+            preset=preset_clean,
+            mode=mode_clean,
+            debug_overlay=payload.debug_overlay,
+            show_window=payload.show_window,
+            max_frames=payload.max_frames,
+            stride=payload.stride,
+            allow_mock=payload.allow_mock,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     # Broadcast status to WebSockets
     realtime_manager.broadcast_threadsafe({
@@ -170,6 +178,40 @@ def get_demo_event_details(event_id: str) -> Dict[str, Any]:
     return ev
 
 
+@router.get("/events/{event_id}/integrity")
+def verify_demo_event_integrity(
+    event_id: str,
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Compare a stored SHA-256 integrity digest with the current evidence file."""
+    db_event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
+    evidence = db_event.evidence if db_event else None
+    if evidence is None or not evidence.video_sha256:
+        return {"event_id": event_id, "hash_status": HashStatus.NOT_AVAILABLE.value, "sha256": None}
+    path = Path(evidence.video_path or evidence.file_path)
+    if not path.is_file():
+        return {
+            "event_id": event_id,
+            "hash_status": HashStatus.MISMATCH.value,
+            "sha256": evidence.video_sha256,
+            "error": "Evidence file is missing",
+        }
+    actual = compute_file_sha256(path)
+    hash_status = (
+        HashStatus.VERIFIED.value
+        if secrets.compare_digest(actual.lower(), evidence.video_sha256.lower())
+        else HashStatus.MISMATCH.value
+    )
+    runtime_event = DemoRuntime.get_instance().get_event(event_id)
+    if runtime_event is not None:
+        runtime_event["hash_status"] = hash_status
+    return {
+        "event_id": event_id,
+        "hash_status": hash_status,
+        "sha256": evidence.video_sha256,
+    }
+
+
 @router.post("/events/{event_id}/review")
 def review_demo_event(
     event_id: str,
@@ -181,38 +223,31 @@ def review_demo_event(
     if decision_clean not in ("CONFIRMED", "REJECTED", "INCONCLUSIVE"):
         raise HTTPException(status_code=400, detail="Decision must be 'CONFIRMED', 'REJECTED', or 'INCONCLUSIVE'")
 
-    runtime = DemoRuntime.get_instance()
-    ev_dict = runtime.get_event(event_id)
-    if ev_dict:
-        ev_dict["review_status"] = decision_clean
-        ev_dict["decision_reason"] = payload.reason_code
-        ev_dict["reviewer_notes"] = payload.notes
-        ev_dict["reviewer_id"] = payload.reviewer_id
-
-    # Persist decision in SQLite
-    db_event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
-    if db_event:
-        db_event.review_status = decision_clean
-        db_event.status = decision_clean
-        db_event.reviewer_note = f"[{payload.reason_code}] {payload.notes}".strip()
-
-        # Update or create EventReview
-        rev = db.query(EventReview).filter(EventReview.event_id == db_event.id).first()
-        if rev:
-            rev.decision = decision_clean
-            rev.reason_code = payload.reason_code
-            rev.note = payload.notes or ""
-            rev.reviewer_id = payload.reviewer_id or "Proctor"
-        else:
-            rev = EventReview(
-                event_id=db_event.id,
+    try:
+        submit_event_review(
+            db,
+            ReviewCommand(
+                event_id=event_id,
                 reviewer_id=payload.reviewer_id or "Proctor",
                 decision=decision_clean,
                 reason_code=payload.reason_code,
                 note=payload.notes or "",
-            )
-            db.add(rev)
-        db.commit()
+            ),
+        )
+    except ReviewTargetMissing as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Review incident is not durable; decision was not accepted",
+        ) from exc
+
+    runtime = DemoRuntime.get_instance()
+    ev_dict = runtime.get_event(event_id)
+    if ev_dict:
+        ev_dict["review_status"] = decision_clean
+        ev_dict["review_decision"] = decision_clean
+        ev_dict["decision_reason"] = payload.reason_code
+        ev_dict["reviewer_notes"] = payload.notes
+        ev_dict["reviewer_id"] = payload.reviewer_id
 
     # Broadcast decision to all connected clients
     realtime_manager.broadcast_threadsafe({

@@ -22,7 +22,7 @@ from collections import deque
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import cv2
 import numpy as np
@@ -30,6 +30,14 @@ import numpy as np
 from classroom_monitor.async_evidence_writer import AsyncEvidenceWriter, compute_file_sha256
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine, PatternType
 from classroom_monitor.config import ClassroomConfig, DEFAULT_CONFIG, resolve_runtime_config
+from classroom_monitor.contracts import (
+    CapabilityMode,
+    EvidenceStatus,
+    HashStatus,
+    classroom_event_from_replay,
+    evidence_basename,
+    review_incident_from_classroom_event,
+)
 from classroom_monitor.demo.config import (
     DEMO_PRESETS,
     DemoVideoConfig,
@@ -90,6 +98,9 @@ class DemoStatus:
     active_review_incidents: int = 0
     emitted_review_incidents: int = 0
     session_id: Optional[str] = None
+    inference_mode: str = CapabilityMode.ERROR.value
+    capability_health: Dict[str, str] = field(default_factory=dict)
+    persistence_health: str = "UNKNOWN"
     last_error: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -111,6 +122,9 @@ class DemoStatus:
             "active_review_incidents": self.active_review_incidents,
             "emitted_review_incidents": self.emitted_review_incidents,
             "session_id": self.session_id,
+            "inference_mode": self.inference_mode,
+            "capability_health": dict(self.capability_health),
+            "persistence_health": self.persistence_health,
             "last_error": self.last_error,
         }
 
@@ -128,6 +142,8 @@ class DemoRuntime:
 
     def __init__(self):
         self._lock = threading.Lock()
+        self._lifecycle_lock = threading.Lock()
+        self._callback_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._pause_event = threading.Event()
@@ -144,13 +160,38 @@ class DemoRuntime:
         self._status_callbacks: List[Callable[[DemoStatus], None]] = []
 
     def register_frame_callback(self, cb: Callable[[np.ndarray, np.ndarray, int, float, dict], None]) -> None:
-        self._frame_callbacks.append(cb)
+        with self._callback_lock:
+            if cb not in self._frame_callbacks:
+                self._frame_callbacks.append(cb)
 
     def register_event_callback(self, cb: Callable[[ClassroomEvent, dict], None]) -> None:
-        self._event_callbacks.append(cb)
+        with self._callback_lock:
+            if cb not in self._event_callbacks:
+                self._event_callbacks.append(cb)
 
     def register_status_callback(self, cb: Callable[[DemoStatus], None]) -> None:
-        self._status_callbacks.append(cb)
+        with self._callback_lock:
+            if cb not in self._status_callbacks:
+                self._status_callbacks.append(cb)
+
+    def unregister_frame_callback(self, cb: Callable[..., None]) -> None:
+        with self._callback_lock:
+            if cb in self._frame_callbacks:
+                self._frame_callbacks.remove(cb)
+
+    def unregister_event_callback(self, cb: Callable[..., None]) -> None:
+        with self._callback_lock:
+            if cb in self._event_callbacks:
+                self._event_callbacks.remove(cb)
+
+    def unregister_status_callback(self, cb: Callable[..., None]) -> None:
+        with self._callback_lock:
+            if cb in self._status_callbacks:
+                self._status_callbacks.remove(cb)
+
+    def _callback_snapshot(self, kind: str) -> List[Callable[..., None]]:
+        with self._callback_lock:
+            return list(getattr(self, f"_{kind}_callbacks"))
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
@@ -166,19 +207,17 @@ class DemoRuntime:
 
     def add_or_update_event(self, event: ClassroomEvent, metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Record or update an incident in runtime memory and notify callbacks."""
-        ev_dict = event.to_dict()
+        if metadata:
+            event.metadata.update(metadata)
+        incident = review_incident_from_classroom_event(
+            event,
+            session_id=self.status.session_id or getattr(self, "_db_session_id", None) or "UNPERSISTED",
+            capability_health=self.status.capability_health,
+        )
+        ev_dict = incident.to_dict()
+        # Preserve DB/evidence adapter fields which are not part of perception.
         if metadata:
             ev_dict.update(metadata)
-        if "peak_risk_score" not in ev_dict:
-            ev_dict["peak_risk_score"] = float(getattr(event, "risk_score", 75.0))
-        if "risk_score" not in ev_dict:
-            ev_dict["risk_score"] = float(ev_dict.get("peak_risk_score", 75.0))
-        if "review_status" not in ev_dict:
-            ev_dict["review_status"] = "PENDING"
-        if "occurrence_count" not in ev_dict:
-            ev_dict["occurrence_count"] = 1
-        if "primary_pattern" not in ev_dict:
-            ev_dict["primary_pattern"] = event.behavior
 
         with self._lock:
             existing_idx = next((i for i, e in enumerate(self.emitted_events_list) if e.get("event_id") == event.event_id), None)
@@ -189,11 +228,11 @@ class DemoRuntime:
             self.emitted_events[event.event_id] = ev_dict
             self.status.emitted_review_incidents = len(self.emitted_events_list)
 
-        for cb in self._event_callbacks:
+        for cb in self._callback_snapshot("event"):
             try:
                 cb(event, ev_dict)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Demo event callback failed: %s", exc)
         return ev_dict
 
     _on_live_event = add_or_update_event
@@ -222,6 +261,29 @@ class DemoRuntime:
         show_window: bool = False,
         max_frames: Optional[int] = None,
         stride: int = 1,
+        allow_mock: bool = False,
+    ) -> Dict[str, Any]:
+        """Serialize starts so two inference workers can never overlap."""
+        with self._lifecycle_lock:
+            return self._start_locked(
+                preset=preset,
+                mode=mode,
+                debug_overlay=debug_overlay,
+                show_window=show_window,
+                max_frames=max_frames,
+                stride=stride,
+                allow_mock=allow_mock,
+            )
+
+    def _start_locked(
+        self,
+        preset: str = "india",
+        mode: str = "LIVE",
+        debug_overlay: bool = False,
+        show_window: bool = False,
+        max_frames: Optional[int] = None,
+        stride: int = 1,
+        allow_mock: bool = False,
     ) -> Dict[str, Any]:
         """Start demo analysis in LIVE or REPLAY mode in a background worker thread."""
         with self._lock:
@@ -232,6 +294,11 @@ class DemoRuntime:
 
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=2.0)
+            if self._thread.is_alive():
+                with self._lock:
+                    self.status.state = DemoState.ERROR.value
+                    self.status.last_error = "Previous demo worker did not terminate; new start refused"
+                raise RuntimeError(self.status.last_error)
 
         with self._lock:
             self.reset_state()
@@ -246,6 +313,13 @@ class DemoRuntime:
             self.status.preset = preset.lower()
             self.status.mode = mode_enum.value
             self.status.debug_overlay = bool(debug_overlay)
+            self.status.inference_mode = (
+                CapabilityMode.DEGRADED.value if mode_enum == DemoMode.REPLAY else CapabilityMode.ERROR.value
+            )
+            self.status.capability_health = {
+                "pose": "RECORDED" if mode_enum == DemoMode.REPLAY else CapabilityMode.ERROR.value,
+                "head_orientation": "RECORDED" if mode_enum == DemoMode.REPLAY else "UNKNOWN",
+            }
 
             # Initialize DB Session record
             session_id = self._init_db_session(preset=preset, run_id=run_id, mode=mode_enum.value)
@@ -255,13 +329,13 @@ class DemoRuntime:
                 self._thread = threading.Thread(
                     target=self._worker_replay,
                     args=(preset, run_id, debug_overlay, show_window, max_frames),
-                    daemon=True,
+                    daemon=False,
                 )
             else:
                 self._thread = threading.Thread(
                     target=self._worker_live,
-                    args=(preset, run_id, debug_overlay, show_window, max_frames, stride),
-                    daemon=True,
+                    args=(preset, run_id, debug_overlay, show_window, max_frames, stride, allow_mock),
+                    daemon=False,
                 )
             self._thread.start()
 
@@ -290,6 +364,9 @@ class DemoRuntime:
         if self._thread and self._thread.is_alive() and threading.current_thread() != self._thread:
             self._thread.join(timeout=10.0)
         with self._lock:
+            if self._thread and self._thread.is_alive():
+                self.status.state = DemoState.ERROR.value
+                self.status.last_error = "Demo worker did not terminate within 10 seconds"
             return self.status.to_dict()
 
     def reset(self) -> Dict[str, Any]:
@@ -334,16 +411,32 @@ class DemoRuntime:
                 db.commit()
                 db.refresh(room)
 
+            camera = (
+                db.query(Camera)
+                .filter(Camera.room_id == room.id, Camera.name == demo_cfg.camera_id)
+                .first()
+            )
+            if camera is None:
+                camera = Camera(
+                    room_id=room.id,
+                    name=demo_cfg.camera_id,
+                    source_uri=str(demo_cfg.video_path),
+                    status="online",
+                )
+                db.add(camera)
+                db.flush()
+
             sess = ExamSession(
                 id=session_id,
                 room_id=room.id,
-                camera_id=demo_cfg.camera_id,
+                camera_id=camera.id,
                 exam_name=f"VIGIL AI {mode} Demo ({preset.upper()}) - {run_id}",
                 subject_code=f"ICTU-2026-{preset.upper()}",
                 status="RUNNING",
             )
             db.add(sess)
             db.commit()
+            self._db_camera_id = camera.id
         except Exception as exc:
             logger.warning("Could not create DB ExamSession: %s", exc)
         finally:
@@ -359,16 +452,23 @@ class DemoRuntime:
         evidence_dir: Path,
     ) -> Dict[str, Any]:
         """Save or update ClassroomEvent in SQLite & return clean dictionary representation."""
-        event_dict = event.to_dict()
+        incident = review_incident_from_classroom_event(
+            event,
+            session_id=session_id or "UNPERSISTED",
+            capability_health=self.status.capability_health,
+        )
+        event_dict = incident.to_dict()
 
         # Generate relative evidence URLs
         snapshot_rel = None
         video_rel = None
         video_sha256 = None
 
-        if event.evidence_path and Path(event.evidence_path).exists():
+        snapshot_exists = bool(event.evidence_path and Path(event.evidence_path).is_file())
+        video_exists = bool(event.evidence_video_path and Path(event.evidence_video_path).is_file() and Path(event.evidence_video_path).stat().st_size > 0)
+        if snapshot_exists:
             snapshot_rel = f"/api/v1/demo/evidence/snapshot/{Path(event.evidence_path).name}"
-        if event.evidence_video_path and Path(event.evidence_video_path).exists():
+        if video_exists:
             video_rel = f"/api/v1/demo/evidence/video/{Path(event.evidence_video_path).name}"
             try:
                 video_sha256 = compute_file_sha256(Path(event.evidence_video_path))
@@ -378,11 +478,17 @@ class DemoRuntime:
         event_dict["snapshot_url"] = snapshot_rel
         event_dict["video_url"] = video_rel
         event_dict["video_sha256"] = video_sha256
+        event_dict["hash_status"] = HashStatus.AVAILABLE_NOT_CHECKED.value if video_sha256 else HashStatus.NOT_AVAILABLE.value
+        event_dict["evidence_status"] = event.metadata.get("evidence_status") or (
+            EvidenceStatus.READY.value if snapshot_exists and (not event.evidence_video_path or video_exists)
+            else EvidenceStatus.PENDING.value
+        )
+        event_dict["evidence_error"] = event.metadata.get("evidence_error")
         event_dict["review_status"] = "PENDING"
         event_dict["occurrence_count"] = event.metadata.get("occurrence_count", 1)
         event_dict["first_seen_ms"] = event.metadata.get("first_seen_ms", getattr(event, "timestamp_ms", 0.0) or 0.0)
         event_dict["last_seen_ms"] = event.metadata.get("last_seen_ms", getattr(event, "timestamp_ms", 0.0) or 0.0)
-        event_dict["peak_risk_score"] = float(event.metadata.get("peak_risk_score", getattr(event, "risk_score", 75.0) or 75.0))
+        event_dict["peak_risk_score"] = float(event.metadata.get("peak_risk_score", event.metadata.get("risk_score", 0.0)) or 0.0)
         event_dict["primary_pattern"] = event.metadata.get("primary_pattern") or event.behavior
 
         # Persist to SQLite
@@ -395,7 +501,7 @@ class DemoRuntime:
                 existing.severity = event.severity
                 existing.supporting_patterns_json = json.dumps(event.metadata.get("supporting_pattern_ids", []))
                 existing.reviewer_note = f"Occurrence x{event_dict['occurrence_count']}"
-                db.commit()
+                db_event = existing
             else:
                 # Find seat db id
                 seat_obj = (
@@ -406,12 +512,19 @@ class DemoRuntime:
                 seat_db_id = seat_obj.id if seat_obj else None
                 room_obj = db.query(ExamRoom).filter(ExamRoom.room_code == room_code).first()
                 room_db_id = room_obj.id if room_obj else None
+                camera_obj = None
+                if room_obj is not None:
+                    camera_obj = (
+                        db.query(Camera)
+                        .filter(Camera.room_id == room_obj.id, Camera.name == camera_id)
+                        .first()
+                    )
 
                 db_event = DetectionEvent(
                     id=str(uuid.uuid4()),
                     session_id=session_id or str(uuid.uuid4()),
                     room_id=room_db_id,
-                    camera_id=camera_id,
+                    camera_id=(camera_obj.id if camera_obj else getattr(self, "_db_camera_id", None)),
                     seat_id=seat_db_id,
                     event_id=event.event_id,
                     track_id=event.track_id or 0,
@@ -432,24 +545,39 @@ class DemoRuntime:
                     room_context=event.room_context,
                 )
                 db.add(db_event)
-                db.commit()
+                db.flush()
 
-                # Attach evidence record
-                if event.evidence_path or event.evidence_video_path:
+            # Attach or update the one evidence lifecycle record.
+            if event.evidence_path or event.evidence_video_path:
+                evi = db.query(EvidenceFile).filter(EvidenceFile.event_id == db_event.id).first()
+                if evi is None:
                     evi = EvidenceFile(
                         event_id=db_event.id,
                         file_path=event.evidence_video_path or event.evidence_path or "",
-                        snapshot_path=event.evidence_path,
-                        video_path=event.evidence_video_path,
-                        video_sha256=video_sha256,
-                        file_type="video/mp4" if event.evidence_video_path else "image/jpeg",
-                        status="READY",
                     )
                     db.add(evi)
-                    db.commit()
-            db.close()
+                evi.file_path = event.evidence_video_path or event.evidence_path or ""
+                evi.snapshot_path = event.evidence_path
+                evi.video_path = event.evidence_video_path
+                evi.video_sha256 = video_sha256
+                evi.file_type = "video/mp4" if event.evidence_video_path else "image/jpeg"
+                evi.file_size_bytes = Path(event.evidence_video_path).stat().st_size if video_exists else 0
+                evi.status = event_dict["evidence_status"]
+                evi.error_message = event_dict["evidence_error"]
+            db.commit()
         except Exception as exc:
-            logger.debug("Database event sync notice: %s", exc)
+            if "db" in locals():
+                db.rollback()
+            logger.error("Database event persistence failed for %s: %s", event.event_id, exc)
+            with self._lock:
+                self.status.persistence_health = "ERROR"
+            event_dict["persistence_error"] = str(exc)
+        else:
+            with self._lock:
+                self.status.persistence_health = "READY"
+        finally:
+            if "db" in locals():
+                db.close()
 
         return event_dict
 
@@ -465,6 +593,7 @@ class DemoRuntime:
         show_window: bool,
         max_frames: Optional[int],
         stride: int,
+        allow_mock: bool,
     ) -> None:
         """Executes full live SRS v2 inference pipeline."""
         logger.info("Starting SRS v2 LIVE analysis worker for preset '%s' (run_id: %s)...", preset, run_id)
@@ -540,10 +669,32 @@ class DemoRuntime:
             return
 
         # Initialize AI Models & Engines
-        detector = PoseClassroomDetector(confidence_threshold=config.pose_conf)
+        try:
+            detector = PoseClassroomDetector(confidence_threshold=config.pose_conf, allow_mock=allow_mock)
+            detector.ensure_available()
+        except Exception as exc:
+            logger.error("LIVE start refused: %s", exc)
+            cap.release()
+            with self._lock:
+                self.status.state = DemoState.ERROR.value
+                self.status.inference_mode = CapabilityMode.ERROR.value
+                self.status.capability_health["pose"] = CapabilityMode.ERROR.value
+                self.status.last_error = str(exc)
+            return
+        with self._lock:
+            self.status.inference_mode = detector.inference_mode
+            self.status.capability_health.update(detector.capability_health)
         if self._stop_event.is_set():
             return
         head_provider_inst = create_head_pose_provider(config.head_provider)
+        hpe_ready = not (
+            config.head_provider.lower().replace("-", "_") in ("sixdrepnet", "6drepnet", "sixd")
+            and getattr(head_provider_inst.__class__, "_shared_model", None) is None
+        )
+        with self._lock:
+            self.status.capability_health["head_orientation"] = (
+                CapabilityMode.REAL.value if hpe_ready else CapabilityMode.DEGRADED.value
+            )
         if self._stop_event.is_set():
             return
         obs_extractor = ObservationExtractor(head_pose_provider=head_provider_inst)
@@ -568,6 +719,7 @@ class DemoRuntime:
         all_episodes: List[TemporalEpisode] = []
         all_events: List[ClassroomEvent] = []
         all_patterns: List[BehaviorPattern] = []
+        evidence_jobs: Dict[str, Any] = {}
 
         hpe_interval_ms = (1000.0 / config.hpe_hz) if config.hpe_hz > 0 else 200.0
         hpe_max_age_ms = runtime_cfg["head_pose"]["cache_max_age_ms"]
@@ -689,15 +841,19 @@ class DemoRuntime:
                         all_events.append(event)
                         # Save Evidence Clip
                         if config.save_evidence:
-                            clip_path = evidence_buffer.trigger_evidence_clip(
+                            clip_job = evidence_buffer.trigger_clip(
                                 event_id=event.event_id,
-                                behavior_label=event.behavior,
+                                track_id=event.track_id,
+                                behavior=event.behavior,
+                                frame_idx=frame_idx,
                                 timestamp_ms=source_ts_ms,
-                                priority_score=event.risk_score,
-                                seat_id=event.seat_id,
-                                peak_frame=event.evidence_frame,
                             )
-                            event.evidence_video_path = str(clip_path)
+                            event.evidence_video_path = str(clip_job.output_path)
+                            evidence_jobs[event.event_id] = clip_job
+                            snapshot_path = evidence_dir / f"{event.event_id}_snapshot.jpg"
+                            snapshot_frame = event.evidence_frame if event.evidence_frame is not None else frame
+                            if cv2.imwrite(str(snapshot_path), snapshot_frame):
+                                event.evidence_path = str(snapshot_path)
 
                         # Sync and Broadcast Event
                         ev_dict = self._persist_or_update_event(
@@ -707,17 +863,9 @@ class DemoRuntime:
                             camera_id=config.camera_id,
                             evidence_dir=evidence_dir,
                         )
-                        with self._lock:
-                            self.emitted_events[event.event_id] = ev_dict
-                            if ev_dict not in self.emitted_events_list:
-                                self.emitted_events_list.append(ev_dict)
-                            self.status.emitted_review_incidents = len(self.emitted_events_list)
+                        self.add_or_update_event(event, ev_dict)
 
-                        for cb in self._event_callbacks:
-                            try:
-                                cb(event, ev_dict)
-                            except Exception:
-                                pass
+                    all_patterns.extend(patterns_seat)
 
                 # 5. Render Output Frame
                 active_seats_state = {}
@@ -758,6 +906,17 @@ class DemoRuntime:
                     runtime_metrics=metrics_telemetry,
                     debug_overlay=debug_overlay,
                 )
+                if detector.inference_mode == CapabilityMode.MOCK.value:
+                    cv2.putText(
+                        annotated_frame,
+                        "MOCK / SIMULATION - NOT REAL INFERENCE",
+                        (24, 48),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.9,
+                        (0, 0, 255),
+                        3,
+                        cv2.LINE_AA,
+                    )
 
                 out_writer.write(annotated_frame)
                 _, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
@@ -776,13 +935,13 @@ class DemoRuntime:
                     )
                     self.status.active_review_incidents = metrics_telemetry["active_review_incidents"]
 
-                for cb in self._frame_callbacks:
+                for cb in self._callback_snapshot("frame"):
                     try:
                         cb(annotated_frame, frame, frame_idx, source_ts_ms, metrics_telemetry)
                     except Exception:
                         pass
 
-                for cb in self._status_callbacks:
+                for cb in self._callback_snapshot("status"):
                     try:
                         cb(self.status)
                     except Exception:
@@ -798,6 +957,20 @@ class DemoRuntime:
             flushed_episodes = episode_engine.flush_all(timestamp_ms=source_ts_ms)
             all_episodes.extend(episode_engine.completed_episodes)
             evidence_buffer.flush_all()
+            for completed_event in all_events:
+                job = evidence_jobs.get(completed_event.event_id)
+                if job is not None:
+                    completed_event.metadata["evidence_status"] = job.status
+                    if job.error_message:
+                        completed_event.metadata["evidence_error"] = job.error_message
+                    refreshed = self._persist_or_update_event(
+                        event=completed_event,
+                        session_id=self.status.session_id,
+                        room_code=config.room_code,
+                        camera_id=config.camera_id,
+                        evidence_dir=evidence_dir,
+                    )
+                    self.add_or_update_event(completed_event, refreshed)
             out_writer.release()
             cap.release()
             if show_window:
@@ -820,6 +993,10 @@ class DemoRuntime:
                 "wall_time_sec": time.time() - start_wall_time,
                 "overall_fps": processed_count / max(0.001, time.time() - start_wall_time),
                 "realtime_factor": (source_ts_ms / 1000.0) / max(0.001, time.time() - start_wall_time),
+                "inference_mode": detector.inference_mode,
+                "capability_health": detector.capability_health | {
+                    "head_orientation": self.status.capability_health.get("head_orientation", "UNKNOWN")
+                },
             }
 
             export_demo_artifacts(
@@ -846,7 +1023,9 @@ class DemoRuntime:
                         shutil.copy2(ef, rep_evi / ef.name)
 
             with self._lock:
-                self.status.state = DemoState.COMPLETED.value
+                self.status.state = (
+                    DemoState.STOPPED.value if self._stop_event.is_set() else DemoState.COMPLETED.value
+                )
             logger.info("SRS v2 LIVE analysis completed for run_id: %s", run_id)
 
         except Exception as exc:
@@ -949,41 +1128,29 @@ class DemoRuntime:
                     ev_ts = float(ev.get("timestamp_ms") or ev.get("start_timestamp_ms", 0.0))
                     if ev_id not in emitted_event_ids and source_ts_ms >= ev_ts:
                         emitted_event_ids.add(ev_id)
-                        # Build full relative URLs
-                        snap_name = Path(ev.get("evidence_path", "")).name if ev.get("evidence_path") else ""
-                        vid_name = Path(ev.get("evidence_video_path", "")).name if ev.get("evidence_video_path") else ""
-                        ev_dict = dict(ev)
-                        ev_dict["snapshot_url"] = f"/api/v1/demo/evidence/snapshot/{snap_name}" if snap_name else None
-                        ev_dict["video_url"] = f"/api/v1/demo/evidence/video/{vid_name}" if vid_name else None
-                        ev_dict["occurrence_count"] = ev.get("metadata", {}).get("occurrence_count", 1)
-                        ev_dict["first_seen_ms"] = ev.get("metadata", {}).get("first_seen_ms", ev_ts)
-                        ev_dict["last_seen_ms"] = ev.get("metadata", {}).get("last_seen_ms", source_ts_ms)
-                        ev_dict["peak_risk_score"] = ev.get("metadata", {}).get("peak_risk_score", ev.get("risk_score", 85))
-                        ev_dict["primary_pattern"] = ev.get("metadata", {}).get("primary_pattern") or ev.get("behavior")
-                        ev_dict["review_status"] = "PENDING"
+                        replay_event = classroom_event_from_replay(ev)
+                        # Resolve media against the replay package instead of
+                        # trusting a stale absolute path from an older run.
+                        snap_name = evidence_basename(replay_event.evidence_path)
+                        vid_name = evidence_basename(replay_event.evidence_video_path)
+                        if snap_name:
+                            candidate = replay_root / "evidence" / snap_name
+                            replay_event.evidence_path = str(candidate if candidate.exists() else replay_event.evidence_path)
+                        if vid_name:
+                            candidate = replay_root / "evidence" / vid_name
+                            replay_event.evidence_video_path = str(candidate if candidate.exists() else replay_event.evidence_video_path)
 
-                        with self._lock:
-                            self.emitted_events[ev_id] = ev_dict
-                            if ev_dict not in self.emitted_events_list:
-                                self.emitted_events_list.append(ev_dict)
-                            self.status.emitted_review_incidents = len(self.emitted_events_list)
-
-                        # Dummy ClassroomEvent for callbacks
-                        dummy_event = ClassroomEvent(
-                            event_id=ev_id,
-                            session_id=self.status.session_id or "DEMO-SESSION",
-                            seat_id=ev.get("seat_id", "SEAT-01"),
-                            behavior=ev.get("behavior", "REPEATED_NEIGHBOR_GLANCE"),
-                            severity=ev.get("severity", "HIGH"),
-                            risk_score=int(ev_dict["peak_risk_score"]),
-                            timestamp_ms=ev_ts,
-                            metadata=ev.get("metadata", {}),
+                        # A replay incident is durable before it is visible or
+                        # reviewable.  The adapter handles current and legacy
+                        # artifact field names without mutating ClassroomEvent.
+                        ev_dict = self._persist_or_update_event(
+                            event=replay_event,
+                            session_id=self.status.session_id,
+                            room_code=demo_cfg.room_code,
+                            camera_id=demo_cfg.camera_id,
+                            evidence_dir=replay_root / "evidence",
                         )
-                        for cb in self._event_callbacks:
-                            try:
-                                cb(dummy_event, ev_dict)
-                            except Exception:
-                                pass
+                        self.add_or_update_event(replay_event, ev_dict)
 
                 # Encode Frame
                 _, jpeg_buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
@@ -1006,13 +1173,13 @@ class DemoRuntime:
                     "active_review_incidents": len(self.emitted_events_list),
                 }
 
-                for cb in self._frame_callbacks:
+                for cb in self._callback_snapshot("frame"):
                     try:
                         cb(frame, frame, frame_idx, source_ts_ms, metrics_telemetry)
                     except Exception:
                         pass
 
-                for cb in self._status_callbacks:
+                for cb in self._callback_snapshot("status"):
                     try:
                         cb(self.status)
                     except Exception:
@@ -1033,7 +1200,9 @@ class DemoRuntime:
                 cv2.destroyAllWindows()
 
             with self._lock:
-                self.status.state = DemoState.COMPLETED.value
+                self.status.state = (
+                    DemoState.STOPPED.value if self._stop_event.is_set() else DemoState.COMPLETED.value
+                )
             logger.info("RECORDED ANALYSIS REPLAY completed for run_id: %s", run_id)
 
         except Exception as exc:

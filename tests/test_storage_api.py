@@ -299,11 +299,11 @@ def test_workers_and_reviews_api(client, db_session):
     assert rev_data["decision"] == "CONFIRMED"
     assert rev_data["reviewer_id"] == "proctor_nguyen_van_a"
 
-    # Verify event status updated via API and DB
+    # Human decision is durable but must not overwrite the independent AI status.
     res_get = client.get(f"/api/v1/events/{db_evt.id}")
     assert res_get.status_code == 200
     assert res_get.json()["review_status"] == "CONFIRMED"
-    assert res_get.json()["status"] == "CONFIRMED"
+    assert res_get.json()["status"] == "PENDING"
 
     db_session.expire_all()
     refreshed_evt = event_repo.get_by_id(db_evt.id)

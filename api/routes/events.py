@@ -21,7 +21,8 @@ from api.dependencies import get_evidence_store
 from api.schemas import EventResponse, EventReviewUpdate, ReviewResponse
 from storage.database import get_db
 from storage.evidence_store import EvidenceStore
-from storage.repositories import AuditLogRepository, EventRepository, ReviewRepository
+from storage.repositories import EventRepository
+from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
 
 router = APIRouter(tags=["Detection Events"])
 
@@ -77,37 +78,19 @@ def review_event(
     db: Session = Depends(get_db),
 ):
     """Submit human proctor review decision (CONFIRMED / REJECTED / INCONCLUSIVE)."""
-    event_repo = EventRepository(db)
-    review_repo = ReviewRepository(db)
-    audit_repo = AuditLogRepository(db)
-
-    ev = event_repo.get_by_id(event_id) or event_repo.get_by_event_id(event_id)
-    if not ev:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    review = review_repo.submit_review(
-        event_pk=ev.id,
-        reviewer_id=payload.reviewer_id,
-        decision=payload.decision.upper(),
-        reason_code=payload.reason_code,
-        note=payload.note,
-    )
-
-    # Log action to audit trail
-    audit_repo.log_action(
-        actor_id=payload.reviewer_id,
-        action="REVIEW_EVENT",
-        resource_type="EVENT",
-        resource_id=ev.id,
-        metadata={
-            "decision": payload.decision,
-            "reason_code": payload.reason_code,
-            "event_id": ev.event_id,
-            "seat_id": ev.seat_id,
-        },
-    )
-
-    return review
+    try:
+        return submit_event_review(
+            db,
+            ReviewCommand(
+                event_id=event_id,
+                reviewer_id=payload.reviewer_id,
+                decision=payload.decision,
+                reason_code=payload.reason_code,
+                note=payload.note,
+            ),
+        )
+    except ReviewTargetMissing as exc:
+        raise HTTPException(status_code=404, detail="Event not found") from exc
 
 
 @router.get("/events/{event_id}/evidence")

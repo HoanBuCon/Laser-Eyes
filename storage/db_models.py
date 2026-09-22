@@ -213,7 +213,7 @@ class DetectionEvent(Base):
     room_id = Column(String(36), ForeignKey("exam_rooms.id"), nullable=True)
     camera_id = Column(String(36), ForeignKey("cameras.id"), nullable=True)
     seat_id = Column(String(36), ForeignKey("seats.id"), nullable=True)
-    event_id = Column(String(36), nullable=False, index=True)  # UUID or human-readable EVT-XXXX
+    event_id = Column(String(36), nullable=False, index=True, unique=True)  # idempotency key
     track_id = Column(Integer, default=0)
     event_type = Column(String(50), default="SUSPICIOUS_BEHAVIOR")
     primary_signal = Column(String(50), default="PROLONGED_HEAD_TURN")
@@ -259,7 +259,7 @@ class EvidenceFile(Base):
     __tablename__ = "evidence_files"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    event_id = Column(String(36), ForeignKey("detection_events.id"), nullable=False)
+    event_id = Column(String(36), ForeignKey("detection_events.id"), nullable=False, unique=True)
     file_path = Column(String(500), nullable=False)  # Primary file (or snapshot)
     snapshot_path = Column(String(500), nullable=True)
     video_path = Column(String(500), nullable=True)
@@ -507,4 +507,3 @@ class StagedScenarioChecklist(Base):
 
     # Relationships
     session = relationship("StagedRecordingSession", back_populates="scenarios")
-

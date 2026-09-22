@@ -66,11 +66,14 @@ class EventDetector:
         return {
             EventType.LOOK_AWAY: (
                 exactly_one_person
+                and not result.tracking_held
                 and result.head_direction == "center"
                 and result.eyes_outside_zone
             ),
             EventType.HEAD_TURN: (
-                exactly_one_person and result.head_direction not in {"center", "unknown"}
+                exactly_one_person
+                and not result.tracking_held
+                and result.head_direction not in {"center", "unknown"}
             ),
             EventType.TALKING: exactly_one_person and result.is_talking,
             EventType.NO_FACE: result.face_count == 0,

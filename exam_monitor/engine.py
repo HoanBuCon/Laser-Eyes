@@ -28,6 +28,7 @@ class GazeAnalyzer:
         model_path: Path | None = None,
         max_faces: int = 5,
         object_model_path: Path | None = None,
+        allowed_materials: set[str] | None = None,
     ):
         self.model_path = Path(model_path or MODEL_PATH)
         self.object_model_path = Path(object_model_path or OBJECT_MODEL_PATH)
@@ -44,6 +45,10 @@ class GazeAnalyzer:
         self._calibration_samples: list[tuple[float, float]] = []
         self._calibration_target = 36
         self._calibrated = False
+        self._calibration_state = "NOT_STARTED"
+        self._calibration_quality = 0.0
+        self._calibration_message = "Look at the center target to calibrate."
+        self._allowed_materials = {item.lower() for item in (allowed_materials or set())}
         self._recent_confidence: deque[float] = deque(maxlen=20)
         self._mouth_history: deque[tuple[float, float]] = deque(maxlen=90)
         self._talking_score = 0.0
@@ -113,6 +118,32 @@ class GazeAnalyzer:
             return 1.0
         return min(1.0, len(self._calibration_samples) / self._calibration_target)
 
+    @property
+    def calibration_state(self) -> str:
+        return self._calibration_state
+
+    @property
+    def calibration_quality(self) -> float:
+        return self._calibration_quality
+
+    @property
+    def calibration_message(self) -> str:
+        return self._calibration_message
+
+    def set_allowed_materials(self, materials: set[str]) -> None:
+        """Set per-session material policy while retaining raw detections."""
+        self._allowed_materials = {item.lower() for item in materials}
+
+    def prohibited_objects(
+        self,
+        detections: list[tuple[str, float, tuple[int, int, int, int]]],
+    ) -> list[str]:
+        return sorted({
+            label
+            for label, _, _ in detections
+            if label in {"cell phone", "book"} and label not in self._allowed_materials
+        })
+
     def begin_calibration(self) -> None:
         self._calibration_samples.clear()
         self._baseline_x = 0.0
@@ -120,6 +151,9 @@ class GazeAnalyzer:
         self._smooth_x = 0.0
         self._smooth_y = 0.0
         self._calibrated = False
+        self._calibration_state = "COLLECTING"
+        self._calibration_quality = 0.0
+        self._calibration_message = "Keep your head still and look at the center target."
         self._recent_confidence.clear()
         self._mouth_history.clear()
         self._talking_score = 0.0
@@ -134,6 +168,9 @@ class GazeAnalyzer:
         self._baseline_x = 0.0
         self._baseline_y = 0.0
         self._calibrated = False
+        self._calibration_state = "COLLECTING"
+        self._calibration_quality = 0.0
+        self._calibration_message = "Recalibration started. Look at the center target."
 
     def analyze(self, frame_bgr: np.ndarray, timestamp: float | None = None) -> AnalysisResult:
         timestamp = time.monotonic() if timestamp is None else timestamp
@@ -147,9 +184,7 @@ class GazeAnalyzer:
         h, w = frame_bgr.shape[:2]
         object_detections = self._detect_objects(mp_image, timestamp)
         person_count = sum(label == "person" for label, _, _ in object_detections)
-        suspicious_objects = sorted(
-            {label for label, _, _ in object_detections if label in {"cell phone", "book"}}
-        )
+        suspicious_objects = self.prohibited_objects(object_detections)
         now = time.monotonic()
         delta_ms = max(1, int((now - self._last_wall_time) * 1000))
         self._timestamp_ms += delta_ms
@@ -300,10 +335,23 @@ class GazeAnalyzer:
             self._calibration_samples.append((raw_x, raw_y))
         if len(self._calibration_samples) >= self._calibration_target:
             samples = np.asarray(self._calibration_samples[-self._calibration_target :], dtype=np.float32)
-            self._baseline_x, self._baseline_y = np.median(samples, axis=0).tolist()
+            baseline = np.median(samples, axis=0)
+            median_abs_deviation = float(np.median(np.linalg.norm(samples - baseline, axis=1)))
+            centered_distance = float(np.linalg.norm(baseline))
+            stability_score = float(np.clip(1.0 - median_abs_deviation / 0.16, 0.0, 1.0))
+            centering_score = float(np.clip(1.0 - centered_distance / 0.45, 0.0, 1.0))
+            self._calibration_quality = round(stability_score * centering_score, 3)
+            if centered_distance > 0.38 or median_abs_deviation > 0.14:
+                self._calibration_samples.clear()
+                self._calibration_state = "REJECTED"
+                self._calibration_message = "Calibration was not neutral. Look at the center target and try again."
+                return
+            self._baseline_x, self._baseline_y = baseline.tolist()
             self._smooth_x = 0.0
             self._smooth_y = 0.0
             self._calibrated = True
+            self._calibration_state = "READY"
+            self._calibration_message = "Calibration ready."
 
     @staticmethod
     def _face_area(face) -> float:

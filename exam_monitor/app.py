@@ -28,6 +28,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 
 
+def wait_for_worker_shutdown(
+    worker: threading.Thread | None,
+    stop_event: threading.Event,
+    timeout: float = 5.0,
+) -> bool:
+    """Request cooperative stop and wait before saving or releasing resources."""
+    stop_event.set()
+    if worker is not None and worker.is_alive() and worker is not threading.current_thread():
+        worker.join(timeout=timeout)
+    return worker is None or not worker.is_alive()
+
+
 class Card(tk.Frame):
     def __init__(self, master, **kwargs):
         super().__init__(
@@ -712,18 +724,32 @@ class ExamMonitorApp(tk.Tk):
         self.calibration_text.grid(row=1, column=0, sticky="w", pady=(5, 6))
         self.calibration_bar = tk.Canvas(calibration, height=4, bg=COLORS["surface_hover"], highlightthickness=0)
         self.calibration_bar.grid(row=2, column=0, sticky="ew")
+        self.recalibrate_button = PillButton(
+            calibration,
+            text="RECALIBRATE",
+            variant="secondary",
+            command=self._recalibrate,
+            pady=6,
+        )
+        self.recalibrate_button.grid(row=3, column=0, sticky="ew", pady=(7, 0))
 
         options = tk.Frame(control, bg=COLORS["surface"])
         options.grid(row=5, column=0, sticky="ew", padx=14, pady=7)
         self.landmark_var = tk.BooleanVar(value=False)
         self.save_evidence_var = tk.BooleanVar(value=True)
         self.audio_confirmation_var = tk.BooleanVar(value=True)
+        self.allow_book_var = tk.BooleanVar(value=False)
         for text, var in (
             ("Hiện lưới khuôn mặt", self.landmark_var),
             ("Microphone xác nhận giọng nói", self.audio_confirmation_var),
             ("Lưu ảnh bằng chứng", self.save_evidence_var),
         ):
             OptionToggle(options, text=text, variable=var).pack(fill="x", pady=3)
+        OptionToggle(
+            options,
+            text="Allow books/materials for this session",
+            variable=self.allow_book_var,
+        ).pack(fill="x", pady=3)
 
         tk.Frame(control, bg=COLORS["border"], height=1).grid(row=6, column=0, sticky="ew", padx=14, pady=4)
         self.session_status_card = tk.Frame(control, bg=COLORS["surface_alt"])
@@ -1019,6 +1045,7 @@ class ExamMonitorApp(tk.Tk):
         self._save_evidence_enabled = bool(self.save_evidence_var.get())
         self._show_landmarks_enabled = bool(self.landmark_var.get())
         self._audio_confirmation_enabled = bool(self.audio_confirmation_var.get())
+        self._allowed_materials = {"book"} if self.allow_book_var.get() else set()
         session_id = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4].upper()
         self.session = SessionInfo(
             session_id=session_id,
@@ -1049,7 +1076,7 @@ class ExamMonitorApp(tk.Tk):
         self.live_dot.configure(fg=COLORS["danger"])
         self.live_title.configure(text=f"LIVE  •  {candidate}", fg=COLORS["text"])
         self.session_status.configure(text="Đang khởi tạo bộ phân tích cục bộ…", fg=COLORS["text"])
-        self._worker = threading.Thread(target=self._monitoring_loop, daemon=True, name="monitoring-worker")
+        self._worker = threading.Thread(target=self._monitoring_loop, daemon=False, name="monitoring-worker")
         self._worker.start()
         self._toast("Phiên giám sát đã bắt đầu")
 
@@ -1063,6 +1090,7 @@ class ExamMonitorApp(tk.Tk):
             if self.analyzer is None:
                 self._put_message("status", "Đang tải MediaPipe Face Landmarker…")
                 self.analyzer = GazeAnalyzer()
+            self.analyzer.set_allowed_materials(self._allowed_materials)
             self.analyzer.begin_calibration()
             if self._audio_confirmation_enabled:
                 audio_detector = VoiceActivityDetector()
@@ -1130,8 +1158,6 @@ class ExamMonitorApp(tk.Tk):
                         audio_level_db=audio_state.level_db,
                         status_text=status_text,
                     )
-                if self._stop_worker.is_set():
-                    break
                 created = self.detector.update(result, session.session_id, now)
                 if created:
                     for event in created:
@@ -1282,11 +1308,21 @@ class ExamMonitorApp(tk.Tk):
             text = "Đã hiệu chỉnh (mô phỏng)"
         elif self.analyzer:
             progress = self.analyzer.calibration_progress
-            text = "Đã hiệu chỉnh" if self.analyzer.calibrated else f"Nhìn thẳng… {progress * 100:.0f}%"
+            if self.analyzer.calibrated:
+                text = f"Đã hiệu chỉnh • chất lượng {self.analyzer.calibration_quality:.0%}"
+            elif self.analyzer.calibration_state == "REJECTED":
+                text = "Hiệu chỉnh chưa đạt • nhìn vào tâm rồi thử lại"
+            else:
+                text = f"Nhìn vào tâm màn hình… {progress * 100:.0f}%"
         else:
             progress = 0.0
             text = "Đang khởi tạo"
-        self.calibration_text.configure(text=text, fg=COLORS["good"] if progress >= 1 else COLORS["text_muted"])
+        calibration_color = (
+            COLORS["good"] if self.analyzer and self.analyzer.calibrated
+            else COLORS["danger"] if self.analyzer and self.analyzer.calibration_state == "REJECTED"
+            else COLORS["text_muted"]
+        )
+        self.calibration_text.configure(text=text, fg=calibration_color)
         self._draw_progress(self.calibration_bar, progress)
         status_color = COLORS["danger"] if critical else (
             COLORS["warning"]
@@ -1327,10 +1363,18 @@ class ExamMonitorApp(tk.Tk):
     def stop_session(self) -> None:
         if not self.monitoring:
             return
-        self._stop_worker.set()
+        if not wait_for_worker_shutdown(self._worker, self._stop_worker, timeout=5.0):
+            self.session_status.configure(
+                text="Worker did not stop; session has not been finalized.",
+                fg=COLORS["danger"],
+            )
+            messagebox.showerror(
+                "Unable to stop safely",
+                "The analysis worker is still running. A new session cannot start yet.",
+                parent=self,
+            )
+            return
         self.monitoring = False
-        if self._worker and self._worker.is_alive():
-            self._worker.join(timeout=0.8)
         if self.session:
             self.session.ended_at = datetime.now().isoformat(timespec="seconds")
             self.store.save_session(self.session)
@@ -1562,18 +1606,27 @@ class ExamMonitorApp(tk.Tk):
         return COLORS["good"]
 
     def _on_close(self) -> None:
-        self._stop_worker.set()
-        if self.source:
-            try:
-                self.source.release()
-            except Exception:
-                pass
+        if self.monitoring:
+            self.stop_session()
+            if self._worker and self._worker.is_alive():
+                return
         if self.analyzer:
             try:
                 self.analyzer.close()
             except Exception:
                 pass
         self.destroy()
+
+    def _recalibrate(self) -> None:
+        if self.analyzer is None:
+            self.session_status.configure(
+                text="Start a real camera/video source before calibration.",
+                fg=COLORS["text_muted"],
+            )
+            return
+        self.analyzer.reset_calibration()
+        self.calibration_text.configure(text="Look at the center target... 0%", fg=COLORS["warning"])
+        self._draw_progress(self.calibration_bar, 0.0)
 
     def _capture_screenshot(self) -> None:
         if not self._screenshot_path:

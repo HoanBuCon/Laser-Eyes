@@ -1,9 +1,13 @@
 # VIGIL AI Prototype — Current Status
 
-**Status:** CURRENT implementation record for human acceptance  
-**Validated source commit:** `96f04da` on branch `fix/ictu-2026-prototype-remediation`  
-**Real-model validation commit:** `41604e7` (the successor changes only LAN dashboard token propagation and tests)  
-**Date:** 2026-09-23  
+**Status:** CURRENT implementation record for human acceptance
+
+**Validated source commit:** `96f04da` on branch `fix/ictu-2026-prototype-remediation`
+
+**Real-model validation commit:** `41604e7` (the successor changes only LAN dashboard token propagation and tests)
+
+**Date:** 2026-09-23
+
 **Decision boundary:** AI review priority is not cheating probability; only a human makes the final decision.
 
 ## What is implemented

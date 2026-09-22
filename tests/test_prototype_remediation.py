@@ -587,6 +587,55 @@ def test_evidence_lookup_rejects_traversal_and_ambiguous_basename(tmp_path: Path
     assert _find_evidence_file("duplicate.mp4") is None
 
 
+def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, monkeypatch):
+    import classroom_monitor.demo.runtime as runtime_module
+
+    monkeypatch.chdir(tmp_path)
+    target = tmp_path / "data" / "demo_final" / "student" / "evidence" / "same.mp4"
+    duplicate = tmp_path / "data" / "demo_runs" / "old" / "evidence" / "same.mp4"
+    target.parent.mkdir(parents=True)
+    duplicate.parent.mkdir(parents=True)
+    target.write_bytes(b"canonical")
+    duplicate.write_bytes(b"old")
+    snapshot = target.with_suffix(".jpg")
+    snapshot.write_bytes(b"snapshot")
+
+    runtime = DemoRuntime()
+    db = SessionLocal()
+    try:
+        site = ExamSite(name=f"Scoped {uuid.uuid4()}")
+        db.add(site)
+        db.flush()
+        room = ExamRoom(site_id=site.id, name="Scoped Room", room_code=f"R-{uuid.uuid4().hex[:8]}")
+        db.add(room)
+        db.flush()
+        session = ExamSession(id=str(uuid.uuid4()), room_id=room.id, exam_name="Scoped evidence", status="RUNNING")
+        db.add(session)
+        db.commit()
+        runtime.status.session_id = session.id
+    finally:
+        db.close()
+    event = ClassroomEvent(
+        event_id=f"scoped-{uuid.uuid4()}",
+        track_id=1,
+        seat_id="S1",
+        behavior="REVIEW_SIGNAL",
+        severity="MEDIUM",
+        timestamp_ms=1.0,
+        evidence_path=str(snapshot),
+        evidence_video_path=str(target),
+        metadata={"peak_risk_score": 80.0},
+    )
+    payload = runtime._persist_event_to_db(event)
+    DemoRuntime._instance = runtime
+
+    assert payload["video_url"].endswith(f"/{event.event_id}/evidence/video")
+    with TestClient(app) as client:
+        response = client.get(payload["video_url"])
+    assert response.status_code == 200
+    assert response.content == b"canonical"
+
+
 def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
     source = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
     assert "onclick=\"openReviewModal" not in source

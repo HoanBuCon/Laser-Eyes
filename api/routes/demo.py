@@ -299,6 +299,46 @@ async def mjpeg_stream_endpoint():
 # Evidence Media File Endpoints
 # -----------------------------------------------------------------------------
 
+def _contained_persisted_evidence(path_value: Optional[str], extensions: set[str]) -> Optional[Path]:
+    """Resolve a DB-backed evidence path only inside canonical demo evidence roots."""
+    if not path_value:
+        return None
+    candidate = Path(path_value).resolve()
+    if candidate.suffix.lower() not in extensions or not candidate.is_file():
+        return None
+    roots = [Path("data/demo_runs").resolve(), Path("data/demo_final").resolve()]
+    if not any(root == candidate.parent or root in candidate.parents for root in roots):
+        return None
+    return candidate
+
+
+@router.get("/events/{event_id}/evidence/snapshot")
+def get_event_evidence_snapshot(event_id: str, db: Session = Depends(get_db)):
+    """Serve the exact snapshot linked to a durable incident."""
+    event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
+    evidence = event.evidence if event else None
+    path = _contained_persisted_evidence(
+        evidence.snapshot_path if evidence else None,
+        {".jpg", ".jpeg", ".png", ".webp"},
+    )
+    if path is None:
+        raise HTTPException(status_code=404, detail="Snapshot evidence is unavailable")
+    return FileResponse(str(path), media_type="image/jpeg")
+
+
+@router.get("/events/{event_id}/evidence/video")
+def get_event_evidence_video(event_id: str, db: Session = Depends(get_db)):
+    """Serve the exact video linked to a durable incident."""
+    event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
+    evidence = event.evidence if event else None
+    path = _contained_persisted_evidence(
+        (evidence.video_path or evidence.file_path) if evidence else None,
+        {".mp4"},
+    )
+    if path is None:
+        raise HTTPException(status_code=404, detail="Video evidence is unavailable")
+    return FileResponse(str(path), media_type="video/mp4")
+
 def _find_evidence_file(filename: str, subfolder: str = "evidence") -> Optional[Path]:
     """Locate one unambiguous, contained evidence file by safe basename."""
     if filename != Path(filename).name or filename in {"", ".", ".."}:

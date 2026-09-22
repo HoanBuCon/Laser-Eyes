@@ -468,9 +468,9 @@ class DemoRuntime:
         snapshot_exists = bool(event.evidence_path and Path(event.evidence_path).is_file())
         video_exists = bool(event.evidence_video_path and Path(event.evidence_video_path).is_file() and Path(event.evidence_video_path).stat().st_size > 0)
         if snapshot_exists:
-            snapshot_rel = f"/api/v1/demo/evidence/snapshot/{Path(event.evidence_path).name}"
+            snapshot_rel = f"/api/v1/demo/events/{event.event_id}/evidence/snapshot"
         if video_exists:
-            video_rel = f"/api/v1/demo/evidence/video/{Path(event.evidence_video_path).name}"
+            video_rel = f"/api/v1/demo/events/{event.event_id}/evidence/video"
             try:
                 video_sha256 = compute_file_sha256(Path(event.evidence_video_path))
             except Exception:

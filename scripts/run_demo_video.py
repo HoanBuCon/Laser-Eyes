@@ -43,6 +43,7 @@ def main() -> None:
         "show_window": args.show,
         "debug_overlay": args.debug_overlay,
         "save_evidence": not args.no_evidence,
+        "allow_mock": args.allow_mock,
         "head_provider": args.head_provider,
         "hpe_hz": args.hz,
         "pose_conf": args.conf,

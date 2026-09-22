@@ -31,6 +31,7 @@ class DemoVideoConfig:
     show_window: bool = False
     debug_overlay: bool = False
     save_evidence: bool = True
+    allow_mock: bool = False
     max_frames: Optional[int] = None
     stride: int = 1
     gt_path: Optional[Path] = None
@@ -192,6 +193,7 @@ def get_demo_config(name_or_path: str, **kwargs: Any) -> DemoVideoConfig:
         "show_window": kwargs.get("show_window", False),
         "debug_overlay": kwargs.get("debug_overlay", False),
         "save_evidence": kwargs.get("save_evidence", True),
+        "allow_mock": kwargs.get("allow_mock", False),
         "max_frames": kwargs.get("max_frames", None),
         "stride": kwargs.get("stride", 1),
         "gt_path": kwargs.get("gt_path", None),
@@ -205,6 +207,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="VIGIL AI SRS v2.0 - Calibrated Classroom Demo Video Runner",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "--allow-mock",
+        action="store_true",
+        help="Explicitly allow synthetic pose detections and visibly mark the run as MOCK",
     )
     parser.add_argument(
         "--video",

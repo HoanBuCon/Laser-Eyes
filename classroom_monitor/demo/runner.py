@@ -244,7 +244,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     # 4. Initialize Pipeline Components
     detector = PoseClassroomDetector(
         confidence_threshold=config.pose_conf,
+        allow_mock=config.allow_mock,
     )
+    detector.ensure_available()
 
     head_provider_inst = create_head_pose_provider(config.head_provider)
     obs_extractor = ObservationExtractor(head_pose_provider=head_provider_inst)

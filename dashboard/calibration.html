@@ -23,6 +23,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <style>
         #calibrationCanvas {
@@ -31,18 +32,37 @@
             touch-action: none;
         }
         .seat-item:hover {
-            border-color: #06b6d4;
+            border-color: var(--vigil-border-strong);
         }
         .seat-item.active {
-            border-color: #06b6d4;
-            background-color: rgba(6, 182, 212, 0.1);
+            border-color: var(--vigil-info);
+            background-color: var(--vigil-info-dim);
         }
     </style>
 </head>
-<body class="bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+<body class="vigil-classroom calibration-page bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>CLASSROOM COPILOT</small></span>
+        </a>
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
+            <a href="/demo#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item is-active"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+        </nav>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>GEOMETRY TOOL</strong><small>Seat regions define spatial context.</small></div>
+        </div>
+    </aside>
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
+    <header class="calibration-topbar border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <a href="/" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 hover:opacity-90 transition">
@@ -72,10 +92,10 @@
     </header>
 
     <!-- Main Workspace Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col space-y-4">
+    <main class="calibration-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col space-y-4">
 
         <!-- Top Control Bar: Room, Camera & Reference Source Selector -->
-        <div class="glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="calibration-toolbar glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
             <div class="flex flex-wrap items-center gap-3">
                 <div>
                     <label class="block text-[11px] text-gray-400 uppercase font-semibold mb-1">Select Room</label>
@@ -129,7 +149,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 flex-1">
 
             <!-- Canvas Viewport -->
-            <div class="glass-panel p-4 lg:col-span-3 flex flex-col justify-between">
+            <div class="calibration-canvas-panel glass-panel p-4 lg:col-span-3 flex flex-col justify-between">
                 <!-- Canvas Top Bar -->
                 <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-2">
                     <div class="flex items-center gap-2">
@@ -186,7 +206,7 @@
             </div>
 
             <!-- Right Sidebar: Configured Seat List & Inspector -->
-            <div class="glass-panel p-4 flex flex-col justify-between space-y-4">
+            <div class="calibration-seat-panel glass-panel p-4 flex flex-col justify-between space-y-4">
                 <div>
                     <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-3">
                         <div>
@@ -244,7 +264,7 @@
 
                 <div class="flex items-center gap-2 pt-1">
                     <input id="inputSeatEnabled" type="checkbox" checked class="w-4 h-4 rounded text-cyan-500 bg-gray-900 border-gray-700 focus:ring-cyan-500">
-                    <label for="inputSeatEnabled" class="text-xs text-gray-300 font-medium">Enable for AI Proctoring Surveillance</label>
+                    <label for="inputSeatEnabled" class="text-xs text-gray-300 font-medium">Enable this seat for AI-assisted observation</label>
                 </div>
             </div>
 

@@ -658,6 +658,8 @@ def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
 def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
     html = Path("dashboard/demo.html").read_text(encoding="utf-8")
     operations_html = Path("dashboard/index.html").read_text(encoding="utf-8")
+    calibration_html = Path("dashboard/calibration.html").read_text(encoding="utf-8")
+    workbench_html = Path("dashboard/data_workbench.html").read_text(encoding="utf-8")
     css = Path("dashboard/css/demo.css").read_text(encoding="utf-8")
     tokens = Path("dashboard/css/vigil-tokens.css").read_text(encoding="utf-8")
     shell = Path("dashboard/css/vigil-shell.css").read_text(encoding="utf-8")
@@ -667,8 +669,12 @@ def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
     assert 'href="/static/css/vigil-tokens.css"' in html
     assert 'href="/static/css/vigil-shell.css"' in html
     assert 'href="/static/css/vigil-shell.css"' in operations_html
+    assert 'href="/static/css/vigil-shell.css"' in calibration_html
+    assert 'href="/static/css/vigil-shell.css"' in workbench_html
     assert 'class="vigil-sidebar"' in html
     assert 'class="vigil-sidebar"' in operations_html
+    assert 'class="vigil-sidebar"' in calibration_html
+    assert 'class="vigil-sidebar"' in workbench_html
     assert 'id="reviewQueue"' in html
     assert "--vigil-sidebar:" in tokens
     assert ".vigil-sidebar" in shell

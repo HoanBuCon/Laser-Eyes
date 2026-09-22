@@ -220,3 +220,67 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .badge-pulse-red, .badge-pulse-green { animation: none !important; }
 }
+
+/* Seat calibration workspace ------------------------------------------------ */
+.calibration-topbar {
+  min-height: 90px;
+  border-color: var(--vigil-border) !important;
+  background: color-mix(in srgb, var(--vigil-bg) 94%, transparent) !important;
+}
+.calibration-topbar > div, .calibration-workspace { max-width: var(--vigil-content-max) !important; }
+.calibration-topbar > div { min-height: 90px; height: auto !important; }
+.calibration-topbar > div > div:first-child > a {
+  width: 34px !important;
+  height: 34px !important;
+  border: 1px solid var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-sm) !important;
+  background: var(--vigil-surface-alt) !important;
+  box-shadow: none !important;
+}
+.calibration-topbar h1 { background: none !important; color: var(--vigil-text) !important; font-weight: var(--vigil-font-medium) !important; }
+.calibration-topbar > div > div:last-child > a[href="/"],
+.calibration-topbar > div > div:last-child > a[href="/data-workbench"] { display: none; }
+.calibration-workspace { padding-top: var(--vigil-space-5) !important; padding-bottom: var(--vigil-space-8) !important; }
+.calibration-toolbar label, .calibration-canvas-panel label, .calibration-seat-panel p { color: var(--vigil-text-muted) !important; }
+.calibration-toolbar select {
+  min-height: 34px;
+  border-color: var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-sm) !important;
+  background: var(--vigil-surface-alt) !important;
+  color: var(--vigil-text) !important;
+}
+.calibration-toolbar button, .calibration-toolbar label,
+.calibration-canvas-panel button, .calibration-seat-panel button {
+  border-color: var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-sm) !important;
+  box-shadow: none !important;
+}
+.calibration-toolbar button, .calibration-toolbar label { min-height: 34px; }
+#canvasWrapper {
+  border-color: var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-sm) !important;
+  background: var(--vigil-video-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--vigil-border-subtle);
+}
+#canvasResLabel, #drawingStatusBadge, #seatCountBadge {
+  border-color: var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-xs) !important;
+  background: var(--vigil-surface-alt) !important;
+  color: var(--vigil-text-muted) !important;
+}
+.seat-item {
+  border-color: var(--vigil-border) !important;
+  border-radius: var(--vigil-radius-sm) !important;
+  background: var(--vigil-surface-alt) !important;
+}
+.seat-item:hover { border-color: var(--vigil-border-strong) !important; }
+.seat-item.active {
+  border-color: var(--vigil-info) !important;
+  background: var(--vigil-info-dim) !important;
+}
+
+@media (max-width: 840px) {
+  .calibration-topbar > div { min-height: 78px; align-items: flex-start !important; gap: var(--vigil-space-3); padding-block: var(--vigil-space-3); }
+  .calibration-topbar > div > div:last-child { display: none; }
+  .calibration-toolbar, .calibration-toolbar > div { align-items: stretch !important; width: 100%; }
+}

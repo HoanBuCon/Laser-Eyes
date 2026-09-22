@@ -5,10 +5,30 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VIGIL AI — Human Data Operations Workbench</title>
   <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+  <link rel="stylesheet" href="/static/css/vigil-shell.css">
   <link rel="stylesheet" href="/static/css/data_workbench.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👁️</text></svg>">
 </head>
-<body>
+<body class="vigil-classroom workbench-page">
+
+  <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+    <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+      <span class="vigil-brand-mark">V</span>
+      <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>CLASSROOM COPILOT</small></span>
+    </a>
+    <div class="vigil-nav-label">WORKSPACE</div>
+    <nav class="vigil-nav">
+      <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
+      <a href="/demo#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+      <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+      <a href="/data-workbench" class="vigil-nav-item is-active"><span>04</span><strong>Data workbench</strong></a>
+      <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+    </nav>
+    <div class="vigil-sidebar-note">
+      <span class="vigil-sidebar-note-dot"></span>
+      <div><strong>DATA QUALITY</strong><small>Human labels remain authoritative.</small></div>
+    </div>
+  </aside>
 
   <!-- Top Navbar -->
   <header class="navbar">

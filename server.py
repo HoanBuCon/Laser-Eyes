@@ -27,6 +27,70 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VigilServer")
 
+CALIBRATION_SOURCES = (
+    {
+        "room_code": "ROOM-CALIB-01",
+        "room_name": "India Classroom Calibration",
+        "capacity": 21,
+        "camera_name": "VIGIL India Calibration Video",
+        "source_uri": "demo_video/india_classroom.mp4",
+        "resolution": "1280x720",
+    },
+    {
+        "room_code": "ROOM-STUDENT-01",
+        "room_name": "Student Classroom Calibration",
+        "capacity": 12,
+        "camera_name": "VIGIL Student Calibration Video",
+        "source_uri": "demo_video/student_classroom.mp4",
+        "resolution": "640x352",
+    },
+)
+
+
+def ensure_calibration_sources(db) -> None:
+    """Idempotently expose both competition videos to the calibration UI."""
+    site = db.query(ExamSite).order_by(ExamSite.created_at.asc()).first()
+    if site is None:
+        site = ExamSite(name="VIGIL Competition Demo")
+        db.add(site)
+        db.flush()
+
+    for spec in CALIBRATION_SOURCES:
+        room = (
+            db.query(ExamRoom)
+            .filter(ExamRoom.room_code == spec["room_code"])
+            .first()
+        )
+        if room is None:
+            room = ExamRoom(
+                site_id=site.id,
+                room_code=spec["room_code"],
+                name=spec["room_name"],
+                capacity=spec["capacity"],
+                description="Competition video Seat ROI calibration workspace",
+            )
+            db.add(room)
+            db.flush()
+
+        camera = (
+            db.query(Camera)
+            .filter(
+                Camera.room_id == room.id,
+                Camera.name == spec["camera_name"],
+            )
+            .first()
+        )
+        if camera is None:
+            camera = Camera(room_id=room.id, name=spec["camera_name"])
+            db.add(camera)
+        camera.source_uri = spec["source_uri"]
+        camera.rtsp_url_protected = spec["source_uri"]
+        camera.resolution = spec["resolution"]
+        camera.position = "competition_video"
+        camera.enabled = True
+        camera.status = "online" if os.path.isfile(spec["source_uri"]) else "error"
+    db.commit()
+
 
 def seed_initial_demo_data() -> None:
     """Pre-populate sample campus and classroom records if database is fresh."""
@@ -86,6 +150,7 @@ def seed_initial_demo_data() -> None:
             db.add(sess)
             db.commit()
             logger.info("Successfully initialized default demonstration entities!")
+        ensure_calibration_sources(db)
     except Exception as exc:
         logger.warning("Could not seed demo data: %s", exc)
         db.rollback()

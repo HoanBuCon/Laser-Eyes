@@ -15,6 +15,7 @@ from api.main import app
 from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatState
 from storage.database import Base, get_db
+from storage.db_models import Camera, ExamRoom
 from storage.evidence_store import EvidenceStore
 from storage.repositories import (
     AuditLogRepository,
@@ -283,6 +284,8 @@ def test_workers_and_reviews_api(client, db_session):
         start_frame=10,
         end_frame=40,
         duration_seconds=1.0,
+        evidence_path="data/evidence/review_snapshot.jpg",
+        evidence_video_path="data/evidence/review_clip.mp4",
     )
     db_evt = event_repo.create_from_domain_event(session_id=session.id, event=dummy_event, room_id=room.id)
 
@@ -304,9 +307,38 @@ def test_workers_and_reviews_api(client, db_session):
     assert res_get.status_code == 200
     assert res_get.json()["review_status"] == "CONFIRMED"
     assert res_get.json()["status"] == "PENDING"
+    assert res_get.json()["evidence"]["snapshot_path"] == "data/evidence/review_snapshot.jpg"
+    assert res_get.json()["evidence"]["video_path"] == "data/evidence/review_clip.mp4"
+
+    # Nested EvidenceFile ORM objects must serialize on both detail and list APIs.
+    res_list = client.get("/api/v1/events?limit=50")
+    assert res_list.status_code == 200
+    listed = next(item for item in res_list.json() if item["id"] == db_evt.id)
+    assert listed["evidence"]["status"] == "READY"
+    assert listed["evidence_url"] == f"/api/v1/events/{db_evt.id}/evidence"
 
     db_session.expire_all()
     refreshed_evt = event_repo.get_by_id(db_evt.id)
     assert refreshed_evt.review_status == "CONFIRMED"
+
+
+def test_competition_calibration_sources_are_seeded_idempotently(db_session):
+    from server import ensure_calibration_sources
+
+    ensure_calibration_sources(db_session)
+    ensure_calibration_sources(db_session)
+
+    india = db_session.query(ExamRoom).filter_by(room_code="ROOM-CALIB-01").one()
+    student = db_session.query(ExamRoom).filter_by(room_code="ROOM-STUDENT-01").one()
+    assert db_session.query(Camera).filter_by(
+        room_id=india.id, name="VIGIL India Calibration Video"
+    ).count() == 1
+    assert db_session.query(Camera).filter_by(
+        room_id=student.id, name="VIGIL Student Calibration Video"
+    ).count() == 1
+    student_camera = db_session.query(Camera).filter_by(
+        room_id=student.id, name="VIGIL Student Calibration Video"
+    ).one()
+    assert student_camera.source_uri == "demo_video/student_classroom.mp4"
 
 

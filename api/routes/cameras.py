@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import secrets
 import time
 from pathlib import Path
@@ -21,6 +20,41 @@ router = APIRouter(tags=["Cameras"])
 
 REF_FRAME_DIR = Path("data/reference_frames")
 REF_FRAME_DIR.mkdir(parents=True, exist_ok=True)
+
+CALIBRATION_VIDEO_PRESETS = {
+    "india": Path("demo_video/india_classroom.mp4"),
+    "student": Path("demo_video/student_classroom.mp4"),
+}
+
+
+def _read_video_reference_frame(source: str | Path) -> Optional[np.ndarray]:
+    """Read a stable calibration frame from one explicit camera/video source."""
+    source_text = str(source)
+    is_local_file = Path(source_text).is_file()
+    if not is_local_file and not source_text.startswith(("rtsp://", "http://", "https://")):
+        return None
+    cap = cv2.VideoCapture(source_text)
+    if not cap.isOpened():
+        cap.release()
+        return None
+    if is_local_file:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, 10)
+    ok, frame = cap.read()
+    cap.release()
+    if not ok or frame is None or frame.size == 0:
+        return None
+    return frame
+
+
+def _jpeg_response(frame: np.ndarray, *, source_name: str) -> Response:
+    ok, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    if not ok:
+        raise HTTPException(status_code=500, detail="Failed to encode reference frame")
+    return Response(
+        content=buffer.tobytes(),
+        media_type="image/jpeg",
+        headers={"X-Vigil-Reference-Source": source_name},
+    )
 
 
 @router.post("/cameras", response_model=CameraResponse, status_code=status.HTTP_201_CREATED)
@@ -63,44 +97,35 @@ def list_room_cameras(room_id: str, repo: CameraRepository = Depends(get_camera_
 
 @router.get("/cameras/{camera_id}/reference-frame")
 def get_camera_reference_frame(camera_id: str, repo: CameraRepository = Depends(get_camera_repo)):
-    """Capture and return a reference JPEG frame from camera source (RTSP, video file, or fallback demo video)."""
+    """Capture a frame from the selected camera without cross-video fallback."""
     cam = repo.get_by_id(camera_id)
-    source_uri = cam.source_uri if cam else None
-
-    # Fallback to demo video if source_uri is invalid, mock, or unreachable
-    candidates = []
-    if source_uri and not source_uri.startswith("sim://"):
-        candidates.append(source_uri)
-    candidates.extend([
-        "demo_video/india_classroom.mp4",
-        "demo_video/classroom_demo.mp4",
-    ])
-
-    frame = None
-    for cand in candidates:
-        if Path(cand).exists() or cand.startswith("rtsp://") or cand.startswith("http://"):
-            cap = cv2.VideoCapture(cand)
-            if cap.isOpened():
-                # Grab a frame (seek slightly into video to avoid black intro)
-                if Path(cand).exists():
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 10)
-                ret, img = cap.read()
-                cap.release()
-                if ret and img is not None and img.size > 0:
-                    frame = img
-                    break
-
+    if not cam:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    if not cam.source_uri or cam.source_uri.startswith("sim://"):
+        raise HTTPException(status_code=409, detail="Camera has no real calibration source")
+    frame = _read_video_reference_frame(cam.source_uri)
     if frame is None:
-        # Generate clean synthetic reference test frame
-        frame = np.zeros((720, 1280, 3), dtype=np.uint8)
-        cv2.putText(frame, f"Reference Frame for {camera_id}", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 255), 2)
-        cv2.rectangle(frame, (100, 150), (1180, 650), (60, 60, 60), 2)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Cannot read calibration source for camera {camera_id}",
+        )
+    return _jpeg_response(frame, source_name=f"camera:{camera_id}")
 
-    ret, buf = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 90])
-    if not ret:
-        raise HTTPException(status_code=500, detail="Failed to encode reference frame")
 
-    return Response(content=buf.tobytes(), media_type="image/jpeg")
+@router.get("/cameras/calibration-presets/{preset}/reference-frame")
+def get_calibration_preset_reference_frame(preset: str):
+    """Return a frame from an explicit, repository-owned calibration video."""
+    preset_name = preset.strip().lower()
+    source = CALIBRATION_VIDEO_PRESETS.get(preset_name)
+    if source is None:
+        raise HTTPException(status_code=404, detail="Unknown calibration video preset")
+    frame = _read_video_reference_frame(source)
+    if frame is None:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Calibration video is unavailable: {source.as_posix()}",
+        )
+    return _jpeg_response(frame, source_name=f"preset:{preset_name}")
 
 
 @router.post("/cameras/reference-frame/upload")

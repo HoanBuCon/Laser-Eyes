@@ -574,6 +574,18 @@ def test_reference_upload_rejects_unsafe_or_unsupported_file(monkeypatch, tmp_pa
     assert list(tmp_path.iterdir()) == []
 
 
+def test_student_calibration_preset_returns_real_video_frame():
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/v1/cameras/calibration-presets/student/reference-frame"
+        )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["x-vigil-reference-source"] == "preset:student"
+    assert response.content.startswith(b"\xff\xd8")
+
+
 def test_evidence_lookup_rejects_traversal_and_ambiguous_basename(tmp_path: Path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     first = tmp_path / "data" / "demo_runs" / "one" / "duplicate.mp4"

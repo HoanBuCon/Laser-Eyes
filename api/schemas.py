@@ -185,6 +185,8 @@ class SessionResponse(BaseModel):
 
 # ---- Event & Evidence Schemas ----
 class EvidenceDetail(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     snapshot_path: Optional[str] = None
     video_path: Optional[str] = None
     video_sha256: Optional[str] = None
@@ -323,4 +325,3 @@ class InferenceStatusResponse(BaseModel):
     current_fps: float
     events_detected: int
     last_error: Optional[str] = None
-

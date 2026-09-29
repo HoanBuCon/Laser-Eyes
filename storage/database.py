@@ -115,6 +115,21 @@ def init_db(custom_engine=None) -> None:
                         "Cannot enforce one evidence row per event on existing DB; event %s is duplicated",
                         duplicate_evidence[0],
                     )
+
+            if "proctor_bookmarks" in tables:
+                bookmark_cols = {
+                    row[1] for row in conn.execute(text("PRAGMA table_info(proctor_bookmarks)")).fetchall()
+                }
+                if "session_elapsed_ms" not in bookmark_cols:
+                    conn.execute(text("ALTER TABLE proctor_bookmarks ADD COLUMN session_elapsed_ms FLOAT"))
+
+            if "proctor_bookmark_reviews" in tables:
+                review_cols = {
+                    row[1]
+                    for row in conn.execute(text("PRAGMA table_info(proctor_bookmark_reviews)")).fetchall()
+                }
+                if "previous_note" not in review_cols:
+                    conn.execute(text("ALTER TABLE proctor_bookmark_reviews ADD COLUMN previous_note TEXT DEFAULT ''"))
             conn.commit()
     except Exception as exc:
         logger.exception("Database schema initialization failed: %s", exc)

@@ -5,8 +5,8 @@
 - Repository: HoanBuCon/Laser-Eyes.
 - Nhánh kế hoạch: `feat/proctor-support-plan`.
 - Baseline: `6a7b4b3baf062f5a35cf5a02faac7ee127239bce`, từ `feat/classroom-local-gaze-ui`.
-- Worktree riêng: `../laser_eyes-proctor-support-plan`.
-- Các thay đổi button/Light Mode chưa commit ở worktree UI không nằm trong baseline này. Khi tích hợp sau, chỉ đưa vào các commit UI đã kiểm tra; không chép đè working tree.
+- Thư mục làm việc duy nhất: `D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes`. Chuyển nhánh ngay trong repository này, không tạo folder/worktree phụ.
+- Các thay đổi button/Light Mode chưa commit được giữ nguyên trong working tree khi chuyển sang nhánh kế hoạch; chúng chưa thuộc baseline hoặc commit tài liệu. Chỉ stage tài liệu cho nhiệm vụ lập kế hoạch.
 - Giới hạn khảo sát: đọc mã nguồn; chưa kiểm chứng E2E các tính năng hiện hữu trong lượt lập kế hoạch. Không dùng kết quả pytest lịch sử như kết quả của kế hoạch này.
 
 ## 1. Mục tiêu và phạm vi
@@ -219,9 +219,9 @@ Không đưa nhận diện danh tính, suy luận “gian lận” mới, chấm
 
 ## 10. Git, tích hợp và điểm dừng
 
-- Kế hoạch nằm ở worktree riêng; worktree UI giữ nguyên thay đổi chưa commit.
+- Kế hoạch nằm tại `docs/PROCTOR_SUPPORT_IMPLEMENTATION_PLAN.md` trong repository chính trên nhánh `feat/proctor-support-plan`; các thay đổi UI chưa commit vẫn được giữ nguyên tại đây.
 - Khi triển khai, dùng commit nhỏ theo S0–S7, stage file chủ đích; không đưa media, DB runtime hoặc model weights vào commit tính năng.
-- Worktree mới không tự có venv, media/model bị ignore hoặc DB người dùng. S0 phải chỉ rõ đường dẫn tài nguyên và dùng DB/evidence test riêng; không mặc định sửa DB đang chạy demo.
+- S0 kiểm tra venv, media/model và DB ngay trong repository hiện tại. Các bài test phải dùng DB/evidence test riêng trong phạm vi repository hoặc thư mục tạm của test; không mặc định sửa DB đang chạy demo và không tạo bản sao codebase bên ngoài.
 - Rà diff vùng AI Core trước mỗi nhóm commit; nếu output AI đổi, tìm nguyên nhân integration trước khi tiếp tục.
 - Chỉ tích hợp UI Light Mode từ commit đã hoàn thiện, xử lý xung đột theo file; không reset/stash tự động các thay đổi của chủ dự án.
 - Rollback bằng revert commit chức năng; bảo toàn bảng/file bookmark, không downgrade phá dữ liệu để quay UI lại.
@@ -230,7 +230,7 @@ Không đưa nhận diện danh tính, suy luận “gian lận” mới, chấm
 ## 11. Checklist trạng thái kế hoạch
 
 - [x] Khảo sát code và xác định khả năng tái sử dụng.
-- [x] Chọn baseline, tạo nhánh/worktree riêng.
+- [x] Chọn baseline, tạo nhánh riêng và dùng ngay thư mục repository chính.
 - [x] Lập phạm vi freeze, backlog phụ thuộc và tiêu chí nghiệm thu.
 - [ ] S0–S7 đã triển khai và kiểm thử.
 - [ ] Kiểm thử nguồn thật và báo cáo số đo.

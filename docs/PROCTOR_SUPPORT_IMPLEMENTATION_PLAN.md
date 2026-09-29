@@ -4,9 +4,10 @@
 - Trạng thái: PLAN — chưa triển khai tính năng, chưa nghiệm thu.
 - Repository: HoanBuCon/Laser-Eyes.
 - Nhánh kế hoạch: `feat/proctor-support-plan`.
+- Nhánh triển khai tiếp theo: `feat/proctor-support-implementation`, tạo từ HEAD nhánh kế hoạch sau khi commit/push các thay đổi hiện có.
 - Baseline: `6a7b4b3baf062f5a35cf5a02faac7ee127239bce`, từ `feat/classroom-local-gaze-ui`.
 - Thư mục làm việc duy nhất: `D:/Hoc_Tap/Code/Du_An_Ca_Nhan/H_drive/Code/MingKingLaser/laser_eyes`. Chuyển nhánh ngay trong repository này, không tạo folder/worktree phụ.
-- Các thay đổi button/Light Mode chưa commit được giữ nguyên trong working tree khi chuyển sang nhánh kế hoạch; chúng chưa thuộc baseline hoặc commit tài liệu. Chỉ stage tài liệu cho nhiệm vụ lập kế hoạch.
+- Các thay đổi button/Light Mode được lưu trong commit checkpoint riêng trước khi tạo nhánh triển khai. Đây là công việc UI còn cần kiểm tra trực quan, chưa được coi là đã nghiệm thu; baseline AI vẫn là commit nêu trên.
 - Giới hạn khảo sát: đọc mã nguồn; chưa kiểm chứng E2E các tính năng hiện hữu trong lượt lập kế hoạch. Không dùng kết quả pytest lịch sử như kết quả của kế hoạch này.
 
 ## 1. Mục tiêu và phạm vi
@@ -219,7 +220,7 @@ Không đưa nhận diện danh tính, suy luận “gian lận” mới, chấm
 
 ## 10. Git, tích hợp và điểm dừng
 
-- Kế hoạch nằm tại `docs/PROCTOR_SUPPORT_IMPLEMENTATION_PLAN.md` trong repository chính trên nhánh `feat/proctor-support-plan`; các thay đổi UI chưa commit vẫn được giữ nguyên tại đây.
+- Kế hoạch nằm tại `docs/PROCTOR_SUPPORT_IMPLEMENTATION_PLAN.md` trong repository chính trên nhánh `feat/proctor-support-plan`; nhánh triển khai kế thừa tài liệu và checkpoint UI đã commit.
 - Khi triển khai, dùng commit nhỏ theo S0–S7, stage file chủ đích; không đưa media, DB runtime hoặc model weights vào commit tính năng.
 - S0 kiểm tra venv, media/model và DB ngay trong repository hiện tại. Các bài test phải dùng DB/evidence test riêng trong phạm vi repository hoặc thư mục tạm của test; không mặc định sửa DB đang chạy demo và không tạo bản sao codebase bên ngoài.
 - Rà diff vùng AI Core trước mỗi nhóm commit; nếu output AI đổi, tìm nguyên nhân integration trước khi tiếp tục.

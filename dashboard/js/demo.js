@@ -6,11 +6,18 @@
 let activePreset = 'india';
 let activeMode = 'LIVE';
 let activeFilter = 'ALL';
+let activeSourceFilter = 'ALL';
 let activeEventId = null;
+let activeItemType = 'AI';
 let selectedDecision = 'CONFIRMED';
+let pendingCapture = null;
+let activeSessionId = null;
+let activeEvidenceUrls = { overall: '', crop: '' };
+let evidenceZoom = 1.0;
 let ws = null;
 let pollTimer = null;
 let allIncidents = new Map(); // event_id -> event object
+let allBookmarks = new Map(); // bookmark_id -> manual bookmark object
 const demoToken = new URLSearchParams(window.location.search).get('token') || '';
 
 function apiFetch(url, options = {}) {
@@ -30,15 +37,18 @@ document.addEventListener('DOMContentLoaded', () => {
     selectPreset(activePreset);
     selectMode(activeMode);
     filterQueue(activeFilter);
+    filterQueueSource(activeSourceFilter);
     initWebSocket();
     fetchPresets();
     fetchStatus();
     fetchEvents();
+    fetchBookmarks();
 
     // Start polling fallback every 1500ms
     pollTimer = setInterval(() => {
         fetchStatus();
         fetchEvents();
+        fetchBookmarks();
     }, 1500);
 });
 
@@ -100,6 +110,10 @@ function handleWebSocketMessage(msg) {
             ev.reviewer_notes = msg.notes;
             renderReviewQueue();
         }
+    } else if (msg.type === 'PROCTOR_BOOKMARK' || msg.type === 'PROCTOR_BOOKMARK_REVIEW') {
+        const bookmark = msg.bookmark;
+        allBookmarks.set(bookmark.bookmark_id, bookmark);
+        renderReviewQueue();
     }
 }
 
@@ -203,6 +217,8 @@ async function resetDemo() {
     const res = await apiFetch('/api/v1/demo/reset', { method: 'POST' });
     const data = await res.json();
     allIncidents.clear();
+    allBookmarks.clear();
+    activeSessionId = null;
     renderStatus(data);
     renderReviewQueue();
     refreshStream();
@@ -252,8 +268,24 @@ async function fetchEvents() {
     } catch (e) {}
 }
 
+async function fetchBookmarks() {
+    if (!activeSessionId) return;
+    try {
+        const res = await apiFetch(`/api/v1/proctor/bookmarks?session_id=${encodeURIComponent(activeSessionId)}`);
+        if (!res.ok) return;
+        const bookmarks = await res.json();
+        allBookmarks.clear();
+        bookmarks.forEach((item) => allBookmarks.set(item.bookmark_id, item));
+        renderReviewQueue();
+    } catch (e) {}
+}
+
 function renderStatus(st) {
     if (!st) return;
+    if (st.session_id && st.session_id !== activeSessionId) {
+        activeSessionId = st.session_id;
+        fetchBookmarks();
+    }
 
     const stateText = document.getElementById('stateText');
     const stateBadge = document.getElementById('stateBadge');
@@ -299,6 +331,72 @@ function renderStatus(st) {
 // Review Queue Rendering & Filtering
 // -----------------------------------------------------------------------------
 
+async function captureProctorFrame() {
+    const button = document.getElementById('btnMarkFrame');
+    const error = document.getElementById('captureError');
+    if (button) button.disabled = true;
+    if (error) error.classList.add('hidden');
+    try {
+        const response = await apiFetch('/api/v1/proctor/captures', { method: 'POST' });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || 'No frame is available');
+        pendingCapture = payload;
+        document.getElementById('capturePreview').src = authenticatedUrl(payload.snapshot_url);
+        document.getElementById('captureMeta').textContent = `Frame ${payload.frame_id} • ${(payload.source_timestamp_ms / 1000).toFixed(1)}s • token expires shortly`;
+        document.getElementById('captureSubject').value = '';
+        document.getElementById('captureNote').value = '';
+        document.getElementById('captureModal').classList.remove('hidden');
+    } catch (err) {
+        if (error) {
+            error.textContent = err.message;
+            error.classList.remove('hidden');
+        }
+        window.alert(`Cannot mark frame: ${err.message}`);
+    } finally {
+        if (button) button.disabled = false;
+    }
+}
+
+function closeCaptureModal() {
+    document.getElementById('captureModal').classList.add('hidden');
+    document.getElementById('capturePreview').src = '';
+    pendingCapture = null;
+}
+
+async function saveProctorBookmark() {
+    if (!pendingCapture) return;
+    const button = document.getElementById('btnSaveBookmark');
+    const error = document.getElementById('captureError');
+    button.disabled = true;
+    error.classList.add('hidden');
+    try {
+        const requestId = window.crypto && window.crypto.randomUUID
+            ? window.crypto.randomUUID()
+            : `bookmark-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const response = await apiFetch('/api/v1/proctor/bookmarks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                capture_id: pendingCapture.capture_id,
+                request_id: requestId,
+                subject_ref: document.getElementById('captureSubject').value.trim() || null,
+                note: document.getElementById('captureNote').value.trim(),
+                created_by: 'Lead_Proctor',
+            }),
+        });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || 'Bookmark could not be saved');
+        allBookmarks.set(payload.bookmark_id, payload);
+        renderReviewQueue();
+        closeCaptureModal();
+    } catch (err) {
+        error.textContent = err.message;
+        error.classList.remove('hidden');
+    } finally {
+        button.disabled = false;
+    }
+}
+
 function filterQueue(status) {
     activeFilter = status;
     document.querySelectorAll('.filter-btn').forEach((b) => {
@@ -312,13 +410,24 @@ function renderReviewQueue() {
     const badgeCount = document.getElementById('queueBadgeCount');
     if (!grid) return;
 
-    const incidents = Array.from(allIncidents.values());
-    const pendingCount = incidents.filter((ev) => ev.review_status === 'PENDING').length;
+    const incidents = Array.from(allIncidents.values()).map((item) => ({ ...item, _source: 'AI' }));
+    const bookmarks = Array.from(allBookmarks.values()).map((item) => ({
+        ...item,
+        _source: 'MANUAL',
+        review_status: item.review_decision || item.review_status || 'PENDING',
+    }));
+    const items = [...incidents, ...bookmarks].sort((left, right) => {
+        const leftTime = left.created_at || left.captured_at || '';
+        const rightTime = right.created_at || right.captured_at || '';
+        return rightTime.localeCompare(leftTime);
+    });
+    const pendingCount = items.filter((item) => item.review_status === 'PENDING').length;
     if (badgeCount) badgeCount.textContent = `${pendingCount} Pending`;
 
-    const filtered = incidents.filter((ev) => {
-        if (activeFilter === 'ALL') return true;
-        return ev.review_status === activeFilter;
+    const filtered = items.filter((item) => {
+        const statusMatch = activeFilter === 'ALL' || item.review_status === activeFilter;
+        const sourceMatch = activeSourceFilter === 'ALL' || item._source === activeSourceFilter;
+        return statusMatch && sourceMatch;
     });
 
     if (filtered.length === 0) {
@@ -333,14 +442,20 @@ function renderReviewQueue() {
 
     grid.innerHTML = filtered
         .map((ev) => {
+            const isManual = ev._source === 'MANUAL';
             const risk = Math.round(ev.peak_risk_score || ev.risk_score || 75);
             const occ = ev.occurrence_count || 1;
-            const pattern = escapeHtml(formatBehaviorLabel(ev.primary_pattern || ev.behavior));
-            const seat = escapeHtml(ev.seat_id || 'SEAT-??');
-            const eventId = escapeHtml(String(ev.event_id || ''));
-            const severity = escapeHtml(ev.severity || 'MEDIUM');
-            const firstSeen = (ev.first_seen_ms ? ev.first_seen_ms / 1000 : 0).toFixed(1);
-            const lastSeen = (ev.last_seen_ms ? ev.last_seen_ms / 1000 : firstSeen).toFixed(1);
+            const pattern = escapeHtml(isManual ? (ev.note || 'Proctor-marked observation') : formatBehaviorLabel(ev.primary_pattern || ev.behavior));
+            const seat = escapeHtml(ev.subject_ref || ev.seat_id || 'UNASSIGNED');
+            const itemId = escapeHtml(String(isManual ? ev.bookmark_id : ev.event_id));
+            const severity = escapeHtml(isManual ? 'HUMAN MARK' : (ev.severity || 'MEDIUM'));
+            const sourceSeconds = isManual
+                ? Number(ev.source_timestamp_ms || 0) / 1000
+                : Number(ev.first_seen_ms || 0) / 1000;
+            const firstSeen = sourceSeconds.toFixed(1);
+            const lastSeen = isManual
+                ? firstSeen
+                : (ev.last_seen_ms ? ev.last_seen_ms / 1000 : sourceSeconds).toFixed(1);
 
             let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">PENDING REVIEW</span>`;
             if (ev.review_status === 'CONFIRMED') {
@@ -351,17 +466,24 @@ function renderReviewQueue() {
                 statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">INCONCLUSIVE</span>`;
             }
 
-            const sevBadge =
-                ev.severity === 'HIGH'
+            const sevBadge = isManual
+                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                : ev.severity === 'HIGH'
                     ? 'bg-red-500/20 text-red-300 border-red-500/40'
                     : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
 
+            const sourceBadge = isManual ? 'PROCTOR' : 'AI SIGNAL';
+            const footerMetric = isManual
+                ? `Evidence: <strong class="${ev.evidence_status === 'READY' ? 'text-emerald-400' : 'text-amber-400'}">${escapeHtml(ev.evidence_status || 'PENDING')}</strong>`
+                : `Review Priority: <strong class="text-red-400">${risk}/100</strong>`;
+
             return `
-                <div class="incident-card bg-gray-950/80 border border-gray-800/90 rounded-xl p-4 flex flex-col justify-between space-y-3 cursor-pointer" data-event-id="${eventId}">
+                <div class="incident-card bg-gray-950/80 border border-gray-800/90 rounded-xl p-4 flex flex-col justify-between space-y-3 cursor-pointer" data-item-id="${itemId}" data-item-source="${ev._source}">
                     <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center gap-2">
                             <span class="px-2 py-1 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono">[${seat}]</span>
                             <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${sevBadge} border">${severity}</span>
+                            <span class="text-[10px] font-mono text-gray-500">${sourceBadge}</span>
                         </div>
                         ${statusBadge}
                     </div>
@@ -371,12 +493,12 @@ function renderReviewQueue() {
                         <div class="text-xs text-gray-400 font-mono mt-1 flex items-center gap-2">
                             <span>Time: ${firstSeen}s – ${lastSeen}s</span>
                             <span>&bull;</span>
-                            <span class="text-amber-300 font-semibold">x${occ} Occurrences</span>
+                            <span class="text-amber-300 font-semibold">${isManual ? `Frame ${escapeHtml(ev.frame_id)}` : `x${occ} Occurrences`}</span>
                         </div>
                     </div>
 
                     <div class="pt-2 border-t border-gray-900 flex items-center justify-between text-xs font-mono">
-                        <span class="text-gray-400">Review Priority: <strong class="text-red-400">${risk}/100</strong></span>
+                        <span class="text-gray-400">${footerMetric}</span>
                         <button class="vigil-btn vigil-btn--primary vigil-btn--sm px-2.5 py-1 rounded bg-gray-800 hover:bg-cyan-600 text-gray-200 hover:text-white transition text-xs font-semibold">
                             Review &rarr;
                         </button>
@@ -385,8 +507,8 @@ function renderReviewQueue() {
             `;
         })
         .join('');
-    grid.querySelectorAll('.incident-card[data-event-id]').forEach((card) => {
-        card.addEventListener('click', () => openReviewModal(card.dataset.eventId));
+    grid.querySelectorAll('.incident-card[data-item-id]').forEach((card) => {
+        card.addEventListener('click', () => openReviewItem(card.dataset.itemSource, card.dataset.itemId));
     });
 }
 
@@ -411,7 +533,76 @@ function formatBehaviorLabel(raw) {
 // Human Review Modal Adjudication
 // -----------------------------------------------------------------------------
 
+function openReviewItem(source, itemId) {
+    if (source === 'MANUAL') {
+        openBookmarkModal(itemId);
+    } else {
+        openReviewModal(itemId);
+    }
+}
+
+async function openBookmarkModal(bookmarkId) {
+    const bookmark = allBookmarks.get(bookmarkId);
+    if (!bookmark) return;
+    activeItemType = 'MANUAL';
+    activeEventId = bookmarkId;
+    selectedDecision = bookmark.review_decision && bookmark.review_decision !== 'PENDING'
+        ? bookmark.review_decision
+        : 'INCONCLUSIVE';
+
+    document.getElementById('modalSeatBadge').textContent = bookmark.subject_ref || 'UNASSIGNED';
+    document.getElementById('modalPatternTitle').textContent = 'Proctor-marked observation';
+    document.getElementById('modalSeverityBadge').textContent = 'HUMAN MARK';
+    document.getElementById('modalBehaviorText').textContent = 'Manual observation bookmark';
+    document.getElementById('modalRiskScore').textContent = 'Not an AI score';
+    document.getElementById('modalOccurrence').textContent = 'x1';
+    document.getElementById('modalTimeRange').textContent = `${(Number(bookmark.source_timestamp_ms || 0) / 1000).toFixed(1)}s • frame ${bookmark.frame_id}`;
+    document.getElementById('modalSha256').textContent = bookmark.sha256
+        ? 'HASH AVAILABLE / NOT CHECKED'
+        : 'HASH NOT AVAILABLE';
+    if (bookmark.sha256) {
+        try {
+            const integrityResponse = await apiFetch(`/api/v1/proctor/bookmarks/${encodeURIComponent(bookmarkId)}/integrity`);
+            if (integrityResponse.ok) {
+                const integrity = await integrityResponse.json();
+                const labels = {
+                    HASH_VERIFIED: 'HASH VERIFIED',
+                    HASH_MISMATCH: 'HASH MISMATCH',
+                    HASH_NOT_AVAILABLE: 'HASH NOT AVAILABLE',
+                };
+                document.getElementById('modalSha256').textContent = labels[integrity.hash_status] || 'HASH AVAILABLE / NOT CHECKED';
+            }
+        } catch (err) {
+            console.debug('Bookmark integrity check unavailable:', err);
+        }
+    }
+    const cuesList = document.getElementById('modalSupportingCues');
+    const cues = [
+        `Source: ${bookmark.source_kind || 'VIDEO'}`,
+        `Evidence: ${bookmark.evidence_status || 'PENDING'}`,
+    ];
+    cuesList.replaceChildren(...cues.map((cue) => {
+        const item = document.createElement('li');
+        item.textContent = cue;
+        return item;
+    }));
+    document.getElementById('modalVideoSection').classList.add('hidden');
+    document.getElementById('modalVideoPlayer').src = '';
+    activeEvidenceUrls = {
+        overall: bookmark.snapshot_url ? authenticatedUrl(bookmark.snapshot_url) : '',
+        crop: bookmark.crop_url ? authenticatedUrl(bookmark.crop_url) : '',
+    };
+    evidenceZoom = 1.0;
+    document.getElementById('btnViewCrop').classList.toggle('hidden', !activeEvidenceUrls.crop);
+    setEvidenceView('overall');
+    document.getElementById('modalReasonSelect').value = 'NONE';
+    document.getElementById('modalNotesText').value = bookmark.note || '';
+    updateDecisionButtons();
+    document.getElementById('reviewModal').classList.remove('hidden');
+}
+
 async function openReviewModal(eventId) {
+    activeItemType = 'AI';
     activeEventId = eventId;
     const ev = allIncidents.get(eventId);
     if (!ev) return;
@@ -460,6 +651,7 @@ async function openReviewModal(eventId) {
     // Video & Snapshot
     const videoPlayer = document.getElementById('modalVideoPlayer');
     const snapshotImg = document.getElementById('modalSnapshotImg');
+    document.getElementById('modalVideoSection').classList.remove('hidden');
 
     if (ev.video_url) {
         videoPlayer.src = authenticatedUrl(ev.video_url);
@@ -470,8 +662,12 @@ async function openReviewModal(eventId) {
     }
 
     if (ev.snapshot_url) {
-        snapshotImg.src = authenticatedUrl(ev.snapshot_url);
+        activeEvidenceUrls = { overall: authenticatedUrl(ev.snapshot_url), crop: '' };
+        evidenceZoom = 1.0;
+        document.getElementById('btnViewCrop').classList.add('hidden');
+        setEvidenceView('overall');
     } else {
+        activeEvidenceUrls = { overall: '', crop: '' };
         snapshotImg.src = '';
     }
 
@@ -490,7 +686,26 @@ function closeReviewModal() {
         videoPlayer.src = '';
     }
     document.getElementById('reviewModal').classList.add('hidden');
+    activeEvidenceUrls = { overall: '', crop: '' };
+    evidenceZoom = 1.0;
     activeEventId = null;
+    activeItemType = 'AI';
+}
+
+function setEvidenceView(view) {
+    const image = document.getElementById('modalSnapshotImg');
+    const target = activeEvidenceUrls[view] || activeEvidenceUrls.overall || '';
+    image.src = target;
+    image.dataset.view = view;
+    evidenceZoom = 1.0;
+    image.style.transform = 'scale(1)';
+    document.getElementById('btnViewOverall').setAttribute('aria-pressed', String(view === 'overall'));
+    document.getElementById('btnViewCrop').setAttribute('aria-pressed', String(view === 'crop'));
+}
+
+function zoomEvidence(delta) {
+    evidenceZoom = Math.min(3.0, Math.max(0.5, evidenceZoom + delta));
+    document.getElementById('modalSnapshotImg').style.transform = `scale(${evidenceZoom})`;
 }
 
 function selectDecision(decision) {
@@ -508,25 +723,55 @@ function updateDecisionButtons() {
     btnInc.setAttribute('aria-pressed', String(selectedDecision === 'INCONCLUSIVE'));
 }
 
+function filterQueueSource(source) {
+    activeSourceFilter = source;
+    document.querySelectorAll('.source-filter-btn').forEach((button) => {
+        button.setAttribute('aria-pressed', String(button.dataset.sourceFilter === source));
+    });
+    renderReviewQueue();
+}
+
+function exportProctorReview(format) {
+    if (!activeSessionId) {
+        window.alert('Start a Classroom session before exporting review data.');
+        return;
+    }
+    window.location.href = authenticatedUrl(`/api/v1/proctor/sessions/${encodeURIComponent(activeSessionId)}/export?format=${encodeURIComponent(format)}`);
+}
+
 async function submitHumanReview() {
     if (!activeEventId) return;
 
     const reason = document.getElementById('modalReasonSelect').value;
     const notes = document.getElementById('modalNotesText').value;
 
-    const res = await apiFetch(`/api/v1/demo/events/${encodeURIComponent(activeEventId)}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+    const endpoint = activeItemType === 'MANUAL'
+        ? `/api/v1/proctor/bookmarks/${encodeURIComponent(activeEventId)}/review`
+        : `/api/v1/demo/events/${encodeURIComponent(activeEventId)}/review`;
+    const body = activeItemType === 'MANUAL'
+        ? {
+            decision: selectedDecision,
+            reason_code: reason,
+            note: notes,
+            reviewer_id: 'Lead_Proctor',
+        }
+        : {
             decision: selectedDecision,
             reason_code: reason,
             notes: notes,
             reviewer_id: 'Lead_Proctor',
-        }),
+        };
+    const res = await apiFetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
     });
 
     if (res.ok) {
-        if (allIncidents.has(activeEventId)) {
+        if (activeItemType === 'MANUAL' && allBookmarks.has(activeEventId)) {
+            const updated = await res.json();
+            allBookmarks.set(activeEventId, updated);
+        } else if (allIncidents.has(activeEventId)) {
             const ev = allIncidents.get(activeEventId);
             ev.review_status = selectedDecision;
             ev.decision_reason = reason;

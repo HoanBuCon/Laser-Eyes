@@ -1,7 +1,9 @@
 # Kế hoạch phát triển tính năng hỗ trợ giám thị — VIGIL
 
 - Ngày lập: 2026-09-29.
-- Trạng thái: PLAN — chưa triển khai tính năng, chưa nghiệm thu.
+- Trạng thái: IMPLEMENTED FOR ENGINEERING VALIDATION — đang chờ nghiệm thu thủ công UI/E2E của chủ sản phẩm.
+- Nhánh thực hiện: `feat/proctor-support-implementation`.
+- Phạm vi đã triển khai: capture token, bookmark bền vững, queue AI/người giám thị, viewer ảnh/crop/zoom, review history, JSON/CSV export và luồng Local Gaze tương ứng. Chi tiết kiểm chứng nằm trong `docs/PROCTOR_SUPPORT_BASELINE.md` và `docs/PROCTOR_SUPPORT_ACCEPTANCE.md`.
 - Repository: HoanBuCon/Laser-Eyes.
 - Nhánh kế hoạch: `feat/proctor-support-plan`.
 - Nhánh triển khai tiếp theo: `feat/proctor-support-implementation`, tạo từ HEAD nhánh kế hoạch sau khi commit/push các thay đổi hiện có.

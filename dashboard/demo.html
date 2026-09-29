@@ -141,6 +141,9 @@
                 <button id="btnReset" onclick="resetDemo()" class="vigil-btn px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs font-semibold border border-gray-700 transition" title="Reset Session">
                     Reset
                 </button>
+                <button id="btnMarkFrame" onclick="captureProctorFrame()" class="vigil-btn vigil-btn--primary px-3 py-2 rounded-xl text-xs font-bold transition" title="Save the current frame for human review">
+                    Mark Frame
+                </button>
             </div>
         </div>
 
@@ -252,11 +255,16 @@
 
                 <!-- Status Filter Pills -->
                 <div class="review-filters flex items-center gap-1.5 text-xs font-mono">
+                    <button data-source-filter="ALL" onclick="filterQueueSource('ALL')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">All Sources</button>
+                    <button data-source-filter="AI" onclick="filterQueueSource('AI')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">AI</button>
+                    <button data-source-filter="MANUAL" onclick="filterQueueSource('MANUAL')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">Proctor</button>
                     <button data-filter="ALL" onclick="filterQueue('ALL')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
                     <button data-filter="PENDING" onclick="filterQueue('PENDING')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
                     <button data-filter="CONFIRMED" onclick="filterQueue('CONFIRMED')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
                     <button data-filter="REJECTED" onclick="filterQueue('REJECTED')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
                     <button data-filter="INCONCLUSIVE" onclick="filterQueue('INCONCLUSIVE')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
+                    <button onclick="exportProctorReview('json')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">Export JSON</button>
+                    <button onclick="exportProctorReview('csv')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">CSV</button>
                 </div>
             </div>
 
@@ -270,6 +278,36 @@
         </div>
 
     </main>
+
+    <!-- Manual frame bookmark modal -->
+    <div id="captureModal" class="review-modal fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="review-dialog bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-100">Mark current frame for review</h3>
+                    <p id="captureMeta" class="text-xs text-gray-400 font-mono mt-1">Capturing exact source frame...</p>
+                </div>
+                <button onclick="closeCaptureModal()" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded-lg">Close</button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div class="bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                    <img id="capturePreview" alt="Captured proctor frame" class="w-full h-full object-contain">
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-mono text-gray-400 mb-1">Seat / subject reference (optional)</label>
+                        <input id="captureSubject" maxlength="100" placeholder="e.g. S01" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-gray-400 mb-1">Proctor note</label>
+                        <textarea id="captureNote" maxlength="4000" rows="5" placeholder="Describe the observable behavior; do not make an automatic cheating verdict." class="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-sm text-gray-100"></textarea>
+                    </div>
+                    <div id="captureError" class="hidden text-xs text-red-300 border border-red-500/30 bg-red-500/10 rounded-lg p-2"></div>
+                    <button id="btnSaveBookmark" onclick="saveProctorBookmark()" class="vigil-btn vigil-btn--primary w-full py-2.5 rounded-lg text-sm font-bold">Save review bookmark</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Evidence & Human Review Modal -->
     <div id="reviewModal" class="review-modal fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
@@ -292,7 +330,7 @@
                 
                 <!-- Left: Media Evidence Viewports -->
                 <div class="space-y-4">
-                    <div>
+                    <div id="modalVideoSection">
                         <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">10-Second Candidate Video Clip:</div>
                         <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
                             <video id="modalVideoPlayer" controls class="w-full h-full object-contain"></video>
@@ -300,9 +338,17 @@
                     </div>
 
                     <div>
-                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">Peak Frame Snapshot:</div>
-                        <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
-                            <img id="modalSnapshotImg" src="" alt="Peak Evidence Frame" class="w-full h-full object-contain">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Frame:</div>
+                            <div class="flex gap-1">
+                                <button id="btnViewOverall" onclick="setEvidenceView('overall')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">Overall</button>
+                                <button id="btnViewCrop" onclick="setEvidenceView('crop')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded hidden">Seat crop</button>
+                                <button onclick="zoomEvidence(-0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">−</button>
+                                <button onclick="zoomEvidence(0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">+</button>
+                            </div>
+                        </div>
+                        <div id="modalSnapshotViewport" class="relative bg-black rounded-xl overflow-auto aspect-video border border-gray-800 flex items-center justify-center">
+                            <img id="modalSnapshotImg" src="" alt="Evidence Frame" class="w-full h-full object-contain transition-transform origin-center">
                         </div>
                     </div>
                 </div>

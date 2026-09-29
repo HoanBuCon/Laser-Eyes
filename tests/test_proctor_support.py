@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import csv
 import hashlib
+import io
+import shutil
+from datetime import datetime
 from pathlib import Path
 
+import cv2
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -14,11 +19,22 @@ from sqlalchemy.pool import StaticPool
 
 from api.main import app
 from classroom_monitor.demo.runtime import DemoRuntime, DemoStatus
+from classroom_monitor.evidence_playback import ensure_browser_playback, probe_video_codec
 from exam_monitor.app import persist_local_bookmark
 from exam_monitor.events import SessionStore
 from exam_monitor.models import SessionInfo
 from storage.database import Base, get_db
-from storage.db_models import Camera, ExamRoom, ExamSession, ExamSite, ProctorBookmark, SeatROI
+from storage.db_models import (
+    Camera,
+    DetectionEvent,
+    EventReview,
+    EvidenceFile,
+    ExamRoom,
+    ExamSession,
+    ExamSite,
+    ProctorBookmark,
+    SeatROI,
+)
 
 
 test_engine = create_engine(
@@ -144,12 +160,69 @@ def test_capture_bookmark_review_and_export_are_durable(client):
 
     queue = http.get(f"/api/v1/proctor/queue?session_id={session_id}").json()
     assert [item["queue_id"] for item in queue] == [f"MANUAL:{bookmark['bookmark_id']}"]
+
+    db = TestingSessionLocal()
+    try:
+        seat = db.query(SeatROI).filter_by(seat_code="S01").one()
+        ai_event = DetectionEvent(
+            session_id=session_id,
+            seat_id=seat.id,
+            event_id="AI-EXPORT-001",
+            behavior="HEAD_TURN_LEFT",
+            primary_signal="HEAD_TURN_LEFT",
+            supporting_patterns_json='["REPEATED_NEIGHBOR_GLANCE"]',
+            severity="MEDIUM",
+            risk_score=42,
+            status="FLAGGED_FOR_HUMAN_REVIEW",
+            review_status="CONFIRMED",
+            start_frame=21,
+            start_timestamp=datetime(2026, 9, 29, 10, 0, 1),
+            end_timestamp=datetime(2026, 9, 29, 10, 0, 3),
+            duration_seconds=2.0,
+        )
+        db.add(ai_event)
+        db.flush()
+        db.add(
+            EvidenceFile(
+                event_id=ai_event.id,
+                file_path="data/demo_runs/test/evidence/clip.mp4",
+                snapshot_path="data/demo_runs/test/evidence/frame.jpg",
+                video_path="data/demo_runs/test/evidence/clip.mp4",
+                video_sha256="a" * 64,
+                file_size_bytes=1234,
+                status="READY",
+            )
+        )
+        db.add(
+            EventReview(
+                event_id=ai_event.id,
+                reviewer_id="judge",
+                decision="CONFIRMED",
+                reason_code="OBSERVED_POLICY_VIOLATION",
+                note="Reviewed with context",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
     exported = http.get(f"/api/v1/proctor/sessions/{session_id}/export?format=json")
     assert exported.status_code == 200
-    assert exported.json()["schema_version"] == "vigil.proctor-support.v1"
+    payload = exported.json()
+    assert payload["schema_version"] == "vigil.proctor-support.v1.1"
+    assert payload["record_count"] == 2
+    assert payload["ai_review_incidents"][0]["event_id"] == "AI-EXPORT-001"
+    assert payload["ai_review_incidents"][0]["sha256"] == "a" * 64
+    assert payload["ai_review_incidents"][0]["review_note"] == "Reviewed with context"
     csv_export = http.get(f"/api/v1/proctor/sessions/{session_id}/export?format=csv")
     assert csv_export.status_code == 200
     assert bookmark["bookmark_id"] in csv_export.text
+    rows = list(csv.DictReader(io.StringIO(csv_export.text.lstrip("\ufeff"))))
+    assert {row["record_type"] for row in rows} == {"AI_INCIDENT", "MANUAL_BOOKMARK"}
+    ai_row = next(row for row in rows if row["record_type"] == "AI_INCIDENT")
+    assert ai_row["record_id"] == "AI-EXPORT-001"
+    assert ai_row["review_priority_score"] == "42"
+    assert ai_row["sha256"] == "a" * 64
 
 
 def test_capture_from_previous_run_fails_closed(client):
@@ -195,6 +268,36 @@ def test_classroom_dashboard_exposes_proctor_workflow(client):
     assert script.status_code == 200
     assert "PROCTOR_BOOKMARK" in script.text
     assert "/api/v1/proctor/bookmarks" in script.text
+    assert "Preparing browser-compatible evidence video" in script.text
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg") or not shutil.which("ffprobe"), reason="FFmpeg tools unavailable")
+def test_mp4v_evidence_gets_h264_browser_derivative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("VIGIL_PLAYBACK_CACHE_ROOT", str(tmp_path / "playback"))
+    source = tmp_path / "archive.mp4"
+    writer = cv2.VideoWriter(
+        str(source),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        10.0,
+        (64, 48),
+    )
+    assert writer.isOpened()
+    for index in range(20):
+        frame = np.full((48, 64, 3), index * 8, dtype=np.uint8)
+        writer.write(frame)
+    writer.release()
+    assert probe_video_codec(source) == "mpeg4"
+
+    playback, derivative = ensure_browser_playback(source)
+    assert derivative is True
+    assert playback != source
+    assert playback.is_file()
+    assert probe_video_codec(playback) == "h264"
+    assert probe_video_codec(source) == "mpeg4"
+
+    cached, cached_derivative = ensure_browser_playback(source)
+    assert cached == playback
+    assert cached_derivative is True
 
 
 def test_local_bookmark_round_trip_and_legacy_compatibility(tmp_path: Path):

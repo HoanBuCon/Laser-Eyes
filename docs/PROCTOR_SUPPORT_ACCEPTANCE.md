@@ -21,8 +21,9 @@ Mở `http://127.0.0.1:8000/demo` và kiểm tra:
 7. Trạng thái hash chỉ hiện VERIFIED sau khi server đọc lại file và so digest.
 8. Chọn quyết định, refresh trang; quyết định và ghi chú còn nguyên.
 9. Tắt WebSocket trong DevTools; polling vẫn lấy lại bookmark.
-10. Export JSON và CSV; đối chiếu bookmark ID, frame, timestamp, decision và SHA.
-11. Reset rồi Start run mới; capture token của run cũ không được lưu sang run mới.
+10. Mở một card AI có evidence; clip phát trong Chrome/Edge, nút Open/download hoạt động và hash vẫn đối chiếu file archive gốc.
+11. Export JSON và CSV; CSV phải có cả dòng `AI_INCIDENT` và `MANUAL_BOOKMARK` (nếu phiên có cả hai), với ID, timestamp, decision và SHA tương ứng.
+12. Reset rồi Start run mới; capture token của run cũ không được lưu sang run mới.
 
 ## Local Gaze
 
@@ -49,12 +50,13 @@ Kiểm tra:
 venv\Scripts\python.exe -m pytest
 ```
 
-Các test mới nằm tại `tests/test_proctor_support.py`, bao phủ capture token, stale run, idempotency, evidence READY/FAILED, SHA verification, ROI crop, review history, export và Local JSON backward compatibility.
+Các test mới nằm tại `tests/test_proctor_support.py`, bao phủ capture token, stale run, idempotency, evidence READY/FAILED, SHA verification, chuyển mã playback H.264, ROI crop, review history, export AI/manual và Local JSON backward compatibility.
 
 ## Giới hạn còn lại
 
 - Reviewer ID trong prototype là định danh do client khai báo; chưa có hệ thống authentication doanh nghiệp.
 - Bookmark Classroom chỉ lưu ảnh; clip vẫn là evidence của incident AI hiện hữu.
+- Máy demo cần `ffmpeg` và `ffprobe` trên `PATH` để tạo playback H.264 từ archive `mp4v`; lần mở clip đầu tiên có thể chậm hơn do chuyển mã, các lần sau dùng cache.
 - Seat crop dùng polygon snapshot của seat tại lúc lưu bookmark; nếu `seat_code` trống/sai thì chỉ có ảnh toàn cảnh.
 - Pan/zoom Web là viewer đơn giản, chưa phải công cụ forensic canvas chuyên dụng.
 - Cần chủ sản phẩm chạy checklist trực quan trên màn hình/máy thi thật trước khi merge vào DEV.

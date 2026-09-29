@@ -30,6 +30,7 @@ from classroom_monitor.behavior_pattern_engine import BehaviorPatternEngine, Pat
 from classroom_monitor.demo.config import DemoVideoConfig
 from classroom_monitor.demo.runtime import DemoRuntime
 from classroom_monitor.detector import ModelUnavailableError, PoseClassroomDetector
+from classroom_monitor.evidence_playback import ensure_browser_playback
 from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.observation_extractor import ObservationType, RawObservation
 from classroom_monitor.scene_context import SeatContext, SeatGraph, SeatNeighbors
@@ -606,7 +607,11 @@ def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, 
     duplicate = tmp_path / "data" / "demo_runs" / "old" / "evidence" / "same.mp4"
     target.parent.mkdir(parents=True)
     duplicate.parent.mkdir(parents=True)
-    target.write_bytes(b"canonical")
+    writer = cv2.VideoWriter(str(target), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (32, 24))
+    assert writer.isOpened()
+    for value in (32, 96, 160):
+        writer.write(np.full((24, 32, 3), value, dtype=np.uint8))
+    writer.release()
     duplicate.write_bytes(b"old")
     snapshot = target.with_suffix(".jpg")
     snapshot.write_bytes(b"snapshot")
@@ -644,7 +649,10 @@ def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, 
     with TestClient(app) as client:
         response = client.get(payload["video_url"])
     assert response.status_code == 200
-    assert response.content == b"canonical"
+    expected_playback, is_derivative = ensure_browser_playback(target)
+    assert is_derivative is True
+    assert response.headers["x-vigil-playback-derivative"] == "true"
+    assert response.content == expected_playback.read_bytes()
 
 
 def test_dashboard_review_cards_do_not_embed_inline_event_handlers():

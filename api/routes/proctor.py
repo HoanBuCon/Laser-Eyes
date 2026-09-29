@@ -14,18 +14,18 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
-from storage.db_models import DetectionEvent
+from storage.db_models import DetectionEvent, ExamSession
 from storage.proctor_service import (
     BookmarkConflict,
     BookmarkNotFound,
     bookmark_snapshot_path,
     bookmark_crop_bytes,
-    bookmarks_to_csv,
     create_bookmark,
     get_bookmark,
     get_bookmark_by_request_id,
     list_bookmarks,
     review_bookmark,
+    review_export_to_csv,
     serialize_bookmark,
     verify_bookmark_integrity,
 )
@@ -180,17 +180,46 @@ def submit_bookmark_review(
 
 
 def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
+    try:
+        supporting_signals = json.loads(event.supporting_patterns_json or "[]")
+    except (TypeError, json.JSONDecodeError):
+        supporting_signals = []
+    evidence = event.evidence
+    review = event.review
     return {
         "queue_id": f"AI:{event.event_id}",
         "source_type": "AI_INCIDENT",
+        "source_product": "VIGIL_CLASSROOM",
         "event_id": event.event_id,
         "session_id": event.session_id,
         "subject_ref": event.seat.seat_code if event.seat else None,
         "primary_signal": event.primary_signal or event.behavior,
+        "supporting_signals": supporting_signals,
         "severity": event.severity,
         "review_priority_score": event.risk_score,
+        "frame_id": event.start_frame,
         "review_status": event.review_status,
+        "review_decision": review.decision if review else event.review_status,
+        "ai_status": event.status,
+        "reviewer_id": review.reviewer_id if review else None,
+        "reason_code": review.reason_code if review else None,
+        "review_note": review.note if review else (event.reviewer_note or ""),
+        "reviewed_at": review.reviewed_at.isoformat() if review and review.reviewed_at else None,
         "source_timestamp_ms": None,
+        "first_seen": event.start_timestamp.isoformat() if event.start_timestamp else None,
+        "last_seen": event.end_timestamp.isoformat() if event.end_timestamp else None,
+        "duration_seconds": event.duration_seconds,
+        "occurrence_count": 1,
+        "evidence_status": evidence.status if evidence else "NOT_AVAILABLE",
+        "snapshot_url": f"/api/v1/demo/events/{event.event_id}/evidence/snapshot"
+        if evidence and evidence.snapshot_path
+        else None,
+        "video_url": f"/api/v1/demo/events/{event.event_id}/evidence/video"
+        if evidence and (evidence.video_path or evidence.file_path)
+        else None,
+        "sha256": evidence.video_sha256 if evidence else None,
+        "file_size_bytes": evidence.file_size_bytes if evidence else 0,
+        "evidence_error": evidence.error_message if evidence else None,
         "created_at": event.created_at.isoformat() if event.created_at else None,
     }
 
@@ -220,24 +249,29 @@ def export_session_review(
     format: str = Query("json", pattern="^(json|csv)$"),
     db: Session = Depends(get_db),
 ) -> Response:
+    if db.get(ExamSession, session_id) is None:
+        raise HTTPException(status_code=404, detail=f"Session '{session_id}' was not found")
     bookmarks = list_bookmarks(db, session_id=session_id, limit=1000)
-    if format == "csv":
-        return Response(
-            content=bookmarks_to_csv(bookmarks),
-            media_type="text/csv; charset=utf-8",
-            headers={"Content-Disposition": f'attachment; filename="proctor-bookmarks-{session_id}.csv"'},
-        )
     events = (
         db.query(DetectionEvent)
         .filter(DetectionEvent.session_id == session_id)
         .order_by(DetectionEvent.created_at.asc())
         .all()
     )
+    manual_items = [serialize_bookmark(item, include_reviews=True) for item in bookmarks]
+    ai_items = [_serialize_ai_event(item) for item in events]
+    if format == "csv":
+        return Response(
+            content=review_export_to_csv(ai_items, manual_items),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": f'attachment; filename="proctor-review-{session_id}.csv"'},
+        )
     payload = {
-        "schema_version": "vigil.proctor-support.v1",
+        "schema_version": "vigil.proctor-support.v1.1",
         "session_id": session_id,
-        "manual_bookmarks": [serialize_bookmark(item, include_reviews=True) for item in bookmarks],
-        "ai_review_incidents": [_serialize_ai_event(item) for item in events],
+        "record_count": len(manual_items) + len(ai_items),
+        "manual_bookmarks": manual_items,
+        "ai_review_incidents": ai_items,
     }
     return Response(
         content=json.dumps(payload, ensure_ascii=False, indent=2),

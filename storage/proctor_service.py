@@ -359,3 +359,87 @@ def bookmarks_to_csv(bookmarks: Iterable[ProctorBookmark]) -> str:
         row = serialize_bookmark(item)
         writer.writerow({field: row.get(field) for field in fields})
     return output.getvalue()
+
+
+def review_export_to_csv(
+    ai_incidents: Iterable[dict[str, Any]],
+    manual_bookmarks: Iterable[dict[str, Any]],
+) -> str:
+    """Export a unified, source-labelled review ledger for spreadsheet use."""
+    fields = [
+        "record_type",
+        "record_id",
+        "session_id",
+        "run_id",
+        "source_product",
+        "subject_ref",
+        "primary_signal",
+        "supporting_signals",
+        "severity",
+        "review_priority_score",
+        "frame_id",
+        "source_timestamp_ms",
+        "first_seen",
+        "last_seen",
+        "duration_seconds",
+        "occurrence_count",
+        "ai_status",
+        "review_decision",
+        "reviewer_id",
+        "reason_code",
+        "review_note",
+        "reviewed_at",
+        "evidence_status",
+        "snapshot_url",
+        "video_url",
+        "sha256",
+        "file_size_bytes",
+        "evidence_error",
+        "created_at",
+    ]
+    output = io.StringIO(newline="")
+    writer = csv.DictWriter(output, fieldnames=fields, extrasaction="ignore")
+    writer.writeheader()
+    for incident in ai_incidents:
+        row = dict(incident)
+        row["record_type"] = "AI_INCIDENT"
+        row["record_id"] = incident.get("event_id")
+        row["review_decision"] = incident.get("review_decision") or incident.get("review_status")
+        row["supporting_signals"] = json.dumps(
+            incident.get("supporting_signals") or [], ensure_ascii=False
+        )
+        writer.writerow({field: row.get(field) for field in fields})
+    for bookmark in manual_bookmarks:
+        reviews = bookmark.get("reviews") or []
+        latest_review = reviews[-1] if reviews else {}
+        row = {
+            "record_type": "MANUAL_BOOKMARK",
+            "record_id": bookmark.get("bookmark_id"),
+            "session_id": bookmark.get("session_id"),
+            "run_id": bookmark.get("run_id"),
+            "source_product": bookmark.get("source_product"),
+            "subject_ref": bookmark.get("subject_ref"),
+            "primary_signal": "HUMAN_MARKED_FRAME",
+            "supporting_signals": "[]",
+            "frame_id": bookmark.get("frame_id"),
+            "source_timestamp_ms": bookmark.get("source_timestamp_ms"),
+            "first_seen": bookmark.get("captured_at"),
+            "last_seen": bookmark.get("captured_at"),
+            "duration_seconds": 0,
+            "occurrence_count": 1,
+            "ai_status": "NOT_APPLICABLE",
+            "review_decision": bookmark.get("review_decision"),
+            "reviewer_id": latest_review.get("reviewer_id"),
+            "reason_code": latest_review.get("reason_code"),
+            "review_note": bookmark.get("note"),
+            "reviewed_at": latest_review.get("reviewed_at"),
+            "evidence_status": bookmark.get("evidence_status"),
+            "snapshot_url": bookmark.get("snapshot_url"),
+            "video_url": None,
+            "sha256": bookmark.get("sha256"),
+            "file_size_bytes": bookmark.get("file_size_bytes"),
+            "evidence_error": bookmark.get("error_message"),
+            "created_at": bookmark.get("created_at"),
+        }
+        writer.writerow({field: row.get(field) for field in fields})
+    return "\ufeff" + output.getvalue()

@@ -331,9 +331,13 @@
                 <!-- Left: Media Evidence Viewports -->
                 <div class="space-y-4">
                     <div id="modalVideoSection">
-                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">10-Second Candidate Video Clip:</div>
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Clip — up to 10 seconds:</div>
+                            <a id="modalVideoDownload" href="#" target="_blank" rel="noopener" class="text-[11px] font-mono text-cyan-400 hover:underline hidden">Open / download</a>
+                        </div>
                         <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
                             <video id="modalVideoPlayer" controls class="w-full h-full object-contain"></video>
+                            <div id="modalVideoStatus" class="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 px-3 py-2 text-center text-xs font-mono text-gray-300">Select an AI incident to load evidence.</div>
                         </div>
                     </div>
 

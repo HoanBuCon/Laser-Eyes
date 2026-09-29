@@ -29,6 +29,7 @@ from classroom_monitor.demo.config import DEMO_PRESETS, get_demo_config
 from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState
 from classroom_monitor.async_evidence_writer import compute_file_sha256
 from classroom_monitor.contracts import HashStatus
+from classroom_monitor.evidence_playback import PlaybackUnavailable, ensure_browser_playback
 from storage.db_models import DetectionEvent
 from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
 
@@ -328,7 +329,7 @@ def get_event_evidence_snapshot(event_id: str, db: Session = Depends(get_db)):
 
 @router.get("/events/{event_id}/evidence/video")
 def get_event_evidence_video(event_id: str, db: Session = Depends(get_db)):
-    """Serve the exact video linked to a durable incident."""
+    """Serve H.264 playback while retaining the archived evidence and its digest."""
     event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
     evidence = event.evidence if event else None
     path = _contained_persisted_evidence(
@@ -337,7 +338,19 @@ def get_event_evidence_video(event_id: str, db: Session = Depends(get_db)):
     )
     if path is None:
         raise HTTPException(status_code=404, detail="Video evidence is unavailable")
-    return FileResponse(str(path), media_type="video/mp4")
+    try:
+        playback_path, is_derivative = ensure_browser_playback(path)
+    except PlaybackUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return FileResponse(
+        str(playback_path),
+        media_type="video/mp4",
+        headers={
+            "Content-Disposition": f'inline; filename="{path.name}"',
+            "X-Vigil-Playback-Derivative": str(is_derivative).lower(),
+            "X-Vigil-Archive-Integrity": "sha256-references-archived-source",
+        },
+    )
 
 def _find_evidence_file(filename: str, subfolder: str = "evidence") -> Optional[Path]:
     """Locate one unambiguous, contained evidence file by safe basename."""
@@ -378,4 +391,12 @@ def get_evidence_video(filename: str):
     fpath = _find_evidence_file(filename)
     if not fpath or not fpath.exists():
         raise HTTPException(status_code=404, detail=f"Evidence video '{filename}' not found")
-    return FileResponse(str(fpath), media_type="video/mp4")
+    try:
+        playback_path, is_derivative = ensure_browser_playback(fpath)
+    except PlaybackUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return FileResponse(
+        str(playback_path),
+        media_type="video/mp4",
+        headers={"X-Vigil-Playback-Derivative": str(is_derivative).lower()},
+    )

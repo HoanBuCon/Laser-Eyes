@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fetchStatus();
     fetchEvents();
     fetchBookmarks();
+    initEvidenceVideoStatus();
 
     // Start polling fallback every 1500ms
     pollTimer = setInterval(() => {
@@ -51,6 +52,26 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchBookmarks();
     }, 1500);
 });
+
+function initEvidenceVideoStatus() {
+    const player = document.getElementById('modalVideoPlayer');
+    const status = document.getElementById('modalVideoStatus');
+    if (!player || !status) return;
+    player.addEventListener('loadstart', () => {
+        status.textContent = 'Preparing browser-compatible evidence video…';
+        status.classList.remove('hidden');
+    });
+    player.addEventListener('loadedmetadata', () => {
+        status.textContent = `Evidence ready • ${player.duration.toFixed(1)} seconds`;
+        window.setTimeout(() => status.classList.add('hidden'), 1400);
+    });
+    player.addEventListener('error', () => {
+        const mediaError = player.error;
+        const detail = mediaError ? ` (media error ${mediaError.code})` : '';
+        status.textContent = `Video could not be played${detail}. Use Open / download or check server logs.`;
+        status.classList.remove('hidden');
+    });
+}
 
 // -----------------------------------------------------------------------------
 // WebSocket Realtime Telemetry
@@ -651,14 +672,28 @@ async function openReviewModal(eventId) {
     // Video & Snapshot
     const videoPlayer = document.getElementById('modalVideoPlayer');
     const snapshotImg = document.getElementById('modalSnapshotImg');
+    const videoStatus = document.getElementById('modalVideoStatus');
+    const videoDownload = document.getElementById('modalVideoDownload');
     document.getElementById('modalVideoSection').classList.remove('hidden');
 
     if (ev.video_url) {
-        videoPlayer.src = authenticatedUrl(ev.video_url);
+        const videoUrl = authenticatedUrl(ev.video_url);
+        videoStatus.textContent = 'Preparing browser-compatible evidence video…';
+        videoStatus.classList.remove('hidden');
+        videoDownload.href = videoUrl;
+        videoDownload.classList.remove('hidden');
+        videoPlayer.src = videoUrl;
         videoPlayer.load();
-        videoPlayer.play().catch(() => {});
+        videoPlayer.play().catch(() => {
+            videoStatus.textContent = 'Evidence ready. Press Play to start.';
+            videoStatus.classList.remove('hidden');
+        });
     } else {
         videoPlayer.src = '';
+        videoDownload.href = '#';
+        videoDownload.classList.add('hidden');
+        videoStatus.textContent = ev.evidence_error || 'No video clip is available for this incident.';
+        videoStatus.classList.remove('hidden');
     }
 
     if (ev.snapshot_url) {
@@ -684,6 +719,11 @@ function closeReviewModal() {
     if (videoPlayer) {
         videoPlayer.pause();
         videoPlayer.src = '';
+    }
+    const videoDownload = document.getElementById('modalVideoDownload');
+    if (videoDownload) {
+        videoDownload.href = '#';
+        videoDownload.classList.add('hidden');
     }
     document.getElementById('reviewModal').classList.add('hidden');
     activeEvidenceUrls = { overall: '', crop: '' };

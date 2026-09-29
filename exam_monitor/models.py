@@ -119,6 +119,35 @@ class MonitoringEvent:
 
 
 @dataclass(slots=True)
+class ProctorBookmark:
+    """A human-created Local Gaze frame marker, separate from AI events."""
+
+    bookmark_id: str
+    request_id: str
+    session_id: str
+    frame_id: int
+    session_elapsed_ms: float
+    captured_at: str
+    created_at: str
+    created_by: str = "Local_Proctor"
+    note: str = ""
+    review_decision: str = "PENDING"
+    evidence_status: str = "PENDING"
+    snapshot_path: str | None = None
+    sha256: str | None = None
+    source_product: str = "LOCAL_GAZE"
+    source_kind: str = "CAMERA"
+    source_ref: str = ""
+    coordinate_space: dict[str, Any] = field(default_factory=dict)
+    simulation: bool = False
+    review_history: list[dict[str, Any]] = field(default_factory=list)
+    error_message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(slots=True)
 class SessionInfo:
     session_id: str
     candidate_id: str
@@ -129,6 +158,8 @@ class SessionInfo:
     frame_count: int = 0
     average_fps: float = 0.0
     events: list[MonitoringEvent] = field(default_factory=list)
+    bookmarks: list[ProctorBookmark] = field(default_factory=list)
+    schema_version: str = "vigil.local-session.v2"
 
     @property
     def risk_score(self) -> int:
@@ -160,4 +191,6 @@ class SessionInfo:
             "average_fps": round(self.average_fps, 2),
             "risk_score": self.risk_score,
             "events": [event.to_dict() for event in self.events],
+            "bookmarks": [bookmark.to_dict() for bookmark in self.bookmarks],
+            "schema_version": self.schema_version,
         }

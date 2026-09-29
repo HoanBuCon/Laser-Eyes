@@ -466,9 +466,9 @@ body {
 
 /* Buttons */
 .btn {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
+  background-color: var(--vigil-surface-alt);
+  border: 1px solid var(--vigil-border);
+  color: var(--vigil-text);
   padding: 0.5rem 0.9rem;
   border-radius: var(--radius-sm);
   font-size: 0.85rem;
@@ -477,52 +477,57 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  transition: all 0.2s;
+  box-shadow: none;
+  transition: background var(--vigil-duration-fast) var(--vigil-ease-standard), border-color var(--vigil-duration-fast) var(--vigil-ease-standard), color var(--vigil-duration-fast) var(--vigil-ease-standard), opacity var(--vigil-duration-fast) var(--vigil-ease-standard);
 }
 
 .btn:hover {
-  background-color: var(--bg-card-hover);
-  border-color: var(--text-secondary);
+  background-color: var(--vigil-surface-hover);
+  border-color: var(--vigil-border-strong);
 }
 
 .btn-primary {
-  background-color: var(--accent-blue);
-  border-color: var(--accent-blue);
-  color: #fff;
+  background-color: var(--vigil-primary);
+  border-color: var(--vigil-primary);
+  color: var(--vigil-primary-text);
 }
 
 .btn-primary:hover {
-  background-color: #2563eb;
+  background-color: var(--vigil-primary-hover);
+  border-color: var(--vigil-primary-hover);
 }
 
 .btn-success {
-  background-color: var(--accent-green);
-  border-color: var(--accent-green);
-  color: #fff;
+  background-color: var(--vigil-good-dim);
+  border-color: color-mix(in srgb, var(--vigil-good) 42%, var(--vigil-border));
+  color: var(--vigil-good);
 }
 
 .btn-success:hover {
-  background-color: #059669;
+  background-color: color-mix(in srgb, var(--vigil-good-dim) 82%, var(--vigil-good));
+  border-color: var(--vigil-good);
 }
 
 .btn-danger {
-  background-color: var(--accent-rose);
-  border-color: var(--accent-rose);
-  color: #fff;
+  background-color: var(--vigil-danger-dim);
+  border-color: color-mix(in srgb, var(--vigil-danger) 42%, var(--vigil-border));
+  color: var(--vigil-danger);
 }
 
 .btn-danger:hover {
-  background-color: #e11d48;
+  background-color: var(--vigil-danger-hover);
+  border-color: var(--vigil-danger);
 }
 
 .btn-warning {
-  background-color: var(--accent-amber);
-  border-color: var(--accent-amber);
-  color: #000;
+  background-color: var(--vigil-warning-dim);
+  border-color: color-mix(in srgb, var(--vigil-warning) 42%, var(--vigil-border));
+  color: var(--vigil-warning);
 }
 
 .btn-warning:hover {
-  background-color: #d97706;
+  background-color: color-mix(in srgb, var(--vigil-warning-dim) 82%, var(--vigil-warning));
+  border-color: var(--vigil-warning);
 }
 
 .btn-sm {

@@ -256,6 +256,11 @@ body {
   box-shadow: none !important;
 }
 .calibration-toolbar button, .calibration-toolbar label { min-height: 34px; }
+#btnModeSelect[aria-pressed="true"], #btnModeDraw[aria-pressed="true"] {
+  border-color: var(--vigil-primary) !important;
+  background: var(--vigil-primary) !important;
+  color: var(--vigil-primary-text) !important;
+}
 #canvasWrapper {
   border-color: var(--vigil-border) !important;
   border-radius: var(--vigil-radius-sm) !important;

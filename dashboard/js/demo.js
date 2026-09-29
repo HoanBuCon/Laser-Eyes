@@ -377,7 +377,7 @@ function renderReviewQueue() {
 
                     <div class="pt-2 border-t border-gray-900 flex items-center justify-between text-xs font-mono">
                         <span class="text-gray-400">Review Priority: <strong class="text-red-400">${risk}/100</strong></span>
-                        <button class="px-2.5 py-1 rounded bg-gray-800 hover:bg-cyan-600 text-gray-200 hover:text-white transition text-xs font-semibold">
+                        <button class="vigil-btn vigil-btn--primary vigil-btn--sm px-2.5 py-1 rounded bg-gray-800 hover:bg-cyan-600 text-gray-200 hover:text-white transition text-xs font-semibold">
                             Review &rarr;
                         </button>
                     </div>

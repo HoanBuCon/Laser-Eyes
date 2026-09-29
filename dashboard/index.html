@@ -27,6 +27,7 @@
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
     <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    <script src="/static/js/vigil-theme.js"></script>
 </head>
 <body class="vigil-classroom bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans">
 
@@ -46,6 +47,7 @@
             <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
             <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
             <a href="/" class="vigil-nav-item is-active"><span>05</span><strong>Operations</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
 
         <div class="vigil-sidebar-note">
@@ -87,7 +89,7 @@
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
                     Data Workbench
                 </a>
-                <button onclick="triggerManualRefresh()" class="p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition" title="Refresh Dashboard">
+                <button onclick="triggerManualRefresh()" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition" title="Refresh Dashboard">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                 </button>
                 <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
@@ -164,8 +166,8 @@
                     <p class="text-xs text-gray-400">Real-time room risk scores, active cameras, and seat occupancy</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="filterRooms('ALL')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition">All Rooms</button>
-                    <button onclick="filterRooms('HIGH_RISK')" class="px-3 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-red-400 border border-gray-700 transition">High Risk Only</button>
+                    <button onclick="filterRooms('ALL')" class="vigil-btn vigil-btn--sm vigil-btn--primary px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition">All Rooms</button>
+                    <button onclick="filterRooms('HIGH_RISK')" class="vigil-btn vigil-btn--sm px-3 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-red-400 border border-gray-700 transition">High Risk Only</button>
                 </div>
             </div>
             <div id="roomCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -236,7 +238,7 @@
                     </h3>
                     <p id="modalEventSubtitle" class="text-xs text-gray-400 mt-0.5"></p>
                 </div>
-                <button onclick="closeEvidenceModal()" class="text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition">
+                <button onclick="closeEvidenceModal()" class="vigil-btn vigil-btn--ghost vigil-btn--icon text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
@@ -245,14 +247,14 @@
             <div class="space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex gap-2">
-                        <button id="btnTabSnapshot" onclick="switchEvidenceTab('snapshot')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow">Peak Snapshot (JPEG)</button>
-                        <button id="btnTabVideo" onclick="switchEvidenceTab('video')" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white">10s Video Clip (MP4)</button>
+                        <button id="btnTabSnapshot" onclick="switchEvidenceTab('snapshot')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow">Peak Snapshot (JPEG)</button>
+                        <button id="btnTabVideo" onclick="switchEvidenceTab('video')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white">10s Video Clip (MP4)</button>
                     </div>
                     <!-- Integrity Hash Badge -->
                     <div class="flex items-center gap-2">
                         <span class="text-[11px] text-gray-400 font-mono">SHA-256:</span>
                         <code id="modalSha256" class="text-[11px] text-cyan-300 bg-gray-950 px-2 py-1 rounded border border-gray-800 font-mono truncate max-w-[200px]" title="Cryptographic Evidence Hash">N/A</code>
-                        <button onclick="copySha256()" class="text-xs text-gray-400 hover:text-cyan-400" title="Copy full SHA-256 hash">📋</button>
+                        <button onclick="copySha256()" class="vigil-btn vigil-btn--ghost vigil-btn--icon text-xs text-gray-400 hover:text-cyan-400" title="Copy full SHA-256 hash">📋</button>
                     </div>
                 </div>
 
@@ -298,13 +300,13 @@
                         * In accordance with SRS Section 7: AI never makes final disciplinary decisions.
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="submitReviewDecision('REJECTED')" class="px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition">
+                        <button onclick="submitReviewDecision('REJECTED')" class="vigil-btn px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition">
                             REJECT (Bác bỏ)
                         </button>
-                        <button onclick="submitReviewDecision('INCONCLUSIVE')" class="px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/40 text-xs font-bold transition">
+                        <button onclick="submitReviewDecision('INCONCLUSIVE')" class="vigil-btn vigil-btn--warning px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/40 text-xs font-bold transition">
                             INCONCLUSIVE (Chưa rõ)
                         </button>
-                        <button onclick="submitReviewDecision('CONFIRMED')" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition">
+                        <button onclick="submitReviewDecision('CONFIRMED')" class="vigil-btn vigil-btn--danger px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition">
                             CONFIRM (Xác nhận vi phạm)
                         </button>
                     </div>

@@ -100,19 +100,19 @@
             <!-- Left: Preset & Mode Selection -->
             <div class="flex flex-wrap items-center gap-3">
                 <div class="segmented-control preset-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
-                    <button id="btnPresetIndia" onclick="selectPreset('india')" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md">
+                    <button type="button" id="btnPresetIndia" onclick="selectPreset('india')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
                         India Classroom (21 Seats)
                     </button>
-                    <button id="btnPresetStudent" onclick="selectPreset('student')" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                    <button type="button" id="btnPresetStudent" onclick="selectPreset('student')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
                         Student Classroom (12 Seats)
                     </button>
                 </div>
 
                 <div class="segmented-control mode-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
-                    <button id="btnModeLive" onclick="selectMode('LIVE')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow">
+                    <button type="button" id="btnModeLive" onclick="selectMode('LIVE')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                         Live Analysis
                     </button>
-                    <button id="btnModeReplay" onclick="selectMode('REPLAY')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                    <button type="button" id="btnModeReplay" onclick="selectMode('REPLAY')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                         Recorded Replay
                     </button>
                 </div>
@@ -255,14 +255,14 @@
 
                 <!-- Status Filter Pills -->
                 <div class="review-filters flex items-center gap-1.5 text-xs font-mono">
-                    <button data-source-filter="ALL" onclick="filterQueueSource('ALL')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">All Sources</button>
-                    <button data-source-filter="AI" onclick="filterQueueSource('AI')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">AI</button>
-                    <button data-source-filter="MANUAL" onclick="filterQueueSource('MANUAL')" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">Proctor</button>
-                    <button data-filter="ALL" onclick="filterQueue('ALL')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
-                    <button data-filter="PENDING" onclick="filterQueue('PENDING')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
-                    <button data-filter="CONFIRMED" onclick="filterQueue('CONFIRMED')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
-                    <button data-filter="REJECTED" onclick="filterQueue('REJECTED')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
-                    <button data-filter="INCONCLUSIVE" onclick="filterQueue('INCONCLUSIVE')" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
+                    <button type="button" data-source-filter="ALL" onclick="filterQueueSource('ALL')" aria-pressed="true" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">All Sources</button>
+                    <button type="button" data-source-filter="AI" onclick="filterQueueSource('AI')" aria-pressed="false" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">AI</button>
+                    <button type="button" data-source-filter="MANUAL" onclick="filterQueueSource('MANUAL')" aria-pressed="false" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">Proctor</button>
+                    <button type="button" data-filter="ALL" onclick="filterQueue('ALL')" aria-pressed="true" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg font-semibold">All</button>
+                    <button type="button" data-filter="PENDING" onclick="filterQueue('PENDING')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Pending</button>
+                    <button type="button" data-filter="CONFIRMED" onclick="filterQueue('CONFIRMED')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Confirmed</button>
+                    <button type="button" data-filter="REJECTED" onclick="filterQueue('REJECTED')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Rejected</button>
+                    <button type="button" data-filter="INCONCLUSIVE" onclick="filterQueue('INCONCLUSIVE')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Inconclusive</button>
                     <button onclick="exportProctorReview('json')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">Export JSON</button>
                     <button onclick="exportProctorReview('csv')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">CSV</button>
                 </div>

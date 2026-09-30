@@ -691,6 +691,18 @@ def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
     assert "stateBadge.dataset.state" in javascript
     assert "stateBadge.className" not in javascript
     assert "btnIndia.className" not in javascript
+    assert '.text-white:not(.vigil-btn)' in shell
+    assert 'color: var(--vigil-primary-text) !important;' in css
+    for control_id, selected in (
+        ("btnPresetIndia", "true"),
+        ("btnPresetStudent", "false"),
+        ("btnModeLive", "true"),
+        ("btnModeReplay", "false"),
+    ):
+        control = re.search(rf'<button[^>]*id="{control_id}"[^>]*>', html)
+        assert control is not None
+        assert f'aria-pressed="{selected}"' in control.group(0)
+        assert not re.search(r'\b(?:text-white|text-gray-\d+|bg-(?:cyan|blue|gray)-\S+)', control.group(0))
     assert "badge.dataset.connected" in operations_javascript
     assert "btnSnap.className" not in operations_javascript
     assert "Exam Cheating Surveillance" not in operations_html

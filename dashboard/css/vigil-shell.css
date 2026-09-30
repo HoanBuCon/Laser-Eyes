@@ -67,12 +67,15 @@ select:focus-visible, textarea:focus-visible {
 [data-theme="light"] body.vigil-classroom [class*="bg-gray-900"] { background-color: var(--vigil-surface) !important; }
 [data-theme="light"] body.vigil-classroom [class*="bg-gray-800"] { background-color: var(--vigil-surface-alt) !important; }
 [data-theme="light"] body.vigil-classroom [class*="border-gray-"] { border-color: var(--vigil-border) !important; }
-[data-theme="light"] body.vigil-classroom .text-white,
-[data-theme="light"] body.vigil-classroom .text-gray-100,
-[data-theme="light"] body.vigil-classroom .text-gray-200,
-[data-theme="light"] body.vigil-classroom .text-gray-300 { color: var(--vigil-text) !important; }
-[data-theme="light"] body.vigil-classroom .text-gray-400,
-[data-theme="light"] body.vigil-classroom .text-gray-500 { color: var(--vigil-text-muted) !important; }
+/* Semantic buttons own their foreground through variants/aria state. Excluding
+   them prevents legacy Tailwind text utilities from overriding selected
+   segmented controls in light mode. */
+[data-theme="light"] body.vigil-classroom .text-white:not(.vigil-btn),
+[data-theme="light"] body.vigil-classroom .text-gray-100:not(.vigil-btn),
+[data-theme="light"] body.vigil-classroom .text-gray-200:not(.vigil-btn),
+[data-theme="light"] body.vigil-classroom .text-gray-300:not(.vigil-btn) { color: var(--vigil-text) !important; }
+[data-theme="light"] body.vigil-classroom .text-gray-400:not(.vigil-btn),
+[data-theme="light"] body.vigil-classroom .text-gray-500:not(.vigil-btn) { color: var(--vigil-text-muted) !important; }
 [data-theme="light"] body.vigil-classroom input,
 [data-theme="light"] body.vigil-classroom select,
 [data-theme="light"] body.vigil-classroom textarea { color-scheme: light; }

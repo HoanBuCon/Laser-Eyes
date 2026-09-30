@@ -88,7 +88,15 @@
 .segmented-control button:hover, .filter-btn:hover, .source-filter-btn:hover { background: var(--vigil-surface-hover) !important; color: var(--vigil-text) !important; }
 .segmented-control button[aria-pressed="true"], .filter-btn[aria-pressed="true"], .source-filter-btn[aria-pressed="true"],
 #btnViewOverall[aria-pressed="true"], #btnViewCrop[aria-pressed="true"] {
+    border-color: var(--vigil-primary) !important;
     background: var(--vigil-primary) !important;
+    color: var(--vigil-primary-text) !important;
+}
+.segmented-control button[aria-pressed="true"]:hover,
+.filter-btn[aria-pressed="true"]:hover,
+.source-filter-btn[aria-pressed="true"]:hover {
+    border-color: var(--vigil-primary-hover) !important;
+    background: var(--vigil-primary-hover) !important;
     color: var(--vigil-primary-text) !important;
 }
 .debug-toggle {

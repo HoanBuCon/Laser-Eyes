@@ -22,23 +22,50 @@
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/demo.css">
+    <script src="/static/js/vigil-theme.js"></script>
 </head>
-<body class="bg-[#070a12] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+<body class="vigil-classroom bg-[#070a12] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans min-h-screen flex flex-col">
+
+    <!-- Local Gaze-inspired persistent workspace navigation -->
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/demo" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy">
+                <strong>VIGIL AI</strong>
+                <small>CLASSROOM COPILOT</small>
+            </span>
+        </a>
+
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item is-active"><span>01</span><strong>Live monitor</strong></a>
+            <a href="#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
 
     <!-- Top Navigation Header -->
-    <header class="border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
+    <header class="classroom-topbar border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                <div class="topbar-context-mark w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
                     <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
                 </div>
                 <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
-                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">SRS v2.0 Co-Pilot</span>
-                    </div>
-                    <p class="text-xs text-gray-400 font-mono">AI-Assisted Exam Monitoring &amp; Human-in-the-Loop Review Queue</p>
+                    <div class="vigil-page-eyebrow">CLASSROOM / LIVE MONITOR</div>
+                    <h1 class="vigil-page-title">Room observation</h1>
+                    <p class="vigil-page-subtitle">Observable signals, temporal context and evidence for human review.</p>
                 </div>
             </div>
 
@@ -65,64 +92,67 @@
     </header>
 
     <!-- Main Content Container -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
+    <main class="classroom-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
 
         <!-- Control Toolbar Card -->
-        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="session-toolbar bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
             
             <!-- Left: Preset & Mode Selection -->
             <div class="flex flex-wrap items-center gap-3">
-                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
-                    <button id="btnPresetIndia" onclick="selectPreset('india')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition bg-cyan-500 text-white shadow-md">
+                <div class="segmented-control preset-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                    <button type="button" id="btnPresetIndia" onclick="selectPreset('india')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
                         India Classroom (21 Seats)
                     </button>
-                    <button id="btnPresetStudent" onclick="selectPreset('student')" class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                    <button type="button" id="btnPresetStudent" onclick="selectPreset('student')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
                         Student Classroom (12 Seats)
                     </button>
                 </div>
 
-                <div class="flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
-                    <button id="btnModeLive" onclick="selectMode('LIVE')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition bg-blue-600 text-white shadow">
+                <div class="segmented-control mode-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
+                    <button type="button" id="btnModeLive" onclick="selectMode('LIVE')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                         Live Analysis
                     </button>
-                    <button id="btnModeReplay" onclick="selectMode('REPLAY')" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition text-gray-400 hover:text-gray-200">
+                    <button type="button" id="btnModeReplay" onclick="selectMode('REPLAY')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold transition">
                         Recorded Replay
                     </button>
                 </div>
 
-                <label class="flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
+                <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
                     <input type="checkbox" id="chkDebugOverlay" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
                     <span>Debug Overlay</span>
                 </label>
             </div>
 
             <!-- Right: Playback Controls -->
-            <div class="flex items-center gap-2">
-                <button id="btnStart" onclick="startDemo()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
+            <div class="playback-controls flex items-center gap-2">
+                <button id="btnStart" onclick="startDemo()" class="vigil-btn vigil-btn--primary px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white text-xs font-bold shadow-lg shadow-emerald-500/20 transition flex items-center gap-1.5">
                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path></svg>
                     Start Analysis
                 </button>
-                <button id="btnPause" onclick="pauseDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
+                <button id="btnPause" onclick="pauseDemo()" class="vigil-btn px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
                     Pause
                 </button>
-                <button id="btnResume" onclick="resumeDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
+                <button id="btnResume" onclick="resumeDemo()" class="vigil-btn px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-semibold border border-gray-700 transition">
                     Resume
                 </button>
-                <button id="btnStop" onclick="stopDemo()" class="px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-semibold transition">
+                <button id="btnStop" onclick="stopDemo()" class="vigil-btn vigil-btn--danger px-3 py-2 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-semibold transition">
                     Stop
                 </button>
-                <button id="btnReset" onclick="resetDemo()" class="px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs font-semibold border border-gray-700 transition" title="Reset Session">
+                <button id="btnReset" onclick="resetDemo()" class="vigil-btn px-3 py-2 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-gray-200 text-xs font-semibold border border-gray-700 transition" title="Reset Session">
                     Reset
+                </button>
+                <button id="btnMarkFrame" onclick="captureProctorFrame()" class="vigil-btn vigil-btn--primary px-3 py-2 rounded-xl text-xs font-bold transition" title="Save the current frame for human review">
+                    Mark Frame
                 </button>
             </div>
         </div>
 
         <!-- Middle Section: Video Monitor + Telemetry Sidebar -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="monitor-grid grid grid-cols-1 lg:grid-cols-3 gap-6">
 
             <!-- Video Monitor Viewport (2 cols) -->
-            <div class="lg:col-span-2 bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
-                <div class="flex items-center justify-between pb-3 border-b border-gray-800">
+            <div class="viewer-card lg:col-span-2 bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+                <div class="panel-heading flex items-center justify-between pb-3 border-b border-gray-800">
                     <div class="flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
                         <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono">Clean Proctor Video Stream</h2>
@@ -134,7 +164,7 @@
                 </div>
 
                 <!-- Video Frame Area -->
-                <div class="relative bg-black rounded-xl overflow-hidden mt-3 aspect-video flex items-center justify-center border border-gray-800/80 shadow-inner group">
+                <div class="video-viewport relative bg-black rounded-xl overflow-hidden mt-3 aspect-video flex items-center justify-center border border-gray-800/80 shadow-inner group">
                     <img id="videoStreamImg" src="/api/v1/demo/stream" alt="Live Proctor Stream" class="w-full h-full object-contain" onerror="handleStreamError(this)">
                     <div id="videoPlaceholder" class="absolute inset-0 bg-gray-950/90 flex flex-col items-center justify-center gap-3 text-gray-400">
                         <div class="w-12 h-12 rounded-2xl bg-gray-900 border border-gray-800 flex items-center justify-center text-cyan-400">
@@ -153,11 +183,11 @@
             </div>
 
             <!-- Telemetry & Room State Overview (1 col) -->
-            <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+            <div class="telemetry-card bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
                 <div>
                     <h2 class="text-sm font-bold text-gray-200 uppercase tracking-wider font-mono border-b border-gray-800 pb-3">Session Telemetry</h2>
                     
-                    <div class="grid grid-cols-2 gap-3 mt-4">
+                    <div class="telemetry-grid grid grid-cols-2 gap-3 mt-4">
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Room Context</div>
                             <div id="lblRoomCode" class="text-sm font-bold text-gray-100 mt-0.5">ROOM-CALIB-01</div>
@@ -185,7 +215,7 @@
                     </div>
 
                     <!-- AI Pipeline Stack Details -->
-                    <div class="mt-5 space-y-2 text-xs font-mono">
+                    <div class="pipeline-list mt-5 space-y-2 text-xs font-mono">
                         <div class="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Pipeline Specification:</div>
                         <div class="flex justify-between py-1 border-b border-gray-800/60 text-gray-300">
                             <span>Perception Engine:</span>
@@ -206,15 +236,15 @@
                     </div>
                 </div>
 
-                <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-cyan-300 text-xs leading-relaxed">
+                <div class="copilot-note p-3 rounded-xl bg-cyan-950/30 border border-cyan-500/20 text-cyan-300 text-xs leading-relaxed">
                     <strong>Co-Pilot Principle:</strong> AI flags candidate behavioral incidents with full video context; the Human Proctor retains final adjudication authority.
                 </div>
             </div>
         </div>
 
         <!-- Bottom Section: Review Queue -->
-        <div class="bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
+        <div id="reviewQueue" class="review-panel bg-gray-900/90 border border-gray-800/90 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="review-heading flex flex-wrap items-center justify-between gap-3 border-b border-gray-800 pb-3">
                 <div>
                     <div class="flex items-center gap-2">
                         <h2 class="text-base font-bold text-gray-100 tracking-tight">Review Queue (Human Adjudication)</h2>
@@ -224,12 +254,17 @@
                 </div>
 
                 <!-- Status Filter Pills -->
-                <div class="flex items-center gap-1.5 text-xs font-mono">
-                    <button onclick="filterQueue('ALL')" class="filter-btn px-2.5 py-1 rounded-lg bg-cyan-500 text-white font-semibold">All</button>
-                    <button onclick="filterQueue('PENDING')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Pending</button>
-                    <button onclick="filterQueue('CONFIRMED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Confirmed</button>
-                    <button onclick="filterQueue('REJECTED')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Rejected</button>
-                    <button onclick="filterQueue('INCONCLUSIVE')" class="filter-btn px-2.5 py-1 rounded-lg bg-gray-950 text-gray-400 hover:text-gray-200 border border-gray-800">Inconclusive</button>
+                <div class="review-filters flex items-center gap-1.5 text-xs font-mono">
+                    <button type="button" data-source-filter="ALL" onclick="filterQueueSource('ALL')" aria-pressed="true" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">All Sources</button>
+                    <button type="button" data-source-filter="AI" onclick="filterQueueSource('AI')" aria-pressed="false" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">AI</button>
+                    <button type="button" data-source-filter="MANUAL" onclick="filterQueueSource('MANUAL')" aria-pressed="false" class="vigil-btn vigil-btn--sm source-filter-btn px-2.5 py-1 rounded-lg">Proctor</button>
+                    <button type="button" data-filter="ALL" onclick="filterQueue('ALL')" aria-pressed="true" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg font-semibold">All</button>
+                    <button type="button" data-filter="PENDING" onclick="filterQueue('PENDING')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Pending</button>
+                    <button type="button" data-filter="CONFIRMED" onclick="filterQueue('CONFIRMED')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Confirmed</button>
+                    <button type="button" data-filter="REJECTED" onclick="filterQueue('REJECTED')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Rejected</button>
+                    <button type="button" data-filter="INCONCLUSIVE" onclick="filterQueue('INCONCLUSIVE')" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn px-2.5 py-1 rounded-lg">Inconclusive</button>
+                    <button onclick="exportProctorReview('json')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">Export JSON</button>
+                    <button onclick="exportProctorReview('csv')" class="vigil-btn vigil-btn--sm px-2.5 py-1 rounded-lg">CSV</button>
                 </div>
             </div>
 
@@ -244,9 +279,39 @@
 
     </main>
 
+    <!-- Manual frame bookmark modal -->
+    <div id="captureModal" class="review-modal fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="review-dialog bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div class="p-4 border-b border-gray-800 flex items-center justify-between">
+                <div>
+                    <h3 class="text-base font-bold text-gray-100">Mark current frame for review</h3>
+                    <p id="captureMeta" class="text-xs text-gray-400 font-mono mt-1">Capturing exact source frame...</p>
+                </div>
+                <button onclick="closeCaptureModal()" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded-lg">Close</button>
+            </div>
+            <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div class="bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                    <img id="capturePreview" alt="Captured proctor frame" class="w-full h-full object-contain">
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-mono text-gray-400 mb-1">Seat / subject reference (optional)</label>
+                        <input id="captureSubject" maxlength="100" placeholder="e.g. S01" class="w-full bg-gray-950 border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-100">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-mono text-gray-400 mb-1">Proctor note</label>
+                        <textarea id="captureNote" maxlength="4000" rows="5" placeholder="Describe the observable behavior; do not make an automatic cheating verdict." class="w-full bg-gray-950 border border-gray-800 rounded-lg p-3 text-sm text-gray-100"></textarea>
+                    </div>
+                    <div id="captureError" class="hidden text-xs text-red-300 border border-red-500/30 bg-red-500/10 rounded-lg p-2"></div>
+                    <button id="btnSaveBookmark" onclick="saveProctorBookmark()" class="vigil-btn vigil-btn--primary w-full py-2.5 rounded-lg text-sm font-bold">Save review bookmark</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Evidence & Human Review Modal -->
-    <div id="reviewModal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+    <div id="reviewModal" class="review-modal fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="review-dialog bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
             
             <!-- Modal Header -->
             <div class="p-4 border-b border-gray-800 flex items-center justify-between sticky top-0 bg-gray-900/95 backdrop-blur z-10">
@@ -255,7 +320,7 @@
                     <h3 id="modalPatternTitle" class="text-base font-bold text-gray-100">Review Incident Evidence</h3>
                     <span id="modalSeverityBadge" class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-500/20 text-red-300 border border-red-500/40">HIGH</span>
                 </div>
-                <button onclick="closeReviewModal()" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                <button onclick="closeReviewModal()" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
                 </button>
             </div>
@@ -265,17 +330,29 @@
                 
                 <!-- Left: Media Evidence Viewports -->
                 <div class="space-y-4">
-                    <div>
-                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">10-Second Candidate Video Clip:</div>
+                    <div id="modalVideoSection">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Clip — up to 10 seconds:</div>
+                            <a id="modalVideoDownload" href="#" target="_blank" rel="noopener" class="text-[11px] font-mono text-cyan-400 hover:underline hidden">Open / download</a>
+                        </div>
                         <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
                             <video id="modalVideoPlayer" controls class="w-full h-full object-contain"></video>
+                            <div id="modalVideoStatus" class="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 px-3 py-2 text-center text-xs font-mono text-gray-300">Select an AI incident to load evidence.</div>
                         </div>
                     </div>
 
                     <div>
-                        <div class="text-xs font-mono text-gray-400 uppercase font-bold mb-1.5">Peak Frame Snapshot:</div>
-                        <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
-                            <img id="modalSnapshotImg" src="" alt="Peak Evidence Frame" class="w-full h-full object-contain">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Frame:</div>
+                            <div class="flex gap-1">
+                                <button id="btnViewOverall" onclick="setEvidenceView('overall')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">Overall</button>
+                                <button id="btnViewCrop" onclick="setEvidenceView('crop')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded hidden">Seat crop</button>
+                                <button onclick="zoomEvidence(-0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">−</button>
+                                <button onclick="zoomEvidence(0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">+</button>
+                            </div>
+                        </div>
+                        <div id="modalSnapshotViewport" class="relative bg-black rounded-xl overflow-auto aspect-video border border-gray-800 flex items-center justify-center">
+                            <img id="modalSnapshotImg" src="" alt="Evidence Frame" class="w-full h-full object-contain transition-transform origin-center">
                         </div>
                     </div>
                 </div>
@@ -316,13 +393,13 @@
                         
                         <!-- Action Selector Buttons -->
                         <div class="grid grid-cols-3 gap-2">
-                            <button type="button" onclick="selectDecision('CONFIRMED')" id="btnDecConfirm" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-emerald-400">
+                            <button type="button" onclick="selectDecision('CONFIRMED')" id="btnDecConfirm" class="vigil-btn px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-emerald-400">
                                 Confirm Violation
                             </button>
-                            <button type="button" onclick="selectDecision('REJECTED')" id="btnDecReject" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-amber-400">
+                            <button type="button" onclick="selectDecision('REJECTED')" id="btnDecReject" class="vigil-btn px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-amber-400">
                                 Reject (FP)
                             </button>
-                            <button type="button" onclick="selectDecision('INCONCLUSIVE')" id="btnDecInconclusive" class="px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-purple-400">
+                            <button type="button" onclick="selectDecision('INCONCLUSIVE')" id="btnDecInconclusive" class="vigil-btn px-2.5 py-2 rounded-lg text-xs font-bold border transition bg-gray-900 border-gray-800 text-gray-300 hover:text-purple-400">
                                 Inconclusive
                             </button>
                         </div>
@@ -363,7 +440,7 @@
                         </div>
 
                         <!-- Submit Button -->
-                        <button id="btnSubmitDecision" onclick="submitHumanReview()" class="w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-lg shadow-cyan-500/20">
+                        <button id="btnSubmitDecision" onclick="submitHumanReview()" class="vigil-btn vigil-btn--primary w-full py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition shadow-lg shadow-cyan-500/20">
                             Submit Adjudication
                         </button>
                     </div>
@@ -375,7 +452,7 @@
     </div>
 
     <!-- Footer -->
-    <footer class="border-t border-gray-800/80 py-4 bg-gray-950/60 text-center text-xs font-mono text-gray-500">
+    <footer class="classroom-footer border-t border-gray-800/80 py-4 bg-gray-950/60 text-center text-xs font-mono text-gray-500">
         VIGIL AI Enterprise Proctoring System &bull; Single-Source SRS v2.0 Execution &bull; Built for ICTU 2026 Competition
     </footer>
 

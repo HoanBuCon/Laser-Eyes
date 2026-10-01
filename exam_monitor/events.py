@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .models import AnalysisResult, EventType, MonitoringEvent, SessionInfo, Severity
+from .models import AnalysisResult, EventType, MonitoringEvent, ProctorBookmark, SessionInfo, Severity
 
 
 @dataclass(slots=True)
@@ -178,7 +178,9 @@ class SessionStore:
 
     def save_session(self, session: SessionInfo) -> Path:
         path = self.sessions_dir / f"{session.session_id}.json"
-        path.write_text(json.dumps(session.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path = path.with_suffix(f"{path.suffix}.tmp")
+        temp_path.write_text(json.dumps(session.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(path)
         return path
 
     def list_sessions(self) -> list[dict]:
@@ -189,3 +191,77 @@ class SessionStore:
             except (json.JSONDecodeError, OSError):
                 continue
         return sessions
+
+    def load_session(self, session_id: str) -> SessionInfo | None:
+        """Read current or legacy Local session JSON without changing old meanings."""
+        path = self.sessions_dir / f"{session_id}.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        events: list[MonitoringEvent] = []
+        for item in data.get("events", []):
+            try:
+                events.append(
+                    MonitoringEvent(
+                        event_id=item["event_id"],
+                        session_id=item.get("session_id", session_id),
+                        event_type=EventType(item["event_type"]),
+                        severity=Severity(item["severity"]),
+                        started_at=item["started_at"],
+                        ended_at=item.get("ended_at", item["started_at"]),
+                        duration_seconds=float(item.get("duration_seconds", 0.0)),
+                        reason=item.get("reason", ""),
+                        confidence=float(item.get("confidence", 0.0)),
+                        evidence_path=item.get("evidence_path"),
+                        review_status=item.get("review_status", "Chưa xem"),
+                        reviewer_note=item.get("reviewer_note", ""),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        bookmarks: list[ProctorBookmark] = []
+        for item in data.get("bookmarks", []):
+            try:
+                bookmarks.append(
+                    ProctorBookmark(
+                        bookmark_id=item["bookmark_id"],
+                        request_id=item.get("request_id", item["bookmark_id"]),
+                        session_id=item.get("session_id", session_id),
+                        frame_id=int(item.get("frame_id", 0)),
+                        session_elapsed_ms=float(item.get("session_elapsed_ms", 0.0)),
+                        captured_at=item.get("captured_at", data.get("started_at", "")),
+                        created_at=item.get("created_at", item.get("captured_at", "")),
+                        created_by=item.get("created_by", "Local_Proctor"),
+                        note=item.get("note", ""),
+                        review_decision=item.get("review_decision", "PENDING"),
+                        evidence_status=item.get("evidence_status", "PENDING"),
+                        snapshot_path=item.get("snapshot_path"),
+                        sha256=item.get("sha256"),
+                        source_product=item.get("source_product", "LOCAL_GAZE"),
+                        source_kind=item.get("source_kind", "CAMERA"),
+                        source_ref=item.get("source_ref", ""),
+                        coordinate_space=item.get("coordinate_space") or {},
+                        simulation=bool(item.get("simulation", False)),
+                        review_history=item.get("review_history") or [],
+                        error_message=item.get("error_message"),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        try:
+            return SessionInfo(
+                session_id=data["session_id"],
+                candidate_id=data.get("candidate_id", "UNKNOWN"),
+                exam_name=data.get("exam_name", "Saved session"),
+                started_at=data["started_at"],
+                ended_at=data.get("ended_at"),
+                source_name=data.get("source_name", "Unknown"),
+                frame_count=int(data.get("frame_count", 0)),
+                average_fps=float(data.get("average_fps", 0.0)),
+                events=events,
+                bookmarks=bookmarks,
+                schema_version=data.get("schema_version", "vigil.local-session.v1"),
+            )
+        except (KeyError, TypeError, ValueError):
+            return None

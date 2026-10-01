@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import queue
 import threading
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor, wait
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
@@ -18,7 +20,7 @@ from PIL import Image, ImageGrab, ImageTk
 from .audio import VoiceActivityDetector, speech_is_confirmed
 from .engine import GazeAnalyzer, OverlayRenderer
 from .events import EventDetector, SessionStore
-from .models import EventType, MonitoringEvent, SessionInfo, Severity
+from .models import EventType, MonitoringEvent, ProctorBookmark, SessionInfo, Severity
 from .sources import CameraSource, DemoSource, FrameSource, VideoSource
 from .theme import COLORS, FONTS, THEMES, set_theme
 
@@ -38,6 +40,63 @@ def wait_for_worker_shutdown(
     if worker is not None and worker.is_alive() and worker is not threading.current_thread():
         worker.join(timeout=timeout)
     return worker is None or not worker.is_alive()
+
+
+def persist_local_bookmark(
+    evidence_dir: Path,
+    *,
+    session_id: str,
+    frame_id: int,
+    session_elapsed_ms: float,
+    frame,
+    note: str,
+    source_kind: str,
+    source_ref: str,
+    simulation: bool,
+) -> ProctorBookmark:
+    """Encode and atomically persist one Local frame outside the Tk thread."""
+    bookmark_id = uuid.uuid4().hex[:12].upper()
+    now = datetime.now().isoformat(timespec="milliseconds")
+    height, width = frame.shape[:2]
+    bookmark = ProctorBookmark(
+        bookmark_id=bookmark_id,
+        request_id=uuid.uuid4().hex,
+        session_id=session_id,
+        frame_id=frame_id,
+        session_elapsed_ms=session_elapsed_ms,
+        captured_at=now,
+        created_at=now,
+        note=note,
+        source_kind=source_kind,
+        source_ref=source_ref,
+        simulation=simulation,
+        coordinate_space={
+            "name": "PREPARED_SOURCE_FRAME_PIXELS",
+            "origin": "TOP_LEFT",
+            "width": int(width),
+            "height": int(height),
+            "mirrored": source_kind in {"CAMERA", "VIDEO"},
+        },
+    )
+    final_path = evidence_dir / f"{session_id}_BOOKMARK_{bookmark_id}.jpg"
+    temp_path = evidence_dir / f".{session_id}_BOOKMARK_{bookmark_id}.tmp"
+    try:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        ok, encoded = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 92])
+        if not ok:
+            raise OSError("Không thể mã hóa ảnh bookmark")
+        payload = encoded.tobytes()
+        temp_path.write_bytes(payload)
+        temp_path.replace(final_path)
+        bookmark.snapshot_path = str(final_path)
+        bookmark.sha256 = hashlib.sha256(payload).hexdigest()
+        bookmark.evidence_status = "READY"
+    except Exception as exc:
+        if temp_path.exists():
+            temp_path.unlink()
+        bookmark.evidence_status = "FAILED"
+        bookmark.error_message = str(exc)
+    return bookmark
 
 
 class Card(tk.Frame):
@@ -157,6 +216,9 @@ class ExamMonitorApp(tk.Tk):
         # Keep them on a separate unbounded queue so alerts and camera errors
         # cannot be dropped when rendering falls briefly behind.
         self._message_queue: queue.Queue = queue.Queue()
+        self._bookmark_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="bookmark-io")
+        self._bookmark_futures = set()
+        self._bookmark_futures_lock = threading.Lock()
         self._photo = None
         self._page_name = "dashboard"
         self._video_path: Path | None = None
@@ -180,6 +242,7 @@ class ExamMonitorApp(tk.Tk):
         self.bind("<Configure>", self._handle_vertical_resize, add="+")
         self.bind("<F11>", self._toggle_presentation)
         self.bind("<Escape>", self._exit_presentation)
+        self.bind("<Control-b>", lambda _event: self._capture_bookmark())
         self._show_page("dashboard")
         self.after(35, self._poll_frames)
         self.after(700, self._tick_clock)
@@ -782,6 +845,15 @@ class ExamMonitorApp(tk.Tk):
         self.start_button = PillButton(actions, text="BẮT ĐẦU GIÁM SÁT", command=self.start_session)
         self.start_button.grid(row=0, column=0, sticky="ew")
         self.stop_button = PillButton(actions, text="KẾT THÚC PHIÊN", variant="danger", command=self.stop_session, state="disabled")
+        self.bookmark_button = PillButton(
+            actions,
+            text="ĐÁNH DẤU FRAME  (CTRL+B)",
+            variant="secondary",
+            command=self._capture_bookmark,
+            state="disabled",
+            pady=7,
+        )
+        self.bookmark_button.grid(row=1, column=0, sticky="ew", pady=(7, 0))
         control.grid_rowconfigure(7, weight=1)
         return page
 
@@ -818,6 +890,7 @@ class ExamMonitorApp(tk.Tk):
         tools.grid(row=0, column=0, sticky="ew", pady=(0, 12))
         tk.Label(tools, text="Tất cả sự kiện được sinh theo ngưỡng thời gian và cần giám thị xem lại.", bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["small"]).pack(side="left")
         PillButton(tools, text="ĐÁNH DẤU ĐÃ XEM", variant="secondary", command=self._review_selected_event).pack(side="right")
+        PillButton(tools, text="MỞ PHIÊN ĐÃ LƯU", variant="secondary", command=self._load_latest_session).pack(side="right", padx=(0, 8))
 
         card = Card(page)
         card.grid(row=1, column=0, sticky="nsew")
@@ -1055,6 +1128,8 @@ class ExamMonitorApp(tk.Tk):
             source_name=source.label,
         )
         self.detector.reset()
+        self.last_raw_frame = None
+        self.last_display_frame = None
         self._alert_toast_until = 0.0
         self._alert_toast_priority = -1
         self._drain_worker_queues()
@@ -1068,6 +1143,7 @@ class ExamMonitorApp(tk.Tk):
         self.start_button.grid_remove()
         self.stop_button.configure(state="normal")
         self.stop_button.grid(row=0, column=0, sticky="ew")
+        self.bookmark_button.configure(state="normal")
         self.source_combo.configure(state="disabled")
         self.candidate_entry.configure(state="disabled")
         self.exam_entry.configure(state="disabled")
@@ -1079,6 +1155,55 @@ class ExamMonitorApp(tk.Tk):
         self._worker = threading.Thread(target=self._monitoring_loop, daemon=False, name="monitoring-worker")
         self._worker.start()
         self._toast("Phiên giám sát đã bắt đầu")
+
+    def _capture_bookmark(self) -> None:
+        """Freeze the current prepared frame, then persist it on the I/O worker."""
+        if not self.monitoring or self.session is None or self.last_raw_frame is None:
+            self._toast("Chưa có frame đang giám sát để đánh dấu", danger=True)
+            return
+        frame = self.last_raw_frame.copy()
+        session = self.session
+        frame_id = session.frame_count
+        elapsed_ms = max(0.0, (time.monotonic() - self._session_started_monotonic) * 1000.0)
+        note = simpledialog.askstring(
+            "Đánh dấu frame nghi ngờ",
+            "Mô tả hành vi quan sát được (không tự động kết luận gian lận):",
+            parent=self,
+        )
+        if note is None:
+            return
+        if isinstance(self.source, DemoSource):
+            source_kind, source_ref, simulation = "SIMULATION", "built-in-demo", True
+        elif isinstance(self.source, VideoSource):
+            source_kind = "VIDEO"
+            source_ref = str(getattr(self.source, "path", self._video_path or ""))
+            simulation = False
+        else:
+            source_kind, source_ref, simulation = "CAMERA", "camera:0", False
+
+        future = self._bookmark_executor.submit(
+            persist_local_bookmark,
+            self.store.evidence_dir,
+            session_id=session.session_id,
+            frame_id=frame_id,
+            session_elapsed_ms=elapsed_ms,
+            frame=frame,
+            note=note.strip(),
+            source_kind=source_kind,
+            source_ref=source_ref,
+            simulation=simulation,
+        )
+        with self._bookmark_futures_lock:
+            self._bookmark_futures.add(future)
+
+        def completed(done_future) -> None:
+            try:
+                self._put_message("bookmark_saved", done_future.result())
+            except Exception as exc:
+                self._put_message("error", f"Không thể lưu bookmark: {exc}")
+
+        future.add_done_callback(completed)
+        self._toast("Đang lưu frame đã đánh dấu…")
 
     def _monitoring_loop(self) -> None:
         assert self.source is not None and self.session is not None
@@ -1247,6 +1372,25 @@ class ExamMonitorApp(tk.Tk):
             self._toast(payload, danger=True)
         elif kind == "worker_stopped" and self.monitoring and not self._stop_worker.is_set():
             self.after(100, self.stop_session)
+        elif kind == "bookmark_saved":
+            self._on_bookmark_saved(payload)
+
+    def _on_bookmark_saved(self, bookmark: ProctorBookmark) -> None:
+        with self._bookmark_futures_lock:
+            self._bookmark_futures = {future for future in self._bookmark_futures if not future.done()}
+        target = self.session if self.session and self.session.session_id == bookmark.session_id else self.last_session
+        if target is None or target.session_id != bookmark.session_id:
+            return
+        if any(item.bookmark_id == bookmark.bookmark_id for item in target.bookmarks):
+            return
+        target.bookmarks.append(bookmark)
+        self.store.save_session(target)
+        if self._page_name == "events":
+            self._refresh_events()
+        if bookmark.evidence_status == "READY":
+            self._toast("Đã lưu bookmark của giám thị")
+        else:
+            self._toast(f"Bookmark đã ghi nhận nhưng ảnh lỗi: {bookmark.error_message}", danger=True)
 
     def _render_video(self, frame) -> None:
         width = max(320, self.video_label.winfo_width())
@@ -1360,6 +1504,19 @@ class ExamMonitorApp(tk.Tk):
         self._alert_toast_priority = priority
         self._toast(f"Cảnh báo: {event.label}", danger=event.severity is Severity.HIGH)
 
+    def _wait_for_bookmark_io(self, timeout: float = 5.0) -> bool:
+        with self._bookmark_futures_lock:
+            pending = list(self._bookmark_futures)
+        if not pending:
+            return True
+        completed, unfinished = wait(pending, timeout=timeout)
+        for future in completed:
+            try:
+                self._on_bookmark_saved(future.result())
+            except Exception as exc:
+                self._toast(f"Không thể lưu bookmark: {exc}", danger=True)
+        return not unfinished
+
     def stop_session(self) -> None:
         if not self.monitoring:
             return
@@ -1374,6 +1531,17 @@ class ExamMonitorApp(tk.Tk):
                 parent=self,
             )
             return
+        if not self._wait_for_bookmark_io(timeout=5.0):
+            self.session_status.configure(
+                text="Bookmark I/O is still running; session has not been finalized.",
+                fg=COLORS["danger"],
+            )
+            messagebox.showerror(
+                "Unable to save bookmark safely",
+                "A marked frame is still being written. Please try stopping again.",
+                parent=self,
+            )
+            return
         self.monitoring = False
         if self.session:
             self.session.ended_at = datetime.now().isoformat(timespec="seconds")
@@ -1384,6 +1552,7 @@ class ExamMonitorApp(tk.Tk):
         self.start_button.grid(row=0, column=0, sticky="ew")
         self.stop_button.configure(state="disabled")
         self.stop_button.grid_remove()
+        self.bookmark_button.configure(state="disabled")
         self.source_combo.configure(state="readonly")
         self.candidate_entry.configure(state="normal")
         self.exam_entry.configure(state="normal")
@@ -1440,6 +1609,30 @@ class ExamMonitorApp(tk.Tk):
             return self.last_session.events
         return []
 
+    def _load_latest_session(self) -> None:
+        if self.monitoring:
+            self._toast("Hãy kết thúc phiên hiện tại trước khi mở lịch sử", danger=True)
+            return
+        sessions = self.store.list_sessions()
+        if not sessions:
+            self._toast("Chưa có phiên đã lưu")
+            return
+        loaded = self.store.load_session(sessions[0].get("session_id", ""))
+        if loaded is None:
+            self._toast("Không thể đọc phiên đã lưu", danger=True)
+            return
+        self.last_session = loaded
+        self._refresh_events()
+        self._refresh_report()
+        self._toast(f"Đã mở phiên {loaded.session_id}")
+
+    def _current_bookmarks(self) -> list[ProctorBookmark]:
+        if self.session:
+            return self.session.bookmarks
+        if self.last_session:
+            return self.last_session.bookmarks
+        return []
+
     def _refresh_events(self) -> None:
         for item in self.event_tree.get_children():
             self.event_tree.delete(item)
@@ -1448,8 +1641,23 @@ class ExamMonitorApp(tk.Tk):
             self.event_tree.insert(
                 "",
                 "end",
-                iid=event.event_id,
+                iid=f"ai:{event.event_id}",
                 values=(time_text, event.label, event.severity_label, f"{event.duration_seconds:.1f}s", f"{event.confidence * 100:.0f}%", event.review_status),
+            )
+        for bookmark in reversed(self._current_bookmarks()):
+            time_text = bookmark.captured_at.split("T")[-1]
+            self.event_tree.insert(
+                "",
+                "end",
+                iid=f"bookmark:{bookmark.bookmark_id}",
+                values=(
+                    time_text,
+                    "Frame do giám thị đánh dấu",
+                    "HUMAN",
+                    f"{bookmark.session_elapsed_ms / 1000:.1f}s",
+                    "—",
+                    bookmark.review_decision,
+                ),
             )
 
     def _review_selected_event(self) -> None:
@@ -1457,7 +1665,14 @@ class ExamMonitorApp(tk.Tk):
         if not selected:
             self._toast("Hãy chọn một sự kiện trước")
             return
-        event_id = selected[0]
+        selected_id = selected[0]
+        if selected_id.startswith("bookmark:"):
+            bookmark_id = selected_id.split(":", 1)[1]
+            bookmark = next((item for item in self._current_bookmarks() if item.bookmark_id == bookmark_id), None)
+            if bookmark is not None:
+                self._open_bookmark_viewer(bookmark)
+            return
+        event_id = selected_id.split(":", 1)[-1]
         events = self._current_events()
         event = next((item for item in events if item.event_id == event_id), None)
         if event is None:
@@ -1472,6 +1687,114 @@ class ExamMonitorApp(tk.Tk):
             self.store.save_session(target)
         self._refresh_events()
         self._toast("Đã cập nhật trạng thái cảnh báo")
+
+    def _open_bookmark_viewer(self, bookmark: ProctorBookmark) -> None:
+        window = tk.Toplevel(self)
+        window.title(f"Proctor bookmark {bookmark.bookmark_id}")
+        window.geometry("900x680")
+        window.configure(bg=COLORS["bg"])
+        window.transient(self)
+
+        header = tk.Frame(window, bg=COLORS["surface"])
+        header.pack(fill="x")
+        tk.Label(
+            header,
+            text="FRAME DO GIÁM THỊ ĐÁNH DẤU",
+            bg=COLORS["surface"],
+            fg=COLORS["text"],
+            font=FONTS["h2"],
+        ).pack(side="left", padx=16, pady=12)
+        tk.Label(
+            header,
+            text=f"{bookmark.source_kind} • frame {bookmark.frame_id} • {bookmark.session_elapsed_ms / 1000:.1f}s",
+            bg=COLORS["surface"],
+            fg=COLORS["text_muted"],
+            font=FONTS["mono"],
+        ).pack(side="right", padx=16)
+
+        image_label = tk.Label(window, bg=COLORS["video_bg"], fg=COLORS["text_muted"])
+        image_label.pack(fill="both", expand=True, padx=16, pady=12)
+        original = None
+        if bookmark.snapshot_path:
+            try:
+                root = self.store.evidence_dir.resolve()
+                image_path = Path(bookmark.snapshot_path).resolve()
+                image_path.relative_to(root)
+                original = Image.open(image_path).convert("RGB")
+            except (OSError, ValueError):
+                original = None
+        zoom = {"value": 1.0}
+
+        def render() -> None:
+            if original is None:
+                image_label.configure(text=f"Ảnh không khả dụng\n{bookmark.error_message or ''}", image="")
+                return
+            max_width, max_height = 840, 490
+            scale = min(max_width / original.width, max_height / original.height) * zoom["value"]
+            size = (max(1, int(original.width * scale)), max(1, int(original.height * scale)))
+            photo = ImageTk.PhotoImage(original.resize(size, Image.Resampling.LANCZOS))
+            image_label.configure(image=photo, text="")
+            image_label.image = photo
+
+        def change_zoom(delta: float) -> None:
+            zoom["value"] = min(2.0, max(0.5, zoom["value"] + delta))
+            render()
+
+        render()
+        footer = tk.Frame(window, bg=COLORS["surface"])
+        footer.pack(fill="x", padx=16, pady=(0, 16))
+        tk.Label(
+            footer,
+            text=bookmark.note or "Không có ghi chú ban đầu.",
+            wraplength=420,
+            justify="left",
+            bg=COLORS["surface"],
+            fg=COLORS["text_muted"],
+            font=FONTS["body"],
+        ).pack(side="left", padx=10, pady=10)
+        PillButton(footer, text="−", variant="secondary", command=lambda: change_zoom(-0.25), padx=12, pady=6).pack(side="left", padx=3)
+        PillButton(footer, text="+", variant="secondary", command=lambda: change_zoom(0.25), padx=12, pady=6).pack(side="left", padx=3)
+        for decision, label in (
+            ("INCONCLUSIVE", "CHƯA ĐỦ CĂN CỨ"),
+            ("REJECTED", "BỎ QUA"),
+            ("CONFIRMED", "XÁC NHẬN QUAN SÁT"),
+        ):
+            PillButton(
+                footer,
+                text=label,
+                variant="secondary",
+                command=lambda value=decision: self._review_local_bookmark(bookmark, value, window),
+                padx=10,
+                pady=6,
+            ).pack(side="right", padx=3)
+
+    def _review_local_bookmark(self, bookmark: ProctorBookmark, decision: str, window: tk.Toplevel) -> None:
+        note = simpledialog.askstring(
+            "Quyết định của giám thị",
+            "Ghi chú cho quyết định này:",
+            initialvalue=bookmark.note,
+            parent=window,
+        )
+        if note is None:
+            return
+        previous = bookmark.review_decision
+        bookmark.review_decision = decision
+        bookmark.note = note.strip()
+        bookmark.review_history.append(
+            {
+                "previous_decision": previous,
+                "decision": decision,
+                "reviewer_id": "Local_Proctor",
+                "note": bookmark.note,
+                "reviewed_at": datetime.now().isoformat(timespec="seconds"),
+            }
+        )
+        target = self.session or self.last_session
+        if target:
+            self.store.save_session(target)
+        self._refresh_events()
+        window.destroy()
+        self._toast("Đã lưu quyết định của giám thị")
 
     def _refresh_report(self) -> None:
         session = self.session or self.last_session
@@ -1560,9 +1883,24 @@ class ExamMonitorApp(tk.Tk):
         if path:
             with Path(path).open("w", encoding="utf-8-sig", newline="") as handle:
                 writer = csv.writer(handle)
-                writer.writerow(["Mã sự kiện", "Loại", "Mức độ", "Bắt đầu", "Thời lượng", "Tin cậy", "Lý do", "Trạng thái", "Ghi chú"])
+                writer.writerow(["ID", "Nguồn", "Loại", "Mức độ", "Bắt đầu", "Thời lượng", "Tin cậy", "Lý do", "Trạng thái", "Ghi chú", "Ảnh", "SHA-256"])
                 for event in session.events:
-                    writer.writerow([event.event_id, event.label, event.severity_label, event.started_at, event.duration_seconds, event.confidence, event.reason, event.review_status, event.reviewer_note])
+                    writer.writerow([event.event_id, "AI_SIGNAL", event.label, event.severity_label, event.started_at, event.duration_seconds, event.confidence, event.reason, event.review_status, event.reviewer_note, event.evidence_path, ""])
+                for bookmark in session.bookmarks:
+                    writer.writerow([
+                        bookmark.bookmark_id,
+                        "PROCTOR_BOOKMARK",
+                        "Frame do giám thị đánh dấu",
+                        "HUMAN",
+                        bookmark.captured_at,
+                        bookmark.session_elapsed_ms / 1000,
+                        "",
+                        "Observable frame selected by human proctor",
+                        bookmark.review_decision,
+                        bookmark.note,
+                        bookmark.snapshot_path,
+                        bookmark.sha256,
+                    ])
             self._toast("Đã xuất danh sách CSV")
 
     def _setting_changed(self, event_type: EventType) -> None:
@@ -1608,8 +1946,9 @@ class ExamMonitorApp(tk.Tk):
     def _on_close(self) -> None:
         if self.monitoring:
             self.stop_session()
-            if self._worker and self._worker.is_alive():
+            if self.monitoring or (self._worker and self._worker.is_alive()):
                 return
+        self._bookmark_executor.shutdown(wait=True, cancel_futures=False)
         if self.analyzer:
             try:
                 self.analyzer.close()

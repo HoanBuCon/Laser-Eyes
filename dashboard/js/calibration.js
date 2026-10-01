@@ -249,8 +249,8 @@ function setEditorMode(mode) {
 
     if (btnSelect && btnDraw) {
         if (mode === 'SELECT') {
-            btnSelect.className = 'px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-cyan-600 text-white shadow';
-            btnDraw.className = 'px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-1.5';
+            btnSelect.setAttribute('aria-pressed', 'true');
+            btnDraw.setAttribute('aria-pressed', 'false');
             canvas.style.cursor = hoveredSeatIndex !== null ? 'pointer' : 'default';
             if (currentPolygon.length > 0) {
                 currentPolygon = [];
@@ -262,8 +262,8 @@ function setEditorMode(mode) {
                 setDrawingStatus('SELECT MODE (CLICK SEAT)', 'text-cyan-400');
             }
         } else { // DRAW
-            btnDraw.className = 'px-2.5 py-1 rounded-md text-xs font-semibold transition flex items-center gap-1.5 bg-amber-600 text-white shadow';
-            btnSelect.className = 'px-2.5 py-1 rounded-md text-xs font-semibold text-gray-400 hover:text-white transition flex items-center gap-1.5';
+            btnDraw.setAttribute('aria-pressed', 'true');
+            btnSelect.setAttribute('aria-pressed', 'false');
             canvas.style.cursor = 'crosshair';
             selectedSeatIndex = null;
             hoveredSeatIndex = null;
@@ -699,10 +699,10 @@ function renderSeatList() {
             </div>
 
             <div class="flex items-center gap-1" onclick="event.stopPropagation()">
-                <button onclick="toggleSeatEnabled(${idx})" class="p-1.5 rounded hover:bg-gray-800 text-gray-400 hover:text-cyan-300 transition" title="Toggle Enable/Disable">
+                <button onclick="toggleSeatEnabled(${idx})" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded hover:bg-gray-800 text-gray-400 hover:text-cyan-300 transition" title="Toggle Enable/Disable">
                     ${s.enabled ? '🟢' : '⚪'}
                 </button>
-                <button onclick="deleteSeat(${idx})" class="p-1.5 rounded hover:bg-red-950 text-gray-400 hover:text-red-400 transition" title="Delete Seat (Del)">
+                <button onclick="deleteSeat(${idx})" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded hover:bg-red-950 text-gray-400 hover:text-red-400 transition" title="Delete Seat (Del)">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>

@@ -201,6 +201,9 @@ class ExamSession(Base):
     events = relationship(
         "DetectionEvent", back_populates="session", cascade="all, delete-orphan"
     )
+    proctor_bookmarks = relationship(
+        "ProctorBookmark", back_populates="session", cascade="all, delete-orphan"
+    )
 
 
 class DetectionEvent(Base):
@@ -323,6 +326,62 @@ class AuditLog(Base):
     resource_id = Column(String(100), nullable=True)
     metadata_json = Column(Text, nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class ProctorBookmark(Base):
+    """Human-created observation bookmark; deliberately separate from AI events."""
+
+    __tablename__ = "proctor_bookmarks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    request_id = Column(String(64), nullable=False, unique=True, index=True)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=False, index=True)
+    run_id = Column(String(100), nullable=False, index=True)
+    source_product = Column(String(30), nullable=False, default="CLASSROOM")
+    source_kind = Column(String(30), nullable=False, default="VIDEO")
+    source_ref = Column(String(500), nullable=True)
+    frame_id = Column(Integer, nullable=False)
+    source_timestamp_ms = Column(Float, nullable=True)
+    session_elapsed_ms = Column(Float, nullable=True)
+    captured_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+    subject_ref = Column(String(100), nullable=True)
+    created_by = Column(String(100), nullable=False, default="Proctor_01")
+    note = Column(Text, default="")
+    review_decision = Column(String(20), nullable=False, default="PENDING")
+    linked_ai_incident_id = Column(String(36), nullable=True)
+    evidence_status = Column(String(20), nullable=False, default="PENDING")
+    snapshot_path = Column(String(500), nullable=True)
+    sha256 = Column(String(64), nullable=True)
+    file_size_bytes = Column(Integer, default=0)
+    error_message = Column(Text, nullable=True)
+    coordinate_space_json = Column(Text, nullable=True)
+    roi_snapshot_json = Column(Text, nullable=True)
+    simulation = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    session = relationship("ExamSession", back_populates="proctor_bookmarks")
+    reviews = relationship(
+        "ProctorBookmarkReview", back_populates="bookmark", cascade="all, delete-orphan"
+    )
+
+
+class ProctorBookmarkReview(Base):
+    """Append-only history of human decisions for a manual bookmark."""
+
+    __tablename__ = "proctor_bookmark_reviews"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    bookmark_id = Column(String(36), ForeignKey("proctor_bookmarks.id"), nullable=False, index=True)
+    reviewer_id = Column(String(100), nullable=False)
+    previous_decision = Column(String(20), nullable=False)
+    previous_note = Column(Text, default="")
+    decision = Column(String(20), nullable=False)
+    reason_code = Column(String(50), nullable=True)
+    note = Column(Text, default="")
+    reviewed_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+    bookmark = relationship("ProctorBookmark", back_populates="reviews")
 
 
 # ==============================================================================

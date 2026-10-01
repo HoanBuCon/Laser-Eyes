@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import builtins
 import json
+import re
 import threading
 import time
 import uuid
@@ -29,6 +30,7 @@ from classroom_monitor.behavior_pattern_engine import BehaviorPatternEngine, Pat
 from classroom_monitor.demo.config import DemoVideoConfig
 from classroom_monitor.demo.runtime import DemoRuntime
 from classroom_monitor.detector import ModelUnavailableError, PoseClassroomDetector
+from classroom_monitor.evidence_playback import ensure_browser_playback
 from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.observation_extractor import ObservationType, RawObservation
 from classroom_monitor.scene_context import SeatContext, SeatGraph, SeatNeighbors
@@ -605,7 +607,11 @@ def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, 
     duplicate = tmp_path / "data" / "demo_runs" / "old" / "evidence" / "same.mp4"
     target.parent.mkdir(parents=True)
     duplicate.parent.mkdir(parents=True)
-    target.write_bytes(b"canonical")
+    writer = cv2.VideoWriter(str(target), cv2.VideoWriter_fourcc(*"mp4v"), 5.0, (32, 24))
+    assert writer.isOpened()
+    for value in (32, 96, 160):
+        writer.write(np.full((24, 32, 3), value, dtype=np.uint8))
+    writer.release()
     duplicate.write_bytes(b"old")
     snapshot = target.with_suffix(".jpg")
     snapshot.write_bytes(b"snapshot")
@@ -643,7 +649,10 @@ def test_event_scoped_evidence_url_survives_duplicate_basenames(tmp_path: Path, 
     with TestClient(app) as client:
         response = client.get(payload["video_url"])
     assert response.status_code == 200
-    assert response.content == b"canonical"
+    expected_playback, is_derivative = ensure_browser_playback(target)
+    assert is_derivative is True
+    assert response.headers["x-vigil-playback-derivative"] == "true"
+    assert response.content == expected_playback.read_bytes()
 
 
 def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
@@ -652,6 +661,61 @@ def test_dashboard_review_cards_do_not_embed_inline_event_handlers():
     assert "function escapeHtml" in source
     assert "function apiFetch" in source
     assert "X-Vigil-Demo-Token" in source
+
+
+def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
+    html = Path("dashboard/demo.html").read_text(encoding="utf-8")
+    operations_html = Path("dashboard/index.html").read_text(encoding="utf-8")
+    calibration_html = Path("dashboard/calibration.html").read_text(encoding="utf-8")
+    workbench_html = Path("dashboard/data_workbench.html").read_text(encoding="utf-8")
+    css = Path("dashboard/css/demo.css").read_text(encoding="utf-8")
+    tokens = Path("dashboard/css/vigil-tokens.css").read_text(encoding="utf-8")
+    shell = Path("dashboard/css/vigil-shell.css").read_text(encoding="utf-8")
+    javascript = Path("dashboard/js/demo.js").read_text(encoding="utf-8")
+    operations_javascript = Path("dashboard/js/app.js").read_text(encoding="utf-8")
+
+    assert 'href="/static/css/vigil-tokens.css"' in html
+    assert 'href="/static/css/vigil-shell.css"' in html
+    assert 'href="/static/css/vigil-shell.css"' in operations_html
+    assert 'href="/static/css/vigil-shell.css"' in calibration_html
+    assert 'href="/static/css/vigil-shell.css"' in workbench_html
+    assert 'class="vigil-sidebar"' in html
+    assert 'class="vigil-sidebar"' in operations_html
+    assert 'class="vigil-sidebar"' in calibration_html
+    assert 'class="vigil-sidebar"' in workbench_html
+    assert 'id="reviewQueue"' in html
+    assert "--vigil-sidebar:" in tokens
+    assert ".vigil-sidebar" in shell
+    assert ".vigil-sidebar" not in css
+    assert "badge.dataset.connected" in javascript
+    assert "stateBadge.dataset.state" in javascript
+    assert "stateBadge.className" not in javascript
+    assert "btnIndia.className" not in javascript
+    assert '.text-white:not(.vigil-btn)' in shell
+    assert 'color: var(--vigil-primary-text) !important;' in css
+    for control_id, selected in (
+        ("btnPresetIndia", "true"),
+        ("btnPresetStudent", "false"),
+        ("btnModeLive", "true"),
+        ("btnModeReplay", "false"),
+    ):
+        control = re.search(rf'<button[^>]*id="{control_id}"[^>]*>', html)
+        assert control is not None
+        assert f'aria-pressed="{selected}"' in control.group(0)
+        assert not re.search(r'\b(?:text-white|text-gray-\d+|bg-(?:cyan|blue|gray)-\S+)', control.group(0))
+    assert "badge.dataset.connected" in operations_javascript
+    assert "btnSnap.className" not in operations_javascript
+    assert "Exam Cheating Surveillance" not in operations_html
+
+    html_ids = set(re.findall(r'id="([^"]+)"', html))
+    javascript_ids = set(re.findall(r"getElementById\('([^']+)'\)", javascript))
+    assert javascript_ids <= html_ids
+
+    operations_ids = set(re.findall(r'id="([^"]+)"', operations_html))
+    operations_javascript_ids = set(
+        re.findall(r"getElementById\('([^']+)'\)", operations_javascript)
+    )
+    assert operations_javascript_ids <= operations_ids
 
 
 def test_configured_demo_token_protects_api(monkeypatch):

@@ -60,6 +60,8 @@ from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatStat
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
+from proctor_support.contracts import SourceProduct
+from proctor_support.frame_store import CapturedFrame, FrameCaptureStore
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, DetectionEvent, EvidenceFile, ExamRoom, ExamSession, ExamSite, SeatROI
 
@@ -151,7 +153,9 @@ class DemoRuntime:
 
         self.status = DemoStatus()
         self.latest_frame: Optional[np.ndarray] = None
+        self.latest_raw_frame: Optional[np.ndarray] = None
         self.latest_jpeg: Optional[bytes] = None
+        self.frame_capture_store = FrameCaptureStore()
         self.emitted_events: Dict[str, Dict[str, Any]] = {}  # event_id -> dict
         self.emitted_events_list: List[Dict[str, Any]] = []
 
@@ -253,6 +257,37 @@ class DemoRuntime:
     def get_latest_jpeg(self) -> Optional[bytes]:
         with self._lock:
             return self.latest_jpeg
+
+    def capture_latest_frame(self) -> CapturedFrame:
+        """Create a short-lived token bound to the exact latest source frame."""
+        with self._lock:
+            if self.latest_raw_frame is None:
+                raise RuntimeError("No Classroom frame is available to capture")
+            if not self.status.run_id or not self.status.session_id:
+                raise RuntimeError("No durable Classroom run is active")
+            frame = self.latest_raw_frame.copy()
+            run_id = self.status.run_id
+            session_id = self.status.session_id
+            frame_id = self.status.frame_index
+            source_timestamp_ms = self.status.source_timestamp_ms
+            source_kind = "RECORDED_REPLAY" if self.status.mode == DemoMode.REPLAY.value else "VIDEO"
+            try:
+                source_ref = str(resolve_video_path(get_demo_config(self.status.preset).video_path))
+            except Exception:
+                source_ref = self.status.preset
+        return self.frame_capture_store.capture(
+            frame,
+            run_id=run_id,
+            session_id=session_id,
+            source_product=SourceProduct.CLASSROOM.value,
+            source_kind=source_kind,
+            source_ref=source_ref,
+            frame_id=frame_id,
+            source_timestamp_ms=source_timestamp_ms,
+        )
+
+    def get_captured_frame(self, capture_id: str) -> Optional[CapturedFrame]:
+        return self.frame_capture_store.get(capture_id)
 
     def start(
         self,
@@ -381,9 +416,11 @@ class DemoRuntime:
     def reset_state(self) -> None:
         self.status = DemoStatus()
         self.latest_frame = None
+        self.latest_raw_frame = None
         self.latest_jpeg = None
         self.emitted_events.clear()
         self.emitted_events_list.clear()
+        self.frame_capture_store.clear()
 
     # -------------------------------------------------------------------------
     # DB Persistence Helpers
@@ -877,6 +914,7 @@ class DemoRuntime:
 
                 with self._lock:
                     self.latest_frame = annotated_frame
+                    self.latest_raw_frame = frame.copy()
                     self.latest_jpeg = jpeg_bytes
                     self.status.frame_index = frame_idx
                     self.status.source_timestamp_ms = source_ts_ms
@@ -1111,6 +1149,7 @@ class DemoRuntime:
 
                 with self._lock:
                     self.latest_frame = frame
+                    self.latest_raw_frame = frame.copy()
                     self.latest_jpeg = jpeg_bytes
                     self.status.frame_index = frame_idx
                     self.status.source_timestamp_ms = source_ts_ms

@@ -61,13 +61,21 @@ The legacy `/api/v1/inference` route is disabled with HTTP 410 by default. `/api
 
 Evidence follows `PENDING → READY | FAILED`. `HASH VERIFIED` means the current file digest equals its stored SHA-256 digest; it is a file-integrity comparison, not a legally guaranteed chain of custody. AI status and human review decision are stored separately.
 
+Classroom evidence is archived unchanged. Because OpenCV may encode archived MP4 clips as `mp4v`, the web endpoint lazily creates a separate H.264 playback derivative for Chrome/Edge. Install `ffmpeg` and `ffprobe` on the demo machine and make both commands available on `PATH`; the displayed SHA-256 continues to refer to the archived source file, not the playback cache.
+
+## Proctor-support workflow
+
+AI Core is frozen while the prototype adds human workflow around its outputs. In Classroom, **Mark Frame** captures an immutable short-lived frame token, then persists a manual bookmark with optional seat/note, evidence hash, ROI crop, review history and JSON/CSV export. The combined queue labels AI incidents and human bookmarks separately. In Local, use **ĐÁNH DẤU FRAME** or `Ctrl+B`; saved bookmarks can be reopened from the event page and reviewed without converting them into AI events.
+
+See [the acceptance checklist](docs/PROCTOR_SUPPORT_ACCEPTANCE.md) for the manual demo flow and current limitations.
+
 ## Tests
 
 ```powershell
 venv\Scripts\python.exe -m pytest
 ```
 
-The final remediated suite collected and passed 259 tests. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
+The current suite collected and passed 271 tests on 2026-09-30. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
 
 ## Documentation status
 

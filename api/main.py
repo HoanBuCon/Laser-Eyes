@@ -29,6 +29,7 @@ from api.routes import (
     demo,
     events,
     inference,
+    proctor,
     rooms,
     seats,
     sessions,
@@ -131,6 +132,7 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(workers.router, prefix=prefix)
     app.include_router(statistics.router, prefix=prefix)
     app.include_router(inference.router, prefix=prefix)
+    app.include_router(proctor.router, prefix=prefix)
     app.include_router(data_workbench.router, prefix=prefix)
 
 

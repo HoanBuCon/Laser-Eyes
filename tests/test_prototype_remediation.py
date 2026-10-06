@@ -348,6 +348,8 @@ def test_live_worker_crosses_first_incident_and_persists_evidence(tmp_path: Path
         save_evidence=True,
         max_frames=6,
         allow_mock=True,
+        # A LIVE run refuses to start without a seat calibration.
+        seats_preset=[{"seat_code": "S1", "polygon_json": [[0, 0], [80, 0], [80, 64], [0, 64]]}],
     )
 
     detection = Detection(0, "person", 0.9, (10, 5, 70, 60), keypoints=np.zeros((17, 3)))

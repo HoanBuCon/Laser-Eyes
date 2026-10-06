@@ -217,6 +217,9 @@ def resolve_runtime_config(
         "cache_max_age_ms": float(scene_thresholds.get("cache_max_age_ms", base.head_estimate_max_age_ms)),
         "min_crop_size": int(scene_thresholds.get("min_crop_size", base.head_min_crop_size)),
         "min_quality": float(scene_thresholds.get("min_quality", base.head_min_quality)),
+        "adaptive_baseline": bool(scene_thresholds.get("adaptive_baseline", True)),
+        "baseline_window_ms": float(scene_thresholds.get("baseline_window_ms", 60000.0)),
+        "baseline_min_samples": int(scene_thresholds.get("baseline_min_samples", 10)),
     }
 
     # 2. Temporal Episodes
@@ -241,6 +244,7 @@ def resolve_runtime_config(
         "seat_left_timeout_ms": float(pat_scene.get("seat_left_timeout_ms", 15000.0)),
         "multi_person_dwell_ms": float(pat_scene.get("multi_person_dwell_ms", 2500.0)),
         "below_desk_min_duration_ms": float(pat_scene.get("below_desk_min_duration_ms", 1500.0)),
+        "glance_merge_gap_ms": float(pat_scene.get("glance_merge_gap_ms", base.head_merge_gap_ms)),
     }
 
     # 4. Seat Risk Tracker

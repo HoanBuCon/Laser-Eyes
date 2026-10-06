@@ -87,9 +87,14 @@ class SeatRiskProfile:
     pattern_history_counts: Dict[str, int] = field(default_factory=dict)
     recent_patterns: deque[BehaviorPattern] = field(default_factory=lambda: deque(maxlen=10))
 
+    # Incident window: everything since the previous incident.  The peak
+    # detection/frame and the pattern used to label the next incident are
+    # taken from this window only, never from earlier incidents.
     peak_detection: Optional[Detection] = None
     peak_frame_image: Optional[np.ndarray] = None
     peak_pattern: Optional[BehaviorPattern] = None
+    window_peak_score: float = 0.0
+    window_patterns: List[Tuple[float, float, BehaviorPattern]] = field(default_factory=list)
 
     total_event_count: int = 0
     total_incidents_count: int = 0
@@ -116,6 +121,7 @@ class SeatRiskTracker:
         suspicious_threshold: float = 60.0,
         flagged_threshold: float = 80.0,
         post_event_reset_score: float = 45.0,
+        label_window_ms: float = 30000.0,
     ):
         self.room_id = room_id
         self.camera_id = camera_id
@@ -127,6 +133,8 @@ class SeatRiskTracker:
         self.suspicious_threshold = suspicious_threshold
         self.flagged_threshold = flagged_threshold
         self.post_event_reset_score = post_event_reset_score
+        # Patterns older than this cannot name a new incident.
+        self.label_window_ms = label_window_ms
 
         self.profiles: Dict[str, SeatRiskProfile] = {}
 
@@ -207,16 +215,8 @@ class SeatRiskTracker:
                 profile.pattern_history_counts[pat.pattern_type] = history_count + 1
                 profile.processed_pattern_ids.add(pat.pattern_id)
                 profile.recent_patterns.append(pat)
-
                 if pat.pattern_type in PATTERN_PRIORITY_WEIGHTS:
-                    current_peak_weight = (
-                        PATTERN_PRIORITY_WEIGHTS.get(profile.peak_pattern.pattern_type, -1.0)
-                        * profile.peak_pattern.quality
-                        * profile.peak_pattern.confidence
-                        if profile.peak_pattern is not None else -1.0
-                    )
-                    if increment > current_peak_weight:
-                        profile.peak_pattern = pat
+                    profile.window_patterns.append((timestamp_ms, increment, pat))
 
                 # Update ongoing active incident if present
                 if (
@@ -251,13 +251,21 @@ class SeatRiskTracker:
             # Correlated head + torso movement bonus
             profile.risk_score = min(100.0, profile.risk_score + (3.0 * dt_sec))
 
-        # Track Peak values
+        # Track peak values: all-time score for reporting, window peak for evidence
         if profile.risk_score > profile.peak_risk_score:
             profile.peak_risk_score = profile.risk_score
+        if profile.risk_score > profile.window_peak_score:
+            profile.window_peak_score = profile.risk_score
             if detection:
                 profile.peak_detection = detection
             if frame_image is not None:
                 profile.peak_frame_image = frame_image.copy()
+        profile.window_patterns = [
+            item for item in profile.window_patterns if (timestamp_ms - item[0]) <= self.label_window_ms
+        ]
+        profile.peak_pattern = (
+            max(profile.window_patterns, key=lambda item: item[1])[2] if profile.window_patterns else None
+        )
 
         # 7. Recidivism Check (Measured escalation only when not in ongoing incident)
         is_recidivist = (
@@ -334,6 +342,7 @@ class SeatRiskTracker:
                 profile.current_state = RiskState.COOLDOWN.value
                 profile.cooldown_enter_timestamp_ms = timestamp_ms
                 profile.risk_score = self.post_event_reset_score
+                self._reset_incident_window(profile)
 
             else:
                 # Emit a DISTINCT new human incident event
@@ -385,7 +394,10 @@ class SeatRiskTracker:
                     severity=severity,
                     timestamp=timestamp_ms / 1000.0,
                     timestamp_ms=timestamp_ms,
-                    bbox=profile.peak_detection.bbox if profile.peak_detection else (0.0, 0.0, 0.0, 0.0),
+                    bbox=(
+                        profile.peak_detection.bbox if profile.peak_detection
+                        else (detection.bbox if detection is not None else (0.0, 0.0, 0.0, 0.0))
+                    ),
                     frame_index=int(timestamp_ms / 33.33),
                     evidence_frame=profile.peak_frame_image if profile.peak_frame_image is not None else frame_image,
                     seat_id=seat_id,
@@ -394,6 +406,7 @@ class SeatRiskTracker:
                     is_recidivist=profile.is_recidivist,
                     metadata={
                         "risk_score": round(profile.risk_score, 1),
+                        "trigger_risk_score": round(profile.risk_score, 1),
                         "peak_risk_score": round(profile.peak_risk_score, 1),
                         "primary_pattern": primary_pattern_name,
                         "supporting_cues": supporting_cues,
@@ -412,9 +425,18 @@ class SeatRiskTracker:
                 profile.current_state = RiskState.COOLDOWN.value
                 profile.cooldown_enter_timestamp_ms = timestamp_ms
                 profile.risk_score = self.post_event_reset_score
+                self._reset_incident_window(profile)
 
         elif new_state != previous_state:
             profile.current_state = new_state
             profile.state_enter_timestamp_ms = timestamp_ms
 
         return event_to_emit
+
+    def _reset_incident_window(self, profile: SeatRiskProfile) -> None:
+        """Start a fresh window so the next incident has its own label and evidence."""
+        profile.window_patterns.clear()
+        profile.window_peak_score = profile.risk_score
+        profile.peak_pattern = None
+        profile.peak_detection = None
+        profile.peak_frame_image = None

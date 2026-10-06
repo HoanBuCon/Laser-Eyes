@@ -48,6 +48,8 @@ from classroom_monitor.temporal_episode_engine import (
 )
 
 
+# Head yaw is subject-centric and the camera faces the candidate: a nose offset
+# toward the image-left means the candidate turned to THEIR right.
 def _create_mock_detection(
     bbox=(100, 100, 250, 300),
     confidence=0.90,
@@ -240,7 +242,7 @@ def test_case_p05_head_turn_no_neighbor_gating():
         # Turn left for 600ms
         for step in range(7):
             t_ms = base_t + step * 100.0
-            det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+            det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
             obs = extractor.extract(det, ctx, t_ms)
             eps = ep_engine.process_observations(obs, t_ms)
             pats = pat_engine.ingest_episodes(eps, ep_engine.completed_episodes, ctx, t_ms)
@@ -278,7 +280,7 @@ def test_case_p06_valid_neighbor_gating():
 
     # Episode 1: Turn Left (0 to 600ms)
     for t in [0.0, 100.0, 200.0, 300.0, 400.0, 500.0, 600.0]:
-        det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t)
         eps = ep_engine.process_observations(obs, t)
         pat_engine.ingest_episodes(eps, ep_engine.completed_episodes, ctx, t)
@@ -292,7 +294,7 @@ def test_case_p06_valid_neighbor_gating():
 
     # Episode 2: Turn Left Again (1600 to 2200ms)
     for t in [1600.0, 1800.0, 2000.0, 2200.0]:
-        det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t)
         eps = ep_engine.process_observations(obs, t)
         pats = pat_engine.ingest_episodes(eps, ep_engine.completed_episodes, ctx, t)
@@ -319,7 +321,7 @@ def test_case_p07_missing_head_observations_grace_timeout():
     active_eps = []
     for step in range(7):
         t_ms = step * 100.0
-        det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t_ms)
         active_eps = ep_engine.process_observations(obs, t_ms)
 
@@ -363,7 +365,7 @@ def test_case_p08_missing_head_observations_short_gap_recovery():
     # Start turn right (0 to 600ms)
     for step in range(7):
         t_ms = step * 100.0
-        det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t_ms)
         ep_engine.process_observations(obs, t_ms)
 
@@ -377,7 +379,7 @@ def test_case_p08_missing_head_observations_short_gap_recovery():
     latest_eps = []
     for step in range(10, 16):
         t_ms = step * 100.0
-        det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t_ms)
         latest_eps = ep_engine.process_observations(obs, t_ms)
 

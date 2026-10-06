@@ -164,6 +164,21 @@ class SeatOccupancy:
     consecutive_empty_frames: int = 0
     consecutive_occupied_frames: int = 0
     candidate_detections: List[Detection] = field(default_factory=list)
+    # Person-count baseline: how many people normally sit in this ROI (e.g. a
+    # desk mate inside a two-person ROI).  Only people beyond it count as an
+    # additional person near the seat.
+    person_count: int = 0
+    established_person_count: Optional[int] = None
+    pending_person_count: Optional[int] = None
+    pending_since_ms: float = 0.0
+    last_primary_bbox: Optional[Tuple[int, int, int, int]] = None
+
+    @property
+    def expected_person_count(self) -> int:
+        capacity = int(self.seat.metadata.get("capacity", 1) or 1) if self.seat.metadata else 1
+        # Until a baseline has settled, the current count is treated as normal.
+        learned = self.established_person_count if self.established_person_count is not None else self.person_count
+        return max(1, capacity, learned)
 
 
 class SeatManager:
@@ -175,11 +190,21 @@ class SeatManager:
         camera_id: Optional[str] = None,
         empty_timeout_ms: float = 5000.0,
         occlusion_grace_period_ms: float = 4000.0,
+        count_settle_ms: float = 1000.0,
+        count_decrease_ms: float = 10000.0,
+        count_increase_ms: float = 60000.0,
     ):
         self.room_id = room_id
         self.camera_id = camera_id
         self.empty_timeout_ms = empty_timeout_ms
         self.occlusion_grace_period_ms = occlusion_grace_period_ms
+        # Person-count baseline: settles on the first stable count, follows a
+        # lower count only after a long absence (brief missed detections must
+        # not make a returning desk mate look like a newcomer), and adopts a
+        # higher count only after it has persisted for a long time.
+        self.count_settle_ms = count_settle_ms
+        self.count_decrease_ms = count_decrease_ms
+        self.count_increase_ms = count_increase_ms
 
         self.seats: Dict[str, SeatDefinition] = {}
         self.occupancies: Dict[str, SeatOccupancy] = {}
@@ -330,24 +355,30 @@ class SeatManager:
 
         for seat_code, occ in self.occupancies.items():
             candidates = occ.candidate_detections
+            occ.person_count = len(candidates)
+            self._update_person_baseline(occ, len(candidates), timestamp_ms)
 
             if len(candidates) == 1:
                 # Single candidate in seat -> OCCUPIED
                 det = candidates[0]
                 occ.state = SeatState.OCCUPIED
                 occ.assigned_detection = det
+                occ.last_primary_bbox = tuple(det.bbox)
                 occ.last_seen_timestamp_ms = timestamp_ms
                 occ.consecutive_occupied_frames += 1
                 occ.consecutive_empty_frames = 0
                 mapped_results[seat_code] = det
 
             elif len(candidates) > 1:
-                # Multiple candidates -> MULTIPLE_PERSON anomaly
+                # Multiple candidates -> MULTIPLE_PERSON (physical count only;
+                # whether that is unusual is decided against the baseline).
                 occ.state = SeatState.MULTIPLE_PERSON
-                # Select candidate with highest confidence as primary
-                primary_det = max(candidates, key=lambda d: d.confidence)
+                primary_det = self._select_primary(occ, candidates, frame_w=frame_w, frame_h=frame_h)
                 occ.assigned_detection = primary_det
+                occ.last_primary_bbox = tuple(primary_det.bbox)
                 occ.last_seen_timestamp_ms = timestamp_ms
+                occ.consecutive_occupied_frames += 1
+                occ.consecutive_empty_frames = 0
                 mapped_results[seat_code] = primary_det
 
             else:
@@ -373,10 +404,64 @@ class SeatManager:
 
         return mapped_results, unmapped
 
-    def to_seat_graph(self) -> Any:
+    @staticmethod
+    def _anchor(det: Detection) -> Tuple[float, float]:
+        x1, y1, x2, y2 = det.bbox
+        return ((x1 + x2) / 2.0, float(y2) - (y2 - y1) * 0.15)
+
+    def _select_primary(
+        self,
+        occ: SeatOccupancy,
+        candidates: List[Detection],
+        *,
+        frame_w: Optional[int] = None,
+        frame_h: Optional[int] = None,
+    ) -> Detection:
+        """Pick the seat's own occupant, not merely the most confident box.
+
+        Continuity with the previous occupant wins; otherwise the person whose
+        anchor sits deepest inside the ROI (a seated student rather than
+        someone standing at its edge).
+        """
+        if occ.last_primary_bbox is not None:
+            from classroom_monitor.spatial_matcher import compute_bbox_iou
+
+            best = max(candidates, key=lambda d: compute_bbox_iou(d.bbox, occ.last_primary_bbox))
+            if compute_bbox_iou(best.bbox, occ.last_primary_bbox) >= 0.30:
+                return best
+
+        def depth(det: Detection) -> Tuple[float, float, float]:
+            score = self._point_match_score(occ.seat, self._anchor(det), frame_w=frame_w, frame_h=frame_h)
+            if score is None:
+                score = self._point_match_score(occ.seat, det.center, frame_w=frame_w, frame_h=frame_h)
+            depth_score, centrality = score if score is not None else (-1.0, -1e9)
+            return depth_score, centrality, det.confidence
+
+        return max(candidates, key=depth)
+
+    def _update_person_baseline(self, occ: SeatOccupancy, count: int, timestamp_ms: float) -> None:
+        if occ.established_person_count is not None and count == occ.established_person_count:
+            occ.pending_person_count = None
+            return
+        if occ.pending_person_count != count:
+            occ.pending_person_count = count
+            occ.pending_since_ms = timestamp_ms
+            return
+        held_ms = timestamp_ms - occ.pending_since_ms
+        if occ.established_person_count is None:
+            required = self.count_settle_ms
+        elif count < occ.established_person_count:
+            required = self.count_decrease_ms
+        else:
+            required = self.count_increase_ms
+        if held_ms >= required:
+            occ.established_person_count = count
+            occ.pending_person_count = None
+
+    def to_seat_graph(self, camera_view: Optional[str] = None) -> Any:
         """Construct a connected SeatGraph representing all registered seats and spatial context."""
-        from classroom_monitor.scene_context import DeskGeometry, SeatContext, SeatGraph
-        graph = SeatGraph(room_id=self.room_id)
+        from classroom_monitor.scene_context import CAMERA_FACING_SUBJECTS, DeskGeometry, SeatContext, SeatGraph
+        graph = SeatGraph(room_id=self.room_id, camera_view=camera_view or CAMERA_FACING_SUBJECTS)
         for s_code, s_def in self.seats.items():
             desk_geo = None
             if s_def.desk_y is not None or s_def.desk_polygon is not None:

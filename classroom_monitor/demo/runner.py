@@ -37,12 +37,12 @@ from classroom_monitor.config import ClassroomConfig, DEFAULT_CONFIG, resolve_ru
 from classroom_monitor.demo.config import (
     DEMO_PRESETS,
     DemoVideoConfig,
-    INDIA_CALIBRATED_SEATS,
     get_demo_config,
     resolve_video_path,
 )
 from classroom_monitor.demo.exporter import export_demo_artifacts
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer
+from classroom_monitor.demo.seating import CalibrationMismatchError, build_scene_seating
 from classroom_monitor.detector import PoseClassroomDetector
 from classroom_monitor.head_pose_provider import (
     HeadCropExtractor,
@@ -67,87 +67,27 @@ logger = logging.getLogger("VigilDemoRunner")
 def setup_room_seats(
     room_id: str,
     camera_id: str,
-    seats_preset: List[Dict[str, Any]],
-    site_name: str = "Trường Đại học Demo",
+    seats_preset: Optional[List[Dict[str, Any]]] = None,
+    site_name: str = "",
 ) -> List[SeatDefinition]:
-    """Ensure database has site, room, camera, and calibrated seats matching preset."""
-    init_db()
-    db = SessionLocal()
+    """Return the seats calibrated for ``room_id``.
 
-    site = db.query(ExamSite).first()
-    if not site:
-        site = ExamSite(name=site_name, address="Khu Đô thị")
-        db.add(site)
-        db.commit()
-        db.refresh(site)
-
-    room = db.query(ExamRoom).filter(ExamRoom.room_code == room_id).first()
-    if not room:
-        room = ExamRoom(
-            name=f"Phòng thi {room_id}",
-            site_id=site.id,
-            room_code=room_id,
-            capacity=len(seats_preset),
-        )
-        db.add(room)
-        db.commit()
-        db.refresh(room)
-
-    cam = db.query(Camera).filter(Camera.id == camera_id).first()
-    if not cam:
-        cam = Camera(
-            id=camera_id,
-            room_id=room.id,
-            name="Camera Trần Góc 45 Độ",
-            source_uri=f"demo_video/{room_id}.mp4",
-            position="Ceiling Center",
-            resolution="1280x720",
-        )
-        db.add(cam)
-        db.commit()
-        db.refresh(cam)
-
-    existing_seats = db.query(SeatROI).filter(SeatROI.room_id == room.id, SeatROI.enabled == True).all()
-    if not existing_seats:
-        logger.info("Seeding %d calibrated Seat ROIs for %s into database", len(seats_preset), room_id)
-        for s in seats_preset:
-            ctx_dict = {"baseline_yaw": s.get("baseline_yaw", 0.0), "desk_y": s.get("desk_y")}
-            poly_data = s.get("polygon_json") or s.get("polygon")
-            seat_obj = SeatROI(
-                room_id=room.id,
-                camera_id=cam.id,
-                seat_code=s["seat_code"],
-                seat_label=s.get("seat_label") or s["seat_code"],
-                polygon_json=json.dumps(poly_data) if not isinstance(poly_data, str) else poly_data,
-                context_json=json.dumps(ctx_dict),
-                enabled=True,
-            )
-            db.add(seat_obj)
-        db.commit()
-        existing_seats = db.query(SeatROI).filter(SeatROI.room_id == room.id, SeatROI.enabled == True).all()
-
-    seat_defs: List[SeatDefinition] = []
-    for s in existing_seats:
-        poly = json.loads(s.polygon_json) if isinstance(s.polygon_json, str) else s.polygon_json
-        seat_defs.append(
-            SeatDefinition(
-                seat_id=s.seat_code,
-                room_id=s.room_id,
-                seat_code=s.seat_code,
-                seat_label=s.seat_label or s.seat_code,
-                polygon=np.array(poly, dtype=np.float32),
-                camera_id=s.camera_id,
-                desk_y=json.loads(s.context_json).get("desk_y") if s.context_json else None,
-            )
-        )
-
-    db.close()
-    return seat_defs
+    Seats are only ever created on the web calibration page; this helper never
+    writes to the database.  ``seats_preset`` (tests) is used as given.
+    """
+    config = DemoVideoConfig(
+        name=room_id,
+        video_path=Path(""),
+        room_code=room_id,
+        camera_id=camera_id,
+        seats_preset=seats_preset or None,
+    )
+    return build_scene_seating(config).seat_defs
 
 
 def setup_database_seats(room_id: str = "ROOM-CALIB-01", camera_id: str = "CAM-CALIB-01") -> List[SeatDefinition]:
-    """Compatibility helper for existing tests and diagnostic scripts."""
-    return setup_room_seats(room_id=room_id, camera_id=camera_id, seats_preset=INDIA_CALIBRATED_SEATS)
+    """Compatibility helper for diagnostic scripts: seats calibrated on the web page."""
+    return setup_room_seats(room_id=room_id, camera_id=camera_id)
 
 
 def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
@@ -191,50 +131,13 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     print(f" Output Target:   {out_p.resolve()}")
     print(f" Save Evidence:   {config.save_evidence} | Show Window: {config.show_window}")
 
-    # 1. Load SceneProfile or fallback Preset
-    scene_profile: Optional[SceneProfile] = None
-    seats_preset = config.seats_preset or []
-
-    if config.scene_config_path and Path(config.scene_config_path).exists():
-        logger.info("Loading Scene Profile from YAML: %s", config.scene_config_path)
-        scene_profile = SceneProfile.from_file(config.scene_config_path)
-        seat_graph = scene_profile.seat_graph
-        if not seats_preset:
-            seats_preset = []
-            for s_code, ctx in seat_graph.seats_context.items():
-                poly = ctx.metadata.get("polygon")
-                if poly is None and config.scene_config_path:
-                    for raw_s in scene_profile.raw_config.get("seats", []):
-                        if raw_s.get("seat_code") == s_code:
-                            poly = raw_s.get("polygon")
-                            break
-                seats_preset.append({
-                    "seat_code": s_code,
-                    "seat_label": ctx.metadata.get("seat_label") or s_code,
-                    "polygon_json": poly or [],
-                    "desk_y": ctx.desk_geometry.desk_boundary_y if ctx.desk_geometry else None,
-                    "baseline_yaw": ctx.reference_directions.baseline_yaw,
-                })
-    else:
-        logger.info("Using built-in Seat Preset for %s (%d seats)", config.room_code, len(seats_preset))
-        seat_graph = SeatGraph(room_id=config.room_code)
-
-    # 2. Setup Database Seats & SeatManager
-    seat_defs = setup_room_seats(room_id=config.room_code, camera_id=config.camera_id, seats_preset=seats_preset)
+    # 1-2. Seat polygons and seat context from ONE calibration source (shared with the web runtime)
+    seating = build_scene_seating(config)
+    scene_profile = None  # thresholds use engine defaults; seats come from the web calibration
+    seat_graph = seating.seat_graph
     seat_mgr = SeatManager(room_id=config.room_code, camera_id=config.camera_id)
-    seat_mgr.load_seats(seat_defs)
-
-    if scene_profile is None:
-        seat_graph = seat_mgr.to_seat_graph()
-        for s in seats_preset:
-            ctx = seat_graph.get_context(s["seat_code"])
-            if ctx:
-                ctx.reference_directions.baseline_yaw = s.get("baseline_yaw", 0.0)
-                if s.get("desk_y"):
-                    if ctx.desk_geometry is None:
-                        ctx.desk_geometry = DeskGeometry(desk_boundary_y=s.get("desk_y"))
-                    else:
-                        ctx.desk_geometry.desk_boundary_y = s.get("desk_y")
+    seat_mgr.load_seats(seating.seat_defs)
+    print(f" Seat Calibration: {seating.source} ({seating.source_ref}), {len(seating.seat_defs)} seats")
 
     # 3. Resolve Effective Runtime Configuration
     runtime_cfg = resolve_runtime_config(scene_profile=scene_profile, demo_config=config)
@@ -261,6 +164,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 "capability_health": pipeline.capability_health,
                 "model": str(detector.model_path),
                 "provider": config.head_provider,
+                "seat_calibration": seating.describe(),
                 "config": runtime_cfg,
             },
             f,
@@ -274,7 +178,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         output_dir=evidence_dir,
         async_write=True,
     )
-    renderer = DemoHUDOverlayRenderer(debug_overlay=config.debug_overlay)
+    renderer = DemoHUDOverlayRenderer(debug_overlay=config.debug_overlay, behavior_labels=config.behavior_labels)
 
     # Video Writer for annotated result.mp4
     result_video_path = out_p / "result.mp4"
@@ -397,6 +301,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 elif key == ord("d") or key == ord("D"):
                     renderer.debug_overlay = not renderer.debug_overlay
                     logger.info("Toggled debug overlay: %s", renderer.debug_overlay)
+                elif key == ord("b") or key == ord("B"):
+                    renderer.behavior_labels = not renderer.behavior_labels
+                    logger.info("Toggled behaviour labels: %s", renderer.behavior_labels)
                 elif key == ord(" "):
                     logger.info("Demo paused (press Space to resume)...")
                     while True:
@@ -454,6 +361,16 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 gt_data = json.load(f)
 
             gt_episodes = gt_data.get("episodes", [])
+            # Strict matching compares seat codes; codes from another calibration
+            # name different physical seats, so the metrics would be meaningless.
+            gt_seat_codes = {ep.get("seat_code") for ep in gt_episodes if ep.get("seat_code")}
+            unknown_gt_seats = sorted(gt_seat_codes - set(seating.seat_codes))
+            if unknown_gt_seats:
+                raise CalibrationMismatchError(
+                    f"Ground truth uses seat codes not present in the active calibration "
+                    f"({seating.source}): {', '.join(unknown_gt_seats)}. "
+                    "The GT is only valid for the seat layout it was annotated against."
+                )
             eval_res = match_temporal_episodes(
                 gt_episodes=gt_episodes,
                 ai_episodes=all_episodes,
@@ -509,6 +426,8 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 eval_res.recall,
                 eval_res.avg_tp_iou,
             )
+        except CalibrationMismatchError as e:
+            logger.warning("Ground truth benchmark skipped: %s", e)
         except Exception as e:
             logger.warning("Failed to evaluate ground truth benchmark: %s", e, exc_info=True)
 

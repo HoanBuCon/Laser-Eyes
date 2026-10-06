@@ -37,6 +37,9 @@ from storage.database import Base
 from storage.db_models import Camera, DetectionEvent, EventReview, EvidenceFile, ExamRoom, ExamSession, ExamSite, SeatROI
 from storage.repositories import EventRepository, ReviewRepository, SessionRepository
 
+# LIVE runs need Seat ROIs; they come from the calibration page (database).
+pytestmark = pytest.mark.usefixtures("calibrated_demo_rooms")
+
 # In-Memory SQLite Database for Isolation
 TEST_DB_URL = "sqlite:///:memory:"
 test_engine = create_engine(

@@ -92,8 +92,19 @@ class ObservationExtractor:
         occupancy_state: Optional[str] = None,
         frame: Optional[np.ndarray] = None,
         precomputed_head_estimate: Optional[HeadOrientationEstimate] = None,
+        allow_head_inference: bool = True,
+        head_sample_timestamp_ms: Optional[float] = None,
+        expected_person_count: Optional[int] = None,
     ) -> List[RawObservation]:
-        """Extract all valid observations for the candidate person in the given seat context."""
+        """Extract all valid observations for the candidate person in the given seat context.
+
+        ``allow_head_inference=False`` is used by the scheduled pipeline: head
+        orientation then comes only from ``precomputed_head_estimate`` and is
+        UNKNOWN otherwise, so the head model never runs outside its schedule.
+        ``head_sample_timestamp_ms`` identifies the head-model sample so the
+        temporal engine smooths samples rather than repeated cached frames.
+        ``expected_person_count`` is the seat's normal occupancy baseline.
+        """
         observations: List[RawObservation] = []
         seat_id = seat_context.seat_id
 
@@ -131,6 +142,7 @@ class ObservationExtractor:
                     quality=1.0,
                     confidence=1.0,
                     source="seat_mapping",
+                    metadata={"expected_person_count": int(expected_person_count)} if expected_person_count is not None else {},
                 )
             )
             return observations
@@ -156,6 +168,7 @@ class ObservationExtractor:
                 quality=1.0,
                 confidence=detection.confidence,
                 source="seat_mapping",
+                metadata={"expected_person_count": int(expected_person_count)} if expected_person_count is not None else {},
             )
         )
 
@@ -165,8 +178,13 @@ class ObservationExtractor:
 
         # 2. Head Orientation Observations
         if seat_context.capabilities.head_orientation != CapabilityStatus.DISABLED:
+            head_meta: Dict[str, Any] = {}
             if precomputed_head_estimate is not None:
                 head_est = precomputed_head_estimate
+                if head_sample_timestamp_ms is not None:
+                    head_meta["sample_ts"] = float(head_sample_timestamp_ms)
+            elif not allow_head_inference:
+                head_est = HeadOrientationEstimate(source="unscheduled", quality=0.0)
             else:
                 head_est = self.head_pose_provider.estimate(
                     keypoints=keypoints,
@@ -186,6 +204,7 @@ class ObservationExtractor:
                         quality=head_est.quality,
                         confidence=detection.confidence,
                         source=head_est.source,
+                        metadata=dict(head_meta),
                     )
                 )
 
@@ -199,6 +218,7 @@ class ObservationExtractor:
                         quality=head_est.quality,
                         confidence=detection.confidence,
                         source=head_est.source,
+                        metadata=dict(head_meta),
                     )
                 )
 

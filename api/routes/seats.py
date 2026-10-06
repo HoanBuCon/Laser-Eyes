@@ -12,6 +12,7 @@ Canonical Endpoints:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from api.schemas import SeatBulkUpsertRequest, SeatCreate, SeatResponse, SeatUpdate
 from storage.database import get_db
+from storage.db_models import Camera, ExamRoom
 from storage.repositories import SeatRepository
 
 router = APIRouter(tags=["Seats"])
@@ -61,6 +63,65 @@ def bulk_upsert_seats(room_id: str, request: SeatBulkUpsertRequest, db: Session 
         room_id=room_id,
         camera_id=request.camera_id or "",
         seats_data=seats_dicts,
+    )
+
+
+@router.post("/rooms/{room_id}/seats/import-template", response_model=List[SeatResponse])
+def import_seat_template(
+    room_id: str,
+    camera_id: Optional[str] = None,
+    replace: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Import the bundled starting layout for this room into the database.
+
+    The layout is only a starting point that people then adjust on the
+    calibration page; runs always read the seats stored here.
+    """
+    from classroom_monitor.demo.config import DEMO_PRESETS
+    from classroom_monitor.demo.seating import load_scene_template
+
+    room = db.query(ExamRoom).filter(ExamRoom.id == room_id).first()
+    if room is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found")
+    preset = next(
+        (p for p in DEMO_PRESETS.values() if p.get("room_code") == room.room_code and p.get("seat_template_path")),
+        None,
+    )
+    template_path = Path(preset["seat_template_path"]) if preset else None
+    if template_path is None or not template_path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No starting layout is bundled for room {room.room_code}",
+        )
+    repo = SeatRepository(db)
+    if repo.list_by_room(room_id) and not replace:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This room already has Seat ROIs; confirm replacing them to import the starting layout",
+        )
+    if not camera_id:
+        # Attach the seats to the room camera that shows the preset's video.
+        video_name = Path(preset["video_path"]).name.lower()
+        cameras = db.query(Camera).filter(Camera.room_id == room_id).all()
+        matching = [c for c in cameras if Path(str(c.source_uri or "").replace("\\", "/")).name.lower() == video_name]
+        chosen = matching[0] if matching else (cameras[0] if cameras else None)
+        if chosen is None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Room {room.room_code} has no camera to attach the seats to",
+            )
+        camera_id = chosen.id
+    template = load_scene_template(template_path)
+    if replace:
+        for old in repo.list_by_room(room_id):
+            db.delete(old)
+        db.flush()
+    return repo.bulk_upsert_for_camera(
+        room_id=room_id,
+        camera_id=camera_id or "",
+        seats_data=template["seats"],
+        replace_missing=False,
     )
 
 

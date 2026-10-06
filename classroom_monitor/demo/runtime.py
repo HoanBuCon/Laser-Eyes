@@ -41,12 +41,13 @@ from classroom_monitor.contracts import (
 from classroom_monitor.demo.config import (
     DEMO_PRESETS,
     DemoVideoConfig,
-    INDIA_CALIBRATED_SEATS,
     get_demo_config,
     resolve_video_path,
 )
 from classroom_monitor.demo.exporter import export_demo_artifacts
+from classroom_monitor.demo.paths import demo_runs_root, purge_replay_package, replay_package_dir
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer
+from classroom_monitor.demo.seating import build_scene_seating
 from classroom_monitor.detector import PoseClassroomDetector
 from classroom_monitor.head_pose_provider import (
     HeadOrientationEstimate,
@@ -89,6 +90,7 @@ class DemoStatus:
     preset: str = ""
     mode: str = DemoMode.LIVE.value
     debug_overlay: bool = False
+    behavior_labels: bool = False
     frame_index: int = 0
     total_frames: int = 0
     source_timestamp_ms: float = 0.0
@@ -113,6 +115,7 @@ class DemoStatus:
             "preset": self.preset,
             "mode": self.mode,
             "debug_overlay": self.debug_overlay,
+            "behavior_labels": self.behavior_labels,
             "frame_index": self.frame_index,
             "total_frames": self.total_frames,
             "source_timestamp_ms": round(self.source_timestamp_ms, 1),
@@ -152,6 +155,9 @@ class DemoRuntime:
         self._pause_event = threading.Event()
 
         self.status = DemoStatus()
+        # Display-only behaviour tags; read by the LIVE worker on every frame
+        # so the web toggle takes effect immediately.
+        self.behavior_labels = False
         self.latest_frame: Optional[np.ndarray] = None
         self.latest_raw_frame: Optional[np.ndarray] = None
         self.latest_jpeg: Optional[bytes] = None
@@ -200,6 +206,14 @@ class DemoRuntime:
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
+            self.status.behavior_labels = self.behavior_labels
+            return self.status.to_dict()
+
+    def set_behavior_labels(self, enabled: bool) -> Dict[str, Any]:
+        """Show or hide display-only behaviour tags on the live stream."""
+        with self._lock:
+            self.behavior_labels = bool(enabled)
+            self.status.behavior_labels = self.behavior_labels
             return self.status.to_dict()
 
     def get_events(self) -> List[Dict[str, Any]]:
@@ -414,7 +428,7 @@ class DemoRuntime:
             return self.status.to_dict()
 
     def reset_state(self) -> None:
-        self.status = DemoStatus()
+        self.status = DemoStatus(behavior_labels=getattr(self, "behavior_labels", False))
         self.latest_frame = None
         self.latest_raw_frame = None
         self.latest_jpeg = None
@@ -643,7 +657,7 @@ class DemoRuntime:
         config.stride = stride
 
         # Output isolation directory
-        out_p = Path(f"data/demo_runs/{run_id}")
+        out_p = demo_runs_root() / run_id
         out_p.mkdir(parents=True, exist_ok=True)
         evidence_dir = out_p / "evidence"
         evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -667,39 +681,20 @@ class DemoRuntime:
             self.status.source_fps = fps
             self.status.video_duration_ms = (total_frames / fps) * 1000.0 if fps > 0 else 0.0
 
-        # Load Scene Profile & Seat Setup
-        scene_profile: Optional[SceneProfile] = None
-        seats_preset = config.seats_preset or []
-        if config.scene_config_path and Path(config.scene_config_path).exists():
-            scene_profile = SceneProfile.from_file(config.scene_config_path)
-            seat_graph = scene_profile.seat_graph
-        else:
-            seat_graph = SeatGraph(room_id=config.room_code)
-
-        # Setup Database Seats & SeatManager
-        seat_defs: List[SeatDefinition] = []
-        if scene_profile:
-            for s_code, ctx in scene_profile.seat_graph.seats_context.items():
-                poly = ctx.metadata.get("polygon")
-                if poly is None:
-                    for raw_s in scene_profile.raw_config.get("seats", []):
-                        if raw_s.get("seat_code") == s_code:
-                            poly = raw_s.get("polygon")
-                            break
-                if poly:
-                    seat_defs.append(
-                        SeatDefinition(
-                            seat_id=s_code,
-                            room_id=config.room_code,
-                            seat_code=s_code,
-                            seat_label=ctx.metadata.get("seat_label") or s_code,
-                            polygon=np.array(poly, dtype=np.float32),
-                            camera_id=config.camera_id,
-                            desk_y=ctx.desk_geometry.desk_boundary_y if ctx.desk_geometry else None,
-                        )
-                    )
+        # Seat polygons and context from ONE calibration source (shared with the CLI runner)
+        try:
+            seating = build_scene_seating(config)
+        except Exception as exc:
+            logger.error("LIVE start refused: %s", exc)
+            cap.release()
+            with self._lock:
+                self.status.state = DemoState.ERROR.value
+                self.status.last_error = f"Seat calibration error: {exc}"
+            return
+        scene_profile = None  # thresholds use engine defaults; seats come from the web calibration
+        seat_graph = seating.seat_graph
         seat_mgr = SeatManager(room_id=config.room_code, camera_id=config.camera_id)
-        seat_mgr.load_seats(seat_defs)
+        seat_mgr.load_seats(seating.seat_defs)
 
         runtime_cfg = resolve_runtime_config(scene_profile=scene_profile, demo_config=config)
         (out_p / "effective_runtime_config.json").write_text(
@@ -764,6 +759,7 @@ class DemoRuntime:
                     "capability_health": pipeline.capability_health,
                     "model": str(detector.model_path),
                     "provider": config.head_provider,
+                    "seat_calibration": seating.describe(),
                     "config": runtime_cfg,
                 },
                 indent=2,
@@ -820,7 +816,8 @@ class DemoRuntime:
                 last_frame_time = now
                 rolling_fps_deque.append(1.0 / dt)
                 curr_fps = float(np.mean(rolling_fps_deque))
-                source_ts_ms = (frame_idx / fps) * 1000.0
+                # Same clock as the CLI runner: the first frame is t=0.
+                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
 
                 evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
                 frame_result = pipeline.process_frame(frame, frame_idx, source_ts_ms)
@@ -878,6 +875,7 @@ class DemoRuntime:
                     "active_review_incidents": sum(1 for p in risk_tracker.profiles.values() if p.active_incident is not None),
                 }
 
+                renderer.behavior_labels = self.behavior_labels
                 annotated_frame = renderer.render_frame(
                     frame=frame,
                     frame_idx=frame_idx,
@@ -890,7 +888,7 @@ class DemoRuntime:
                     risk_tracker=risk_tracker,
                     active_episodes=active_episodes_frame,
                     recent_events=all_events,
-                    raw_observations=None,
+                    raw_observations=frame_result.observations,
                     detections=detections,
                     roaming_detections=unmapped_dets,
                     runtime_metrics=metrics_telemetry,
@@ -1000,18 +998,25 @@ class DemoRuntime:
                 runtime_stats=runtime_stats,
             )
 
-            # Copy artifacts to canonical replay directory as well
-            replay_dst = Path(f"data/demo_final/{preset}")
-            replay_dst.mkdir(parents=True, exist_ok=True)
-            for f in out_p.glob("*"):
-                if f.is_file():
-                    shutil.copy2(f, replay_dst / f.name)
-            if evidence_dir.exists():
-                rep_evi = replay_dst / "evidence"
-                rep_evi.mkdir(parents=True, exist_ok=True)
-                for ef in evidence_dir.glob("*"):
-                    if ef.is_file():
-                        shutil.copy2(ef, rep_evi / ef.name)
+            # Publish to the canonical replay package only for a complete,
+            # uninterrupted run; a stopped or frame-limited run must never
+            # replace the package REPLAY mode plays back.
+            run_complete = not self._stop_event.is_set() and not config.max_frames
+            if run_complete:
+                replay_dst = replay_package_dir(preset)
+                replay_dst.mkdir(parents=True, exist_ok=True)
+                purge_replay_package(replay_dst)
+                for f in out_p.glob("*"):
+                    if f.is_file():
+                        shutil.copy2(f, replay_dst / f.name)
+                if evidence_dir.exists():
+                    rep_evi = replay_dst / "evidence"
+                    rep_evi.mkdir(parents=True, exist_ok=True)
+                    for ef in evidence_dir.glob("*"):
+                        if ef.is_file():
+                            shutil.copy2(ef, rep_evi / ef.name)
+            else:
+                logger.info("Run %s is partial; replay package for '%s' left unchanged", run_id, preset)
 
             with self._lock:
                 self.status.state = (
@@ -1042,7 +1047,7 @@ class DemoRuntime:
         demo_cfg = get_demo_config(preset)
 
         # Locate precomputed artifacts
-        replay_root = Path(f"data/demo_final/{preset}")
+        replay_root = replay_package_dir(preset)
         if not replay_root.exists() or not (replay_root / "result.mp4").exists():
             replay_root = Path(demo_cfg.output_dir)
 
@@ -1111,7 +1116,8 @@ class DemoRuntime:
                 if max_frames and frame_idx > max_frames:
                     break
 
-                source_ts_ms = (frame_idx / fps) * 1000.0
+                # Same clock as the CLI runner: the first frame is t=0.
+                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
 
                 # Check and emit events synchronized with timestamp
                 for ev in sorted_events:

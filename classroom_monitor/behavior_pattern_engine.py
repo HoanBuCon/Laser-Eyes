@@ -81,6 +81,7 @@ class BehaviorPatternEngine:
         seat_left_timeout_ms: float = 15000.0,
         multi_person_dwell_ms: float = 2500.0,
         below_desk_min_duration_ms: float = 1500.0,
+        glance_merge_gap_ms: float = 500.0,
     ):
         self.seat_graph = seat_graph or SeatGraph()
         self.glance_rolling_window_ms = glance_rolling_window_ms
@@ -89,6 +90,9 @@ class BehaviorPatternEngine:
         self.seat_left_timeout_ms = seat_left_timeout_ms
         self.multi_person_dwell_ms = multi_person_dwell_ms
         self.below_desk_min_duration_ms = below_desk_min_duration_ms
+        # Same-direction head-turn episodes separated by strictly less than this gap are
+        # one glance split by sensor noise or a brief missing sample.
+        self.glance_merge_gap_ms = glance_merge_gap_ms
 
         # Historical episode store per seat: seat_id -> List[TemporalEpisode]
         self._episode_history: Dict[str, List[TemporalEpisode]] = {}
@@ -239,17 +243,21 @@ class BehaviorPatternEngine:
         target_turns: List[TemporalEpisode] = []
         target_dir = ""
         target_neighbor = None
+        left_glances = self._count_distinct_glances(left_turns, timestamp_ms)
+        right_glances = self._count_distinct_glances(right_turns, timestamp_ms)
 
-        if len(left_turns) >= self.min_glance_episodes:
+        if left_glances >= self.min_glance_episodes:
             target_turns = left_turns
             target_dir = "LEFT"
             target_neighbor = left_neighbor
-        elif len(right_turns) >= self.min_glance_episodes:
+            glance_count = left_glances
+        elif right_glances >= self.min_glance_episodes:
             target_turns = right_turns
             target_dir = "RIGHT"
             target_neighbor = right_neighbor
+            glance_count = right_glances
 
-        if not target_turns or target_neighbor is None or len(target_turns) < self.min_glance_episodes:
+        if not target_turns or target_neighbor is None:
             return None
 
         # Check rate limiting cooldown (e.g. 10.0s per pattern)
@@ -272,10 +280,26 @@ class BehaviorPatternEngine:
             primary_direction=target_dir,
             target_neighbor_id=target_neighbor,
             component_episode_ids=[ep.episode_id for ep in target_turns],
-            supporting_cues=[f"Glance Count: {len(target_turns)} in {self.glance_rolling_window_ms/1000:.0f}s window"],
+            supporting_cues=[f"Glance Count: {glance_count} in {self.glance_rolling_window_ms/1000:.0f}s window"],
         )
         self._pattern_cooldowns[cooldown_key] = timestamp_ms
         return pattern
+
+    def _count_distinct_glances(self, turns: List[TemporalEpisode], timestamp_ms: float) -> int:
+        """Number of separate glances after merging fragments of one head turn."""
+        if not turns:
+            return 0
+        ordered = sorted(turns, key=lambda ep: ep.start_timestamp_ms)
+        glances = 1
+        current_end = ordered[0].end_timestamp_ms if ordered[0].end_timestamp_ms is not None else timestamp_ms
+        for ep in ordered[1:]:
+            ep_end = ep.end_timestamp_ms if ep.end_timestamp_ms is not None else timestamp_ms
+            if ep.start_timestamp_ms - current_end >= self.glance_merge_gap_ms:
+                glances += 1
+                current_end = ep_end
+            else:
+                current_end = max(current_end, ep_end)
+        return glances
 
     def _evaluate_neighbor_lean(
         self,

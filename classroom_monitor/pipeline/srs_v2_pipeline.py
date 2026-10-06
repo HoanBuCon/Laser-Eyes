@@ -16,7 +16,7 @@ import numpy as np
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine
 from classroom_monitor.demo.config import DemoVideoConfig
 from classroom_monitor.detector import PoseClassroomDetector
-from classroom_monitor.head_pose_provider import HeadOrientationEstimate, create_head_pose_provider
+from classroom_monitor.head_pose_provider import AdaptiveYawBaseline, HeadOrientationEstimate, create_head_pose_provider
 from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.observation_extractor import ObservationExtractor, RawObservation
 from classroom_monitor.scene_context import CapabilityStatus, SceneProfile, SeatContext, SeatGraph
@@ -78,7 +78,16 @@ class SRSv2Pipeline:
             **runtime_config["risk"],
         )
         self.hpe_interval_ms = (1000.0 / config.hpe_hz) if config.hpe_hz > 0 else 200.0
-        self.hpe_max_age_ms = runtime_config["head_pose"]["cache_max_age_ms"]
+        head_cfg = runtime_config["head_pose"]
+        self.hpe_max_age_ms = head_cfg["cache_max_age_ms"]
+        self.yaw_baseline: Optional[AdaptiveYawBaseline] = (
+            AdaptiveYawBaseline(
+                window_ms=float(head_cfg.get("baseline_window_ms", 60000.0)),
+                min_samples=int(head_cfg.get("baseline_min_samples", 10)),
+            )
+            if head_cfg.get("adaptive_baseline", True)
+            else None
+        )
         self.seat_hpe_cache: Dict[str, Tuple[HeadOrientationEstimate, float]] = {}
         self.last_hpe_time: Dict[str, float] = {}
         self.scheduled_hpe_cycles = 0
@@ -110,7 +119,12 @@ class SRSv2Pipeline:
         started = time.perf_counter()
         requests: List[Dict[str, Any]] = []
         for seat_code, occupancy in self.seat_manager.occupancies.items():
-            if occupancy.state != SeatState.OCCUPIED or occupancy.assigned_detection is None:
+            # A seat shared with a desk mate still has its own occupant
+            # (SeatManager picks it by continuity), so it is scheduled too.
+            if (
+                occupancy.state not in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
+                or occupancy.assigned_detection is None
+            ):
                 continue
             context = self.seat_graph.get_context(seat_code)
             if context is None or context.capabilities.head_orientation == CapabilityStatus.DISABLED:
@@ -131,15 +145,27 @@ class SRSv2Pipeline:
         if requests:
             self.scheduled_hpe_cycles += 1
             for seat_id, estimate in self.head_provider.estimate_batch(requests=requests, frame=frame).items():
+                if self.yaw_baseline is not None:
+                    estimate = self.yaw_baseline.apply(seat_id, estimate, timestamp_ms)
                 self.seat_hpe_cache[seat_id] = (estimate, timestamp_ms)
+
+        # A seat that has been empty starts over: the next person has their own neutral.
+        if self.yaw_baseline is not None:
+            for seat_code, occupancy in self.seat_manager.occupancies.items():
+                if occupancy.state == SeatState.EMPTY:
+                    self.yaw_baseline.reset_seat(seat_code)
 
         observations: Dict[str, List[RawObservation]] = {}
         for seat_code, occupancy in self.seat_manager.occupancies.items():
             context = self.seat_graph.get_context(seat_code) or SeatContext(seat_id=seat_code)
             cached = self.seat_hpe_cache.get(seat_code)
             estimate = None
+            sample_ts = None
             if cached and (timestamp_ms - cached[1]) <= self.hpe_max_age_ms:
-                estimate = cached[0]
+                estimate, sample_ts = cached
+            # Head orientation comes only from the scheduled batch above; a
+            # seat without a fresh sample is UNKNOWN rather than triggering an
+            # extra per-frame head-model forward.
             observations[seat_code] = self.observation_extractor.extract(
                 detection=occupancy.assigned_detection,
                 seat_context=context,
@@ -148,6 +174,9 @@ class SRSv2Pipeline:
                 nearby_person_count=len(occupancy.candidate_detections),
                 frame=frame,
                 precomputed_head_estimate=estimate,
+                allow_head_inference=False,
+                head_sample_timestamp_ms=sample_ts,
+                expected_person_count=getattr(occupancy, "expected_person_count", None),
             )
         timings["head_observation"] = (time.perf_counter() - started) * 1000.0
 
@@ -200,7 +229,7 @@ class SRSv2Pipeline:
             incidents=incidents,
             occupied_seat_count=sum(
                 1 for occupancy in self.seat_manager.occupancies.values()
-                if occupancy.state == SeatState.OCCUPIED
+                if occupancy.state in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
             ),
             timings_ms=timings,
         )

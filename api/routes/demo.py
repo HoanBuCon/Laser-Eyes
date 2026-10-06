@@ -25,8 +25,10 @@ from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
 from api.realtime import realtime_manager
+from classroom_monitor.demo.paths import demo_final_root, demo_runs_root, replay_package_dir
 from classroom_monitor.demo.config import DEMO_PRESETS, get_demo_config
 from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState
+from classroom_monitor.demo.seating import CalibrationMismatchError, build_scene_seating
 from classroom_monitor.async_evidence_writer import compute_file_sha256
 from classroom_monitor.contracts import HashStatus
 from classroom_monitor.evidence_playback import PlaybackUnavailable, ensure_browser_playback
@@ -41,6 +43,7 @@ class DemoStartRequest(BaseModel):
     preset: str = Field("india", description="Demo preset name: 'india' or 'student'")
     mode: str = Field("LIVE", description="Execution mode: 'LIVE' or 'REPLAY'")
     debug_overlay: bool = Field(False, description="Render advanced developer overlay")
+    behavior_labels: Optional[bool] = Field(None, description="Show display-only behaviour tags on the stream")
     show_window: bool = Field(False, description="Open local OpenCV GUI window")
     max_frames: Optional[int] = Field(None, description="Max frames to process (for quick validation)")
     stride: int = Field(1, description="Frame subsampling stride")
@@ -54,20 +57,29 @@ class HumanReviewRequest(BaseModel):
     reviewer_id: Optional[str] = Field("Proctor_01", description="Identifier of human reviewer")
 
 
+def _calibration_state(preset: str) -> Dict[str, Any]:
+    """Seat ROIs saved on the calibration page for the preset's room."""
+    try:
+        seating = build_scene_seating(get_demo_config(preset))
+        return {"calibrated": True, "seat_count": len(seating.seat_defs), "error": None}
+    except CalibrationMismatchError as exc:
+        return {"calibrated": False, "seat_count": 0, "error": str(exc)}
+
+
 @router.get("/presets")
 def list_presets() -> List[Dict[str, Any]]:
     """List all available competition demonstration presets and their metadata."""
     presets = []
     for name, p_cfg in DEMO_PRESETS.items():
         # Check if precomputed replay artifacts exist
-        replay_p = Path(f"data/demo_final/{name}")
+        replay_p = replay_package_dir(name)
         has_replay = (replay_p / "result.mp4").exists() and (replay_p / "events.json").exists()
 
         video_p = p_cfg.get("video_path", "")
         room_c = p_cfg.get("room_code", "ROOM-01")
         cam_id = p_cfg.get("camera_id", "CAM-01")
         imgsz = p_cfg.get("pose_imgsz", 1280)
-        seats = p_cfg.get("seats_preset", [])
+        calibration = _calibration_state(name)
 
         presets.append({
             "name": name,
@@ -76,10 +88,22 @@ def list_presets() -> List[Dict[str, Any]]:
             "room_code": room_c,
             "camera_id": cam_id,
             "resolution": f"{imgsz}x{imgsz}" if imgsz else "HD",
-            "seat_count": len(seats) if seats else 21,
+            "seat_count": calibration["seat_count"],
+            "calibrated": calibration["calibrated"],
+            "calibration_error": calibration["error"],
             "has_replay_artifacts": has_replay,
         })
     return presets
+
+
+class OverlayRequest(BaseModel):
+    behavior_labels: bool = Field(..., description="Show display-only behaviour tags (no effect on scoring)")
+
+
+@router.post("/overlay")
+def set_overlay(payload: OverlayRequest) -> Dict[str, Any]:
+    """Toggle display-only behaviour tags on the live stream while a run is in progress."""
+    return DemoRuntime.get_instance().set_behavior_labels(payload.behavior_labels)
 
 
 @router.post("/start")
@@ -99,7 +123,14 @@ def start_demo(payload: DemoStartRequest) -> Dict[str, Any]:
             detail=f"Unknown mode '{payload.mode}'. Must be 'LIVE' or 'REPLAY'",
         )
 
+    if mode_clean == DemoMode.LIVE.value:
+        calibration = _calibration_state(preset_clean)
+        if not calibration["calibrated"]:
+            raise HTTPException(status_code=409, detail=calibration["error"])
+
     runtime = DemoRuntime.get_instance()
+    if payload.behavior_labels is not None:
+        runtime.set_behavior_labels(payload.behavior_labels)
     try:
         res = runtime.start(
             preset=preset_clean,
@@ -307,7 +338,7 @@ def _contained_persisted_evidence(path_value: Optional[str], extensions: set[str
     candidate = Path(path_value).resolve()
     if candidate.suffix.lower() not in extensions or not candidate.is_file():
         return None
-    roots = [Path("data/demo_runs").resolve(), Path("data/demo_final").resolve()]
+    roots = [demo_runs_root().resolve(), demo_final_root().resolve()]
     if not any(root == candidate.parent or root in candidate.parents for root in roots):
         return None
     return candidate
@@ -357,8 +388,8 @@ def _find_evidence_file(filename: str, subfolder: str = "evidence") -> Optional[
     if filename != Path(filename).name or filename in {"", ".", ".."}:
         return None
     candidate_roots = [
-        Path("data/demo_runs"),
-        Path("data/demo_final"),
+        demo_runs_root(),
+        demo_final_root(),
     ]
     matches: list[Path] = []
     for root in candidate_roots:

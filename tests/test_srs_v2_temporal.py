@@ -34,6 +34,8 @@ from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType,
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 
 
+# Head yaw is subject-centric and the camera faces the candidate: a nose offset
+# toward the image-left means the candidate turned to THEIR right.
 def _create_mock_detection(
     bbox=(100, 100, 250, 300),
     confidence=0.90,
@@ -161,7 +163,7 @@ def test_case_04_short_head_turn_no_repeated_glance():
     for t in [0.0, 100.0, 200.0, 300.0]:
         raw_obs = [
             ObservationExtractor().extract(
-                _create_mock_detection(nose_xy=(205, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120)), # Turned Right
+                _create_mock_detection(nose_xy=(145, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120)), # Turned Right
                 ctx,
                 t,
             )[1]
@@ -184,7 +186,7 @@ def test_case_05_repeated_neighbor_head_turn():
 
     # Episode 1: Turn Right (0 to 600ms)
     for t in [0.0, 100.0, 200.0, 300.0, 400.0, 500.0, 600.0]:
-        det = _create_mock_detection(nose_xy=(208, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(142, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t)
         eps = ep_engine.process_observations(obs, t)
         pat_engine.ingest_episodes(eps, ep_engine.completed_episodes, ctx, t)
@@ -199,7 +201,7 @@ def test_case_05_repeated_neighbor_head_turn():
     # Episode 2: Turn Right Again (1600 to 2200ms)
     detected_pats = []
     for t in [1600.0, 1800.0, 2000.0, 2200.0]:
-        det = _create_mock_detection(nose_xy=(208, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+        det = _create_mock_detection(nose_xy=(142, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
         obs = extractor.extract(det, ctx, t)
         eps = ep_engine.process_observations(obs, t)
         pats = pat_engine.ingest_episodes(eps, ep_engine.completed_episodes, ctx, t)
@@ -377,7 +379,7 @@ def test_case_12_framerate_invariance_5fps_vs_10fps():
             t_ms = s * dt_ms
             # Turn active between 500ms and 2000ms (duration 1500ms)
             if 500.0 <= t_ms <= 2000.0:
-                det = _create_mock_detection(nose_xy=(210, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
+                det = _create_mock_detection(nose_xy=(140, 120), l_ear_xy=(160, 120), r_ear_xy=(190, 120))
             else:
                 det = _create_mock_detection(nose_xy=(175, 120))
 

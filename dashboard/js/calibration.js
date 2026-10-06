@@ -470,6 +470,7 @@ function completeCurrentPolygon() {
     document.getElementById('inputSeatCode').value = suggestedCode;
     document.getElementById('inputSeatLabel').value = suggestedLabel;
     document.getElementById('inputSeatEnabled').checked = true;
+    document.getElementById('inputSeatCapacity').value = 1;
 
     document.getElementById('seatModal').classList.remove('hidden');
     document.getElementById('seatModal').classList.add('flex');
@@ -488,6 +489,7 @@ function confirmSeatDetails() {
     const seatCode = document.getElementById('inputSeatCode').value.trim();
     const seatLabel = document.getElementById('inputSeatLabel').value.trim();
     const isEnabled = document.getElementById('inputSeatEnabled').checked;
+    const capacity = clampCapacity(document.getElementById('inputSeatCapacity').value);
 
     if (!seatCode) {
         alert('Please enter a unique Seat Code.');
@@ -499,7 +501,8 @@ function confirmSeatDetails() {
         seat_code: seatCode,
         seat_label: seatLabel || seatCode,
         polygon: [...currentPolygon],
-        enabled: isEnabled
+        enabled: isEnabled,
+        context: { capacity },
     };
 
     seats.push(newSeat);
@@ -699,6 +702,10 @@ function renderSeatList() {
             </div>
 
             <div class="flex items-center gap-1" onclick="event.stopPropagation()">
+                <label class="text-[10px] text-gray-400 font-mono flex items-center gap-1" title="People normally inside this ROI">
+                    Cap
+                    <input type="number" min="1" max="4" value="${seatCapacity(s)}" onchange="updateSeatCapacity(${idx}, this.value)" class="w-11 bg-gray-950 border border-gray-700 rounded px-1 py-0.5 text-[11px] text-white font-mono">
+                </label>
                 <button onclick="toggleSeatEnabled(${idx})" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-1.5 rounded hover:bg-gray-800 text-gray-400 hover:text-cyan-300 transition" title="Toggle Enable/Disable">
                     ${s.enabled ? '🟢' : '⚪'}
                 </button>
@@ -830,14 +837,25 @@ async function reloadSeatsFromDB() {
                 poly = poly.map(p => [p.x, p.y]);
             }
 
+            let context = {};
+            if (typeof s.context_json === 'string' && s.context_json) {
+                try { context = JSON.parse(s.context_json) || {}; } catch(e) { context = {}; }
+            } else if (s.context_json && typeof s.context_json === 'object') {
+                context = s.context_json;
+            }
+
             return {
                 id: s.id,
                 seat_code: s.seat_code,
                 seat_label: s.seat_label,
                 polygon: poly,
-                enabled: s.enabled
+                enabled: s.enabled,
+                context,
             };
         });
+
+        const savedView = seats.map(s => s.context && s.context.camera_view).find(Boolean);
+        document.getElementById('selectCameraView').value = savedView || 'facing_subjects';
 
         selectedSeatIndex = null;
         renderSeatList();
@@ -871,7 +889,13 @@ async function saveAllSeatsToDB() {
             seat_code: s.seat_code,
             seat_label: s.seat_label || s.seat_code,
             polygon_json: s.polygon,
-            enabled: s.enabled
+            enabled: s.enabled,
+            // Runtime context read by every analysis run (see classroom_monitor/demo/seating.py)
+            context_json: {
+                ...(s.context || {}),
+                capacity: seatCapacity(s),
+                camera_view: document.getElementById('selectCameraView').value,
+            },
         }))
     };
 
@@ -891,6 +915,53 @@ async function saveAllSeatsToDB() {
     } catch (err) {
         alert('Failed to save seats: ' + err.message);
         setDrawingStatus('SAVE ERROR', 'text-red-400');
+    }
+}
+
+function clampCapacity(value) {
+    const n = parseInt(value, 10);
+    if (!Number.isFinite(n)) return 1;
+    return Math.min(4, Math.max(1, n));
+}
+
+function seatCapacity(seat) {
+    return clampCapacity(seat && seat.context ? seat.context.capacity : 1);
+}
+
+function updateSeatCapacity(idx, value) {
+    if (idx < 0 || idx >= seats.length) return;
+    seats[idx].context = { ...(seats[idx].context || {}), capacity: clampCapacity(value) };
+    setDrawingStatus('CAPACITY CHANGED (UNSAVED)', 'text-amber-400');
+    renderSeatList();
+}
+
+function onCameraViewChanged() {
+    setDrawingStatus('CAMERA PLACEMENT CHANGED (UNSAVED)', 'text-amber-400');
+}
+
+async function importSeatTemplate() {
+    if (!currentRoomId) {
+        alert('Please select an exam room first.');
+        return;
+    }
+    const camParam = currentCameraId ? `camera_id=${encodeURIComponent(currentCameraId)}&` : '';
+    const url = (replace) => `/api/v1/rooms/${currentRoomId}/seats/import-template?${camParam}replace=${replace}`;
+    try {
+        let res = await fetch(url(false), { method: 'POST' });
+        if (res.status === 409) {
+            if (!confirm('This room already has Seat ROIs. Replace them with the starting layout?')) return;
+            res = await fetch(url(true), { method: 'POST' });
+        }
+        if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || `HTTP ${res.status}`);
+        }
+        const imported = await res.json();
+        setDrawingStatus(`IMPORTED ${imported.length} SEATS — REVIEW AND ADJUST`, 'text-emerald-400');
+        reloadSeatsFromDB();
+    } catch (err) {
+        alert('Could not import the starting layout: ' + err.message);
+        setDrawingStatus('IMPORT ERROR', 'text-red-400');
     }
 }
 

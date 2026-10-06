@@ -4,6 +4,11 @@
  */
 
 let activePreset = 'india';
+// Room, camera and seat count per preset as reported by the server (seats come
+// from the web calibration page).
+let presetInfo = {};
+// The behaviour-label checkbox follows the server once, on page load.
+let behaviorLabelsSynced = false;
 let activeMode = 'LIVE';
 let activeFilter = 'ALL';
 let activeSourceFilter = 'ALL';
@@ -150,15 +155,15 @@ function selectPreset(preset) {
     btnIndia.setAttribute('aria-pressed', String(preset === 'india'));
     btnStudent.setAttribute('aria-pressed', String(preset === 'student'));
 
-    if (preset === 'india') {
-        document.getElementById('lblRoomCode').textContent = 'ROOM-CALIB-01';
-        document.getElementById('lblCameraId').textContent = 'CAM-CALIB-01';
-        document.getElementById('lblCalibratedSeats').textContent = '21';
-    } else {
-        document.getElementById('lblRoomCode').textContent = 'ROOM-STUDENT-01';
-        document.getElementById('lblCameraId').textContent = 'CAM-STUDENT-01';
-        document.getElementById('lblCalibratedSeats').textContent = '12';
-    }
+    renderPresetDetails();
+}
+
+function renderPresetDetails() {
+    const info = presetInfo[activePreset];
+    if (!info) return;
+    document.getElementById('lblRoomCode').textContent = info.room_code;
+    document.getElementById('lblCameraId').textContent = info.camera_id;
+    document.getElementById('lblCalibratedSeats').textContent = info.calibrated ? String(info.seat_count) : '0';
 }
 
 function selectMode(mode) {
@@ -198,14 +203,21 @@ async function startDemo() {
                 preset: activePreset,
                 mode: activeMode,
                 debug_overlay: debug,
+                behavior_labels: document.getElementById('chkBehaviorLabels').checked,
             }),
         });
         const data = await res.json();
+        if (!res.ok) {
+            showDemoError(data.detail || `Could not start (HTTP ${res.status})`);
+            return;
+        }
+        showDemoError(null);
         renderStatus(data);
         refreshStream();
         fetchEvents();
     } catch (err) {
         console.error('Failed to start demo:', err);
+        showDemoError('Could not reach the VIGIL server.');
     } finally {
         setTimeout(() => {
             if (btnStart) {
@@ -263,12 +275,50 @@ function handleStreamError(img) {
 // API Polling & Telemetry Fetching
 // -----------------------------------------------------------------------------
 
+const PRESET_BUTTON_IDS = { india: 'btnPresetIndia', student: 'btnPresetStudent' };
+
 async function fetchPresets() {
     try {
         const res = await apiFetch('/api/v1/demo/presets');
         const presets = await res.json();
-        // Presets populated
+        presets.forEach((p) => {
+            presetInfo[p.name] = p;
+            const btn = document.getElementById(PRESET_BUTTON_IDS[p.name]);
+            if (!btn) return;
+            // Seat counts come from the web calibration, never from fixed numbers
+            btn.textContent = p.calibrated
+                ? `${p.title} (${p.seat_count} seats)`
+                : `${p.title} (not calibrated)`;
+            btn.title = p.calibrated ? '' : (p.calibration_error || 'Draw Seat ROIs on the calibration page');
+        });
+        renderPresetDetails();
     } catch (e) {}
+}
+
+async function toggleBehaviorLabels(enabled) {
+    try {
+        await apiFetch('/api/v1/demo/overlay', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ behavior_labels: enabled }),
+        });
+    } catch (e) {
+        console.error('Failed to toggle behavior labels:', e);
+    }
+}
+
+function showDemoError(message) {
+    const banner = document.getElementById('demoErrorBanner');
+    const text = document.getElementById('demoErrorText');
+    const link = document.getElementById('demoErrorLink');
+    if (!banner || !text) return;
+    if (!message) {
+        banner.classList.add('hidden');
+        return;
+    }
+    text.textContent = message;
+    if (link) link.classList.toggle('hidden', !/calibrat|seat roi/i.test(message));
+    banner.classList.remove('hidden');
 }
 
 async function fetchStatus() {
@@ -320,7 +370,17 @@ function renderStatus(st) {
     const lblIncidents = document.getElementById('lblIncidentCount');
     const placeholder = document.getElementById('videoPlaceholder');
 
+    if (!behaviorLabelsSynced && typeof st.behavior_labels === 'boolean') {
+        const chk = document.getElementById('chkBehaviorLabels');
+        if (chk) chk.checked = st.behavior_labels;
+        behaviorLabelsSynced = true;
+    }
     if (stateText) stateText.textContent = st.state;
+    if (st.state === 'ERROR' && st.last_error) {
+        showDemoError(st.last_error);
+    } else if (st.state === 'RUNNING') {
+        showDemoError(null);
+    }
     if (stateBadge) {
         stateBadge.dataset.state = st.state;
         if (st.state === 'RUNNING') {
@@ -464,7 +524,9 @@ function renderReviewQueue() {
     grid.innerHTML = filtered
         .map((ev) => {
             const isManual = ev._source === 'MANUAL';
-            const risk = Math.round(ev.peak_risk_score || ev.risk_score || 75);
+            // Show only the score the core recorded; never invent a default priority.
+            const riskValue = ev.peak_risk_score ?? ev.risk_score;
+            const risk = Number.isFinite(Number(riskValue)) ? Math.round(Number(riskValue)) : '--';
             const occ = ev.occurrence_count || 1;
             const pattern = escapeHtml(isManual ? (ev.note || 'Proctor-marked observation') : formatBehaviorLabel(ev.primary_pattern || ev.behavior));
             const seat = escapeHtml(ev.subject_ref || ev.seat_id || 'UNASSIGNED');
@@ -634,7 +696,8 @@ async function openReviewModal(eventId) {
     document.getElementById('modalPatternTitle').textContent = formatBehaviorLabel(ev.primary_pattern || ev.behavior);
     document.getElementById('modalSeverityBadge').textContent = ev.severity || 'MEDIUM';
     document.getElementById('modalBehaviorText').textContent = ev.primary_pattern || ev.behavior;
-    document.getElementById('modalRiskScore').textContent = `${Math.round(ev.peak_risk_score || ev.risk_score || 80)} / 100`;
+    const modalRisk = ev.peak_risk_score ?? ev.risk_score;
+    document.getElementById('modalRiskScore').textContent = Number.isFinite(Number(modalRisk)) ? `${Math.round(Number(modalRisk))} / 100` : 'Not recorded';
     document.getElementById('modalOccurrence').textContent = `x${ev.occurrence_count || 1}`;
 
     const firstSeen = (ev.first_seen_ms ? ev.first_seen_ms / 1000 : 0).toFixed(1);

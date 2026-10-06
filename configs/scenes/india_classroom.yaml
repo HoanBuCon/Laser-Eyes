@@ -10,6 +10,9 @@ video_resolution:
 
 calibration_version: "v2.0"
 coordinate_space: "pixel"
+# Camera at the front of the room looking at the candidates' faces: a candidate's
+# own left/right (head turns, torso lean, neighbours) is the image's right/left.
+camera_view: "facing_subjects"
 
 seats:
   - seat_code: "SEAT-ROOM-CALIB-01-01"

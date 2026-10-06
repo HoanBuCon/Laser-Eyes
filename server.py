@@ -158,11 +158,75 @@ def seed_initial_demo_data() -> None:
         db.close()
 
 
+def preflight_report() -> dict:
+    """Check what a Classroom run needs and print it; nothing here is fatal."""
+    import shutil
+    from pathlib import Path
+
+    from classroom_monitor.config import DEFAULT_CONFIG
+    from classroom_monitor.demo.config import DEMO_PRESETS, get_demo_config
+    from classroom_monitor.demo.seating import CalibrationMismatchError, build_scene_seating
+
+    def line(ok: bool, label: str, detail: str) -> None:
+        print(f"  [{'OK' if ok else '!!'}] {label:<22} {detail}")
+
+    print("\n  Preflight")
+    try:
+        import torch
+
+        cuda = torch.cuda.is_available()
+        line(True, "Compute", torch.cuda.get_device_name(0) if cuda else "CPU only (slow)")
+    except Exception as exc:  # pragma: no cover - environment specific
+        line(False, "Compute", f"PyTorch unavailable: {exc}")
+
+    pose = Path(DEFAULT_CONFIG.pose_model_path)
+    line(pose.is_file(), "Pose model", str(pose) if pose.is_file() else f"{pose} missing (downloaded on first run if online)")
+    hpe_cache = Path.home() / ".cache" / "torch" / "hub" / "checkpoints" / "6DRepNet_300W_LP_AFLW2000.pth"
+    line(hpe_cache.is_file(), "Head pose weights", "cached" if hpe_cache.is_file() else "not cached (downloaded on first run if online)")
+    ffmpeg_ok = shutil.which("ffmpeg") is not None and shutil.which("ffprobe") is not None
+    line(ffmpeg_ok, "ffmpeg / ffprobe", "on PATH" if ffmpeg_ok else "missing: evidence clips may not play in the browser")
+
+    uncalibrated = []
+    for name in DEMO_PRESETS:
+        try:
+            config = get_demo_config(name)
+            video_ok = True
+        except FileNotFoundError as exc:
+            line(False, f"Video {name}", str(exc))
+            continue
+        try:
+            seating = build_scene_seating(config)
+            line(video_ok, f"Room {config.room_code}", f"{len(seating.seat_defs)} Seat ROIs ({name} video)")
+        except CalibrationMismatchError:
+            uncalibrated.append(name)
+            line(False, f"Room {config.room_code}", f"no Seat ROI yet — draw them at /calibration ({name} video)")
+    return {"uncalibrated": uncalibrated}
+
+
+def _open_browser_when_ready(url: str, port: int) -> None:
+    import threading
+    import time
+    import urllib.request
+    import webbrowser
+
+    def wait_and_open() -> None:
+        for _ in range(120):
+            try:
+                urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
+        webbrowser.open(url)
+
+    threading.Thread(target=wait_and_open, daemon=True).start()
+
+
 def main() -> None:
-    parser = argparse.ArgumentParser(description="VIGIL AI Enterprise Server Launcher")
+    parser = argparse.ArgumentParser(description="VIGIL AI Classroom server (single entry point)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Binding host IP (localhost by default)")
     parser.add_argument("--port", type=int, default=8000, help="Listening port")
     parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
+    parser.add_argument("--open-browser", action="store_true", help="Open the web interface once the server is ready")
     parser.add_argument(
         "--demo-token",
         default=os.getenv("VIGIL_DEMO_TOKEN"),
@@ -184,17 +248,23 @@ def main() -> None:
     # 2. Seed initial data if necessary
     seed_initial_demo_data()
 
-    # 3. Print Banner
+    # 3. Print Banner (the website is the only operator interface)
     print("\n" + "=" * 70)
-    print("      🚀 VIGIL AI ENTERPRISE EXAM PROCTORING SERVER RUNNING")
+    print("      VIGIL AI CLASSROOM — open the website to operate the system")
     print("=" * 70)
-    print(f"  * Web Demo (ICTU) : http://localhost:{args.port}/demo")
-    print(f"  * Web Dashboard   : http://localhost:{args.port}/")
-    print(f"  * REST API Docs   : http://localhost:{args.port}/docs")
-    print(f"  * ReDoc Schema    : http://localhost:{args.port}/redoc")
+    preflight = preflight_report()
+    print()
+    print(f"  * Seat calibration : http://localhost:{args.port}/calibration")
+    print(f"  * Live monitor     : http://localhost:{args.port}/demo")
+    print(f"  * Operations       : http://localhost:{args.port}/")
     if args.demo_token:
-        print("  * Network access  : protected by X-Vigil-Demo-Token")
+        print("  * Network access   : protected by X-Vigil-Demo-Token")
+    print("  * Stop the server  : Ctrl+C in this window")
     print("=" * 70 + "\n")
+
+    if args.open_browser:
+        start_page = "/calibration" if preflight["uncalibrated"] else "/demo"
+        _open_browser_when_ready(f"http://localhost:{args.port}{start_page}", args.port)
 
     # 4. Start Uvicorn Server
     uvicorn.run(

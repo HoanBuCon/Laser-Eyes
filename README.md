@@ -25,31 +25,29 @@ The UI includes guided calibration, an explicit Recalibrate action and an allowe
 - YOLO11 Pose, seat mapping, SixDRepNet head orientation, temporal episodes, behavior patterns, review-priority scoring, evidence and a web review queue.
 - CLI and web adapters use the same `SRSv2Pipeline` semantic core.
 
-Install the base dependencies and optional HPE dependencies:
+### Start — one command
 
 ```powershell
-venv\Scripts\python.exe -m pip install -r requirements.txt
-venv\Scripts\python.exe -m pip install -r requirements-hpe.txt
+.\start_vigil.bat
 ```
 
-Run the competition web app on localhost:
+(Or double-click `start_vigil.bat`.) On the first run it creates the Python environment. Each start checks the GPU, models, `ffmpeg` and the seat calibration of every room, starts the server on `http://localhost:8000` and opens the browser. Arguments are passed through, e.g. `.\start_vigil.bat --port 8080`, or `.\start_vigil.bat --host 0.0.0.0 --demo-token "choose-a-secret"` for LAN access (a token is mandatory beyond localhost). Stop the system with `Ctrl+C` in that window.
 
-```powershell
-venv\Scripts\python.exe server.py --host 127.0.0.1 --port 8000
-```
+### Operate — the website is the only interface
 
-Open `http://127.0.0.1:8000/demo`. For LAN access, an explicit token is required:
+| Page | Purpose |
+|---|---|
+| `/calibration` | Draw the Seat ROIs of each room on the camera frame, set how many people normally sit in an ROI ("Cap", use 2 for a shared desk) and where the camera is (in front of or behind the candidates). **Import starting layout** loads a bundled example layout to adjust. Save stores the seats in the database. |
+| `/demo` | Start LIVE analysis or REPLAY, watch the annotated stream, review incidents, mark frames, export. |
+| `/` and `/data-workbench` | Operations overview and dataset tools. |
 
-```powershell
-venv\Scripts\python.exe server.py --host 0.0.0.0 --port 8000 --demo-token "choose-a-secret"
-```
+Every run reads the Seat ROIs saved on `/calibration`; there is no other calibration source. A room without seats cannot start LIVE: the page shows the reason and a link to the calibration page. A complete LIVE run also refreshes the REPLAY package of that room.
 
-Run real-model CLI validation:
+For best speed keep a laptop on AC power: a GPU in power-saving state (for example while the screen is locked) can make analysis several times slower.
 
-```powershell
-venv\Scripts\python.exe scripts\run_demo_video.py --video student
-venv\Scripts\python.exe scripts\run_demo_video.py --video india
-```
+### Developer tools (not for operators)
+
+`scripts/run_demo_video.py --video student|india` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
 
 ## Real, degraded and mock modes
 
@@ -75,7 +73,7 @@ See [the acceptance checklist](docs/PROCTOR_SUPPORT_ACCEPTANCE.md) for the manua
 venv\Scripts\python.exe -m pytest
 ```
 
-The current suite collected and passed 271 tests on 2026-09-30. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
+The suite runs against a temporary database and temporary demo folders; it passed 294 tests on 2026-10-06. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
 
 ## Documentation status
 

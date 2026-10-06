@@ -74,6 +74,8 @@ wandb/
 
 # ---- 5. Runtime Storage, Databases & Temp Logs ----
 data/*.db
+data/*.db-shm
+data/*.db-wal
 data/*.sqlite
 data/*.sqlite3
 data/evidence/

@@ -5,7 +5,7 @@ Implements Two Distinct Display Modes:
    - Unobtrusive, production-grade AI co-pilot view for exam proctors.
    - Zero visual clutter: Person bboxes OFF, Skeletons OFF, Head rays OFF, Desk lines OFF.
    - Normal/Empty seats: Dim minimal label [S01] without polygon borders.
-   - Suspicious seats: Amber border + score badge (canonical threshold >= 60.0 or RiskState.SUSPICIOUS).
+   - Suspicious seats: Amber border + score badge (core RiskState.SUSPICIOUS only).
    - Incident / Review Required seats: High-contrast RED border and floating Review Card ONLY for active review incidents.
    - Clean ASCII labels (e.g. S01, S08) eliminating cv2.putText Unicode glyph errors.
    - Incident reason derived strictly from ClassroomEvent.behavior / active incident (never non-causal active episodes).
@@ -32,7 +32,7 @@ from classroom_monitor.models import ClassroomEvent, Detection
 from classroom_monitor.observation_extractor import RawObservation
 from classroom_monitor.scene_context import SeatGraph
 from classroom_monitor.seat_manager import SeatManager, SeatState
-from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
+from classroom_monitor.seat_risk_tracker import EPISODE_PRIORITY_WEIGHTS, RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import TemporalEpisode
 
 # COCO 17 Keypoints Skeleton Connections for Debug Mode
@@ -42,6 +42,15 @@ SKELETON_PAIRS = [
     (5, 11), (6, 12), (11, 12),               # Torso
     (11, 13), (13, 15), (12, 14), (14, 16),   # Legs
 ]
+
+
+def _episode_name(ep: Any) -> str:
+    raw_type = getattr(ep, "episode_type", "")
+    return str(getattr(raw_type, "value", raw_type))
+
+
+def _episode_weight(ep: Any) -> float:
+    return EPISODE_PRIORITY_WEIGHTS.get(_episode_name(ep), 0.0)
 
 
 def get_short_seat_label(seat_id: str, label: str = "") -> str:
@@ -57,8 +66,13 @@ def get_short_seat_label(seat_id: str, label: str = "") -> str:
 class DemoHUDOverlayRenderer:
     """Renders clean proctor overlays (default) or rich developer telemetry."""
 
-    def __init__(self, debug_overlay: bool = False):
+    def __init__(self, debug_overlay: bool = False, behavior_labels: bool = False):
         self.debug_overlay = debug_overlay
+        # Descriptive per-student behaviour tags (head turn, posture, hands).
+        # Display only: they never change risk, review state or incidents.
+        self.behavior_labels = behavior_labels
+        self._hand_active: Dict[str, bool] = {}
+        self._hand_pending_since: Dict[str, Optional[float]] = {}
 
     def render_frame(
         self,
@@ -91,22 +105,56 @@ class DemoHUDOverlayRenderer:
 
         if show_debug:
             # === DEVELOPER DEBUG MODE ===
-            self._render_debug_detections(canvas, det_list, obs_dict)
+            self._render_debug_detections(canvas, det_list, obs_dict, seat_mgr, episodes_list, seat_graph)
             self._render_debug_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_debug_roaming(canvas, roam_list)
+            if self.behavior_labels:
+                self._render_behavior_labels(canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms)
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
-            self._render_bottom_ticker(canvas, events_list, timestamp_ms)
+            self._render_bottom_ticker(canvas, events_list, timestamp_ms, risk_tracker)
             self._render_debug_panel(canvas, runtime_metrics or {}, episodes_list, obs_dict)
         else:
             # === CLEAN PROCTOR MODE (DEFAULT PRESENTATION) ===
             self._render_proctor_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_proctor_roaming(canvas, roam_list)
+            if self.behavior_labels:
+                self._render_behavior_labels(canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms)
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
-            self._render_bottom_ticker(canvas, events_list, timestamp_ms)
+            self._render_bottom_ticker(canvas, events_list, timestamp_ms, risk_tracker)
 
         return canvas
 
     render = render_frame
+
+    # -------------------------------------------------------------------------
+    # CORE-STATE HELPERS (the renderer only reflects core decisions)
+    # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _event_ts(evt: Any) -> float:
+        evt_ts = getattr(evt, "timestamp_ms", None)
+        if evt_ts is None:
+            evt_ts = (getattr(evt, "timestamp", 0.0) or 0.0) * 1000.0
+        return float(evt_ts)
+
+    @staticmethod
+    def _review_display_ms(risk_tracker: Optional[SeatRiskTracker]) -> float:
+        return float(getattr(risk_tracker, "cooldown_duration_ms", 5000.0) or 5000.0)
+
+    def _is_event_live(self, evt: Any, timestamp_ms: float, risk_tracker: Optional[SeatRiskTracker]) -> bool:
+        if timestamp_ms <= 0.0:
+            return True
+        age = timestamp_ms - self._event_ts(evt)
+        return 0.0 <= age <= self._review_display_ms(risk_tracker)
+
+    @staticmethod
+    def _trigger_score(evt: Any, fallback: float) -> float:
+        """Score at the moment the core emitted the incident (not the post-reset score)."""
+        meta = getattr(evt, "metadata", None) or {}
+        for key in ("trigger_risk_score", "risk_score", "peak_risk_score"):
+            if meta.get(key) is not None:
+                return float(meta[key])
+        return fallback
 
     # -------------------------------------------------------------------------
     # CLEAN PROCTOR MODE RENDERING
@@ -126,8 +174,6 @@ class DemoHUDOverlayRenderer:
         suspicious_seats = []
         normal_seats = []
 
-        suspicious_th = getattr(risk_tracker, "suspicious_threshold", 60.0)
-        flagged_th = getattr(risk_tracker, "flagged_threshold", 80.0)
 
         for seat_id, s_def in seat_mgr.seats.items():
             poly = s_def.polygon.astype(np.int32)
@@ -144,7 +190,7 @@ class DemoHUDOverlayRenderer:
             short_lbl = get_short_seat_label(seat_id, s_def.seat_label)
 
             occ = seat_mgr.occupancies.get(seat_id)
-            is_occupied = occ is not None and occ.state == SeatState.OCCUPIED
+            is_occupied = occ is not None and occ.state in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
             has_active_ep = any(getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id for ep in active_episodes)
 
             # Check if there is an active Review Incident for this seat
@@ -157,25 +203,21 @@ class DemoHUDOverlayRenderer:
             is_active_incident = False
             incident_evt = None
 
-            if latest_evt is not None:
-                evt_ts = getattr(latest_evt, "timestamp_ms", None)
-                if evt_ts is None:
-                    evt_ts = (getattr(latest_evt, "timestamp", 0.0) or 0.0) * 1000.0
-                if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
-                    is_active_incident = True
-                    incident_evt = latest_evt
-            elif state == RiskState.FLAGGED_FOR_REVIEW.value or score >= flagged_th:
+            # A review card exists only for an incident the core emitted, and
+            # only while the core's own post-incident cooldown runs.  The
+            # renderer never derives "review" from a score threshold itself.
+            if latest_evt is not None and self._is_event_live(latest_evt, timestamp_ms, risk_tracker):
                 is_active_incident = True
-                if profile and profile.active_event:
-                    incident_evt = profile.active_event
+                incident_evt = latest_evt
 
             # Categorize seat:
             # 1. FLAGGED (RED): Active Review Incident ONLY
-            # 2. SUSPICIOUS (AMBER): Canonical SUSPICIOUS state or score >= suspicious_threshold (60.0)
+            # 2. SUSPICIOUS (AMBER): core RiskState.SUSPICIOUS only
             # 3. NORMAL / OBSERVE (or COOLDOWN without active incident): Gray minimal badge
             is_flagged = is_active_incident and (is_occupied or has_active_ep)
             is_suspicious = (
-                (state == RiskState.SUSPICIOUS.value or (score >= suspicious_th and not is_flagged))
+                not is_flagged
+                and state == RiskState.SUSPICIOUS.value
                 and (is_occupied or has_active_ep)
             )
 
@@ -220,7 +262,7 @@ class DemoHUDOverlayRenderer:
             f_sub = 0.30 if canvas.shape[1] < 800 else 0.35
 
             card_title = f"{short_lbl}: REVIEW REQUIRED"
-            card_sub = f"{beh_str} (Score: {score:.0f})"
+            card_sub = f"{beh_str} (Score: {self._trigger_score(incident_evt, score):.0f})"
 
             (w1, h1), _ = cv2.getTextSize(card_title, cv2.FONT_HERSHEY_SIMPLEX, f_title, 1)
             (w2, h2), _ = cv2.getTextSize(card_sub, cv2.FONT_HERSHEY_SIMPLEX, f_sub, 1)
@@ -252,6 +294,131 @@ class DemoHUDOverlayRenderer:
             cv2.putText(canvas, lbl, (x1 + 2, y1 - 2), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (0, 180, 255), 1, cv2.LINE_AA)
 
     # -------------------------------------------------------------------------
+    # BEHAVIOUR LABELS (display only, independent of scoring)
+    # -------------------------------------------------------------------------
+
+    # Wrist speed in person-heights per second; chosen so roughly the top 5-10 %
+    # of wrist motion on the demo videos is shown, with hysteresis against flicker.
+    HAND_ON_SPEED = 0.60
+    HAND_OFF_SPEED = 0.35
+    HAND_ON_HOLD_MS = 300.0
+    HAND_OFF_HOLD_MS = 500.0
+
+    def _hand_movement(self, seat_code: str, speed: Optional[float], timestamp_ms: float) -> bool:
+        active = self._hand_active.get(seat_code, False)
+        if speed is None:
+            self._hand_pending_since[seat_code] = None
+            return active
+        crossing = speed > self.HAND_ON_SPEED if not active else speed < self.HAND_OFF_SPEED
+        if not crossing:
+            self._hand_pending_since[seat_code] = None
+            return active
+        since = self._hand_pending_since.get(seat_code)
+        if since is None:
+            self._hand_pending_since[seat_code] = timestamp_ms
+            return active
+        hold = self.HAND_OFF_HOLD_MS if active else self.HAND_ON_HOLD_MS
+        if timestamp_ms - since >= hold:
+            self._hand_active[seat_code] = not active
+            self._hand_pending_since[seat_code] = None
+        return self._hand_active.get(seat_code, False)
+
+    def _behavior_tags(
+        self,
+        seat_code: str,
+        episodes: List[TemporalEpisode],
+        observations: List[RawObservation],
+        detection: Optional[Detection],
+        mirrors_image: bool,
+        timestamp_ms: float,
+    ) -> List[Tuple[str, Tuple[int, int, int]]]:
+        """Short tags for what the student is doing now, from core episodes.
+
+        Head-turn and lean episodes are subject-centric; the arrow shows the
+        direction on screen so viewers do not have to translate left/right.
+        """
+        types = {_episode_name(ep) for ep in episodes if getattr(ep, "seat_id", "") == seat_code}
+
+        def arrow(subject_left: bool) -> str:
+            # The candidate's left is the image's right when the camera faces them.
+            image_right = subject_left if mirrors_image else not subject_left
+            return "->" if image_right else "<-"
+
+        head_col = (230, 200, 60)    # light blue (BGR)
+        posture_col = (220, 140, 200)  # violet
+        hand_col = (110, 210, 120)   # green
+        presence_col = (60, 170, 240)  # orange
+        tags: List[Tuple[str, Tuple[int, int, int]]] = []
+        if "HEAD_TURN_LEFT" in types:
+            tags.append((f"Head turn {arrow(True)}", head_col))
+        if "HEAD_TURN_RIGHT" in types:
+            tags.append((f"Head turn {arrow(False)}", head_col))
+        if "HEAD_PITCH_DOWN" in types:
+            tags.append(("Head down", head_col))
+        if "TORSO_LEAN_LEFT" in types:
+            tags.append((f"Lean {arrow(True)}", posture_col))
+        if "TORSO_LEAN_RIGHT" in types:
+            tags.append((f"Lean {arrow(False)}", posture_col))
+        if "WRIST_BELOW_DESK" in types:
+            tags.append(("Hand below desk", hand_col))
+
+        speed = None
+        if detection is not None:
+            wrist = next(
+                (o for o in observations if o.observation_type == "WRIST_VELOCITY" and o.value is not None),
+                None,
+            )
+            if wrist is not None:
+                height = max(1.0, float(detection.bbox[3] - detection.bbox[1]))
+                speed = float(wrist.value) / height
+        if self._hand_movement(seat_code, speed, timestamp_ms):
+            tags.append(("Hand movement", hand_col))
+
+        if "MULTI_PERSON_NEAR_SEAT" in types:
+            tags.append(("Extra person", presence_col))
+        return tags
+
+    def _render_behavior_labels(
+        self,
+        canvas: np.ndarray,
+        seat_mgr: SeatManager,
+        seat_graph: Optional[SeatGraph],
+        active_episodes: List[TemporalEpisode],
+        raw_observations: Dict[str, List[RawObservation]],
+        timestamp_ms: float,
+    ) -> None:
+        """Draw behaviour tags on each seated student's box (no scoring meaning)."""
+        mirrors_image = True if seat_graph is None else bool(getattr(seat_graph, "mirrors_image", True))
+        small = canvas.shape[1] < 800
+        scale = 0.30 if small else 0.38
+        line_h = 11 if small else 14
+        for seat_code, occ in seat_mgr.occupancies.items():
+            det = occ.assigned_detection
+            tags = self._behavior_tags(
+                seat_code,
+                active_episodes,
+                raw_observations.get(seat_code, []),
+                det,
+                mirrors_image,
+                timestamp_ms,
+            )
+            if not tags or det is None:
+                continue
+            x1, y1, x2, _y2 = [int(v) for v in det.bbox]
+            cv2.rectangle(canvas, (x1, y1), (x2, _y2), (190, 170, 90), 1, cv2.LINE_AA)
+            y = y1 + 2
+            for text, col in tags:
+                (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, 1)
+                y_top = y
+                y_bottom = y + th + 4
+                if y_bottom >= canvas.shape[0]:
+                    break
+                cv2.rectangle(canvas, (x1, y_top), (x1 + tw + 6, y_bottom), (25, 25, 25), -1)
+                cv2.rectangle(canvas, (x1, y_top), (x1 + 2, y_bottom), col, -1)
+                cv2.putText(canvas, text, (x1 + 4, y_bottom - 3), cv2.FONT_HERSHEY_SIMPLEX, scale, (235, 235, 235), 1, cv2.LINE_AA)
+                y += line_h
+
+    # -------------------------------------------------------------------------
     # DEVELOPER DEBUG MODE RENDERING
     # -------------------------------------------------------------------------
 
@@ -260,8 +427,29 @@ class DemoHUDOverlayRenderer:
         canvas: np.ndarray,
         detections: List[Detection],
         raw_observations: Dict[str, List[RawObservation]],
+        seat_mgr: Optional[SeatManager] = None,
+        active_episodes: Optional[List[TemporalEpisode]] = None,
+        seat_graph: Optional[SeatGraph] = None,
     ) -> None:
-        """Draw bounding boxes, keypoint skeletons, and 3D head rays for development telemetry."""
+        """Draw bounding boxes, keypoint skeletons, and head rays for development telemetry.
+
+        The head ray shows the yaw the core actually used (the seat's
+        HEAD_YAW_RELATIVE observation) and turns red only while the core has an
+        active HEAD_TURN episode for that seat; nothing is re-estimated here.
+        Yaw is subject-centric, so it is mirrored when the camera faces the
+        candidates (their right is the image's left).
+        """
+        image_sign = -1.0 if (seat_graph is None or getattr(seat_graph, "mirrors_image", True)) else 1.0
+        seat_of_detection: Dict[int, str] = {}
+        if seat_mgr is not None:
+            for s_code, occ in seat_mgr.occupancies.items():
+                if occ.assigned_detection is not None:
+                    seat_of_detection[id(occ.assigned_detection)] = s_code
+        turning_seats = {
+            getattr(ep, "seat_id", "")
+            for ep in (active_episodes or [])
+            if _episode_name(ep).startswith("HEAD_TURN")
+        }
         for det in detections:
             x1, y1, x2, y2 = [int(v) for v in det.bbox]
             # Yellow detection bbox
@@ -291,24 +479,27 @@ class DemoHUDOverlayRenderer:
                 if len(kp) >= 3 and kp[2] > 0.30:
                     cv2.circle(canvas, (int(kp[0]), int(kp[1])), 2, (0, 255, 0), -1, cv2.LINE_AA)
 
-            # Draw 3D Head Ray from Nose
+            # Head ray from the nose using the core's yaw for this seat
             nose = kps[0]
-            if len(nose) >= 3 and nose[2] > 0.30:
-                nx, ny = int(nose[0]), int(nose[1])
-                # Calculate yaw/pitch from nose & ears
-                if len(kps) > 4 and kps[3][2] > 0.25 and kps[4][2] > 0.25:
-                    ear_mid_x = (kps[3][0] + kps[4][0]) / 2.0
-                    ear_dist = max(1.0, float(np.linalg.norm(kps[3][:2] - kps[4][:2])))
-                    yaw_ratio = (nose[0] - ear_mid_x) / (ear_dist / 2.0)
-                    deg_yaw = float(np.clip(yaw_ratio * 45.0, -90.0, 90.0))
-
-                    rad_yaw = math.radians(deg_yaw)
-                    arrow_len = 32.0
-                    dx = int(arrow_len * math.sin(rad_yaw))
-                    dy = int(arrow_len * 0.3)
-
-                    ray_col = (0, 60, 255) if abs(deg_yaw) >= 28.0 else (50, 255, 50)
-                    cv2.arrowedLine(canvas, (nx, ny), (nx + dx, ny + dy), ray_col, 2, cv2.LINE_AA, tipLength=0.35)
+            seat_code = seat_of_detection.get(id(det))
+            if seat_code is None or len(nose) < 3 or nose[2] <= 0.30:
+                continue
+            yaw_obs = next(
+                (
+                    o for o in raw_observations.get(seat_code, [])
+                    if o.observation_type == "HEAD_YAW_RELATIVE" and o.value is not None
+                ),
+                None,
+            )
+            if yaw_obs is None:
+                continue
+            nx, ny = int(nose[0]), int(nose[1])
+            rad_yaw = math.radians(float(yaw_obs.value))
+            arrow_len = 32.0
+            dx = int(image_sign * arrow_len * math.sin(rad_yaw))
+            dy = int(arrow_len * 0.3)
+            ray_col = (0, 60, 255) if seat_code in turning_seats else (50, 255, 50)
+            cv2.arrowedLine(canvas, (nx, ny), (nx + dx, ny + dy), ray_col, 2, cv2.LINE_AA, tipLength=0.35)
 
     def _render_debug_seats(
         self,
@@ -322,8 +513,6 @@ class DemoHUDOverlayRenderer:
         """Draw full seat polygon boundaries, desk boundaries, and alert badges with developer telemetry."""
         ep_list = active_episodes or []
         evt_list = recent_events or []
-        suspicious_th = getattr(risk_tracker, "suspicious_threshold", 60.0)
-        flagged_th = getattr(risk_tracker, "flagged_threshold", 80.0)
 
         for seat_id, s_def in seat_mgr.seats.items():
             poly = s_def.polygon.astype(np.int32)
@@ -339,7 +528,7 @@ class DemoHUDOverlayRenderer:
             state = profile.current_state if profile else RiskState.NORMAL.value
 
             occ = seat_mgr.occupancies.get(seat_id)
-            is_occupied = occ is not None and occ.state == SeatState.OCCUPIED
+            is_occupied = occ is not None and occ.state in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
             seat_act_eps = [
                 ep for ep in ep_list
                 if getattr(ep, "seat_id", getattr(ep, "seat_code", "")) == seat_id
@@ -356,21 +545,17 @@ class DemoHUDOverlayRenderer:
             is_active_incident = False
             incident_evt = None
 
-            if latest_evt is not None:
-                evt_ts = getattr(latest_evt, "timestamp_ms", None)
-                if evt_ts is None:
-                    evt_ts = (getattr(latest_evt, "timestamp", 0.0) or 0.0) * 1000.0
-                if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
-                    is_active_incident = True
-                    incident_evt = latest_evt
-            elif state == RiskState.FLAGGED_FOR_REVIEW.value or score >= flagged_th:
+            # A review card exists only for an incident the core emitted, and
+            # only while the core's own post-incident cooldown runs.  The
+            # renderer never derives "review" from a score threshold itself.
+            if latest_evt is not None and self._is_event_live(latest_evt, timestamp_ms, risk_tracker):
                 is_active_incident = True
-                if profile and profile.active_event:
-                    incident_evt = profile.active_event
+                incident_evt = latest_evt
 
             is_flagged = is_active_incident and (is_occupied or has_active_ep)
             is_suspicious = (
-                (state == RiskState.SUSPICIOUS.value or (score >= suspicious_th and not is_flagged))
+                not is_flagged
+                and state == RiskState.SUSPICIOUS.value
                 and (is_occupied or has_active_ep)
             )
 
@@ -408,7 +593,7 @@ class DemoHUDOverlayRenderer:
 
                 beh_str = str(beh_raw).replace("_", " ").title()
                 badge_header = f"{short_lbl}: REVIEW"
-                badge_sub = f"{beh_str} ({score:.0f})"
+                badge_sub = f"{beh_str} ({self._trigger_score(incident_evt, score):.0f})"
 
                 f_title = 0.38 if canvas.shape[1] < 800 else 0.44
                 f_sub = 0.32 if canvas.shape[1] < 800 else 0.36
@@ -428,10 +613,11 @@ class DemoHUDOverlayRenderer:
                 cv2.putText(canvas, badge_sub, (bx1 + 5, by2 - 3), cv2.FONT_HERSHEY_SIMPLEX, f_sub, (230, 230, 230), 1, cv2.LINE_AA)
 
             elif is_suspicious:
-                if seat_act_eps:
-                    raw_type = seat_act_eps[0].episode_type
-                    ep_name = raw_type.value if hasattr(raw_type, "value") else str(raw_type)
-                    beh_str = ep_name.replace("_", " ").title()
+                # Name the active episode that actually carries risk weight
+                weighted = [ep for ep in seat_act_eps if _episode_weight(ep) > 0.0]
+                if weighted:
+                    top = max(weighted, key=_episode_weight)
+                    beh_str = _episode_name(top).replace("_", " ").title()
                 else:
                     beh_str = "Suspicious"
 
@@ -498,7 +684,7 @@ class DemoHUDOverlayRenderer:
 
         lines = [
             f"Perception (YOLO-Pose): {runtime_metrics.get('lat_perception_ms', 0.0):.1f} ms",
-            f"6DRepNet Subsampled:    {runtime_metrics.get('lat_6drepnet_ms', 0.0):.1f} ms",
+            f"Head Pose + Observe:    {runtime_metrics.get('lat_6drepnet_ms', 0.0):.1f} ms",
             f"Temporal Episodes:      {runtime_metrics.get('lat_temporal_ms', 0.0):.1f} ms",
             f"Pattern Engine:         {runtime_metrics.get('lat_pat_ms', 0.0):.1f} ms",
             f"Seat Risk Tracker:      {runtime_metrics.get('lat_risk_ms', 0.0):.1f} ms",
@@ -540,15 +726,15 @@ class DemoHUDOverlayRenderer:
         time_str = f"{int(time_sec // 60):02d}:{time_sec % 60:04.1f}"
 
         total_seats = len(seat_mgr.seats)
-        occupied_seats = sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED)
+        occupied_seats = sum(
+            1 for occ in seat_mgr.occupancies.values()
+            if occ.state in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
+        )
 
         # Count active review incidents
         active_review_seats = set()
         for evt in recent_events:
-            evt_ts = getattr(evt, "timestamp_ms", None)
-            if evt_ts is None:
-                evt_ts = (getattr(evt, "timestamp", 0.0) or 0.0) * 1000.0
-            if timestamp_ms <= 0.0 or (timestamp_ms - evt_ts) <= 6000.0:
+            if self._is_event_live(evt, timestamp_ms, risk_tracker):
                 s_id = getattr(evt, "seat_id", getattr(evt, "seat_code", ""))
                 if s_id:
                     active_review_seats.add(s_id)
@@ -587,18 +773,16 @@ class DemoHUDOverlayRenderer:
         canvas: np.ndarray,
         recent_events: List[ClassroomEvent],
         current_timestamp_ms: float,
+        risk_tracker: Optional[SeatRiskTracker] = None,
     ) -> None:
         """Bottom incident ticker for recent review triggers with responsive scaling."""
         if not recent_events:
             return
 
         latest = recent_events[-1]
-        evt_ts = getattr(latest, "timestamp_ms", None)
-        if evt_ts is None:
-            evt_ts = (getattr(latest, "timestamp", 0.0) or 0.0) * 1000.0
-
-        # Only display if triggered within last 6 seconds
-        if (current_timestamp_ms - evt_ts) > 6000.0:
+        evt_ts = self._event_ts(latest)
+        # Shown only while the core's post-incident cooldown runs
+        if current_timestamp_ms > 0.0 and (current_timestamp_ms - evt_ts) > self._review_display_ms(risk_tracker):
             return
 
         h, w = canvas.shape[:2]

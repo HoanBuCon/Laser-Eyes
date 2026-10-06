@@ -42,6 +42,7 @@ def main() -> None:
     overrides = {
         "show_window": args.show,
         "debug_overlay": args.debug_overlay,
+        "behavior_labels": args.behavior_labels,
         "save_evidence": not args.no_evidence,
         "allow_mock": args.allow_mock,
         "head_provider": args.head_provider,
@@ -54,8 +55,6 @@ def main() -> None:
 
     if args.output_dir:
         overrides["output_dir"] = Path(args.output_dir)
-    if args.scene_config:
-        overrides["scene_config_path"] = Path(args.scene_config)
 
     config = get_demo_config(name_or_path=video_target, **overrides)
     run_demo_pipeline(config)

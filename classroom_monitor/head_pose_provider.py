@@ -5,10 +5,14 @@ Implements Scope 03 (FR-PER-003, FR-PER-004) and Scope 06 of SRS v2.0:
 - PoseHeuristicHeadOrientationProvider: Zero-shot 2D keypoint geometric baseline.
 - SixDRepNetHeadOrientationProvider: Pretrained 6DRepNet 3D head pose estimator.
 - HeadCropExtractor: Unknown-safe head ROI extraction with bounding box safeguards.
-- Canonical angle conventions:
-  * yaw < 0: LEFT
-  * yaw > 0: RIGHT
+- Canonical angle conventions are SUBJECT-centric (the candidate's own left/right,
+  as in the annotation guideline and the ground truth):
+  * yaw < 0: candidate turns to THEIR left
+  * yaw > 0: candidate turns to THEIR right
   * pitch > 0: DOWN
+  6DRepNet already reports this convention (verified on real classroom crops: with
+  the camera facing the candidates, positive yaw turns the face toward image-left).
+  Seat neighbours are expressed in the same subject-centric terms (see SeatGraph).
 - Seat-perspective relative yaw/pitch baseline subtraction.
 """
 
@@ -18,8 +22,9 @@ from abc import ABC, abstractmethod
 import logging
 import threading
 import time
-from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+from collections import deque
+from dataclasses import dataclass, replace
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -146,6 +151,11 @@ class PoseHeuristicHeadOrientationProvider(HeadOrientationProvider):
             return HeadOrientationEstimate(source="pose_heuristic", quality=0.0)
 
         raw_yaw, raw_pitch = calculate_head_pose_yaw_pitch(keypoints)
+        # The keypoint geometry is image-space (nose toward image-right is
+        # positive).  This provider needs a visible face, i.e. a camera facing
+        # the candidate, where image-right is the candidate's LEFT.
+        if raw_yaw is not None:
+            raw_yaw = -raw_yaw
 
         # Quality derived from head landmark visibility
         head_confidences = [kp[2] for kp in keypoints[:5] if kp[2] > 0]
@@ -199,17 +209,24 @@ class PoseHeuristicHeadOrientationProvider(HeadOrientationProvider):
 
 
 class HeadCropExtractor:
-    """Robust, unknown-safe head ROI crop extractor from YOLO-Pose keypoints and bbox."""
+    """Robust, unknown-safe head ROI crop extractor from YOLO-Pose keypoints.
+
+    A crop is produced only when the face itself is visible (nose and at least
+    one eye).  Back-of-head, deeply bowed or body-only crops are UNKNOWN: a
+    head-pose model applied to them returns large, meaningless yaw values.
+    """
 
     def __init__(
         self,
         min_kp_conf: float = 0.30,
         min_crop_size: int = 24,
         padding_ratio: float = 0.45,
+        require_face_landmarks: bool = True,
     ):
         self.min_kp_conf = min_kp_conf
         self.min_crop_size = min_crop_size
         self.padding_ratio = padding_ratio
+        self.require_face_landmarks = require_face_landmarks
 
     def extract_crop(
         self,
@@ -225,7 +242,13 @@ class HeadCropExtractor:
         crop_box = None
         quality = 0.0
 
-        if keypoints is not None and len(keypoints) >= 5:
+        face_visible = True
+        if keypoints is not None and len(keypoints) >= 5 and self.require_face_landmarks:
+            nose_ok = keypoints[0][2] >= self.min_kp_conf
+            eye_ok = keypoints[1][2] >= self.min_kp_conf or keypoints[2][2] >= self.min_kp_conf
+            face_visible = bool(nose_ok and eye_ok)
+
+        if keypoints is not None and len(keypoints) >= 5 and face_visible:
             head_kps = keypoints[:5]
             valid_kps = [kp for kp in head_kps if kp[2] >= self.min_kp_conf]
             if len(valid_kps) >= 2:
@@ -248,20 +271,8 @@ class HeadCropExtractor:
                     crop_box = (x1, y1, x2, y2)
                     quality = float(np.clip(np.mean([kp[2] for kp in valid_kps]), 0.0, 1.0))
 
-        # Fallback to upper 25% of bbox if keypoints are occluded
-        if crop_box is None and bbox is not None:
-            bx1, by1, bx2, by2 = bbox
-            bw = bx2 - bx1
-            bh = by2 - by1
-            if bw >= self.min_crop_size and bh >= self.min_crop_size * 2:
-                x1 = int(max(0, bx1))
-                y1 = int(max(0, by1))
-                x2 = int(min(w, bx2))
-                y2 = int(min(h, by1 + bh * 0.28))
-                if (x2 - x1) >= self.min_crop_size and (y2 - y1) >= self.min_crop_size:
-                    crop_box = (x1, y1, x2, y2)
-                    quality = 0.40
-
+        # No bounding-box fallback: the upper part of a person box contains
+        # shoulders/torso, and head pose estimated from it is not a head pose.
         if crop_box is None:
             return None, 0.0
 
@@ -450,11 +461,49 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
                 )
 
         except Exception as e:
-            logger.debug("Batched 6DRepNet inference failed: %s", e)
+            logger.warning("Batched 6DRepNet inference failed: %s", e)
             for s_id, qual, _, _ in valid_meta:
                 results[s_id] = HeadOrientationEstimate(source="sixdrepnet", quality=0.0)
 
         return results
+
+
+class AdaptiveYawBaseline:
+    """Per-seat neutral head yaw learned from that seat's own head-pose samples.
+
+    Camera perspective and the way a candidate sits give every seat its own
+    "looking at my paper" yaw, measured on the demo videos between -55 and +70
+    degrees, far from the hand-set calibration baselines.  A head turn is a
+    deviation from this neutral, so the yaw passed on is relative to the
+    rolling median of the seat's recent samples.  Until enough samples exist
+    the yaw is UNKNOWN rather than judged against a guessed neutral.
+    """
+
+    def __init__(self, window_ms: float = 60000.0, min_samples: int = 10):
+        self.window_ms = window_ms
+        self.min_samples = min_samples
+        self._samples: Dict[str, Deque[Tuple[float, float]]] = {}
+
+    def apply(self, seat_id: str, estimate: HeadOrientationEstimate, timestamp_ms: float) -> HeadOrientationEstimate:
+        if estimate.yaw is None:
+            return estimate
+        history = self._samples.setdefault(seat_id, deque())
+        history.append((timestamp_ms, float(estimate.yaw)))
+        while history and (timestamp_ms - history[0][0]) > self.window_ms:
+            history.popleft()
+        if len(history) < self.min_samples:
+            return replace(estimate, yaw=None, source=f"{estimate.source}_baseline_warmup")
+        neutral = float(np.median([yaw for _, yaw in history]))
+        return replace(estimate, yaw=float(np.clip(estimate.yaw - neutral, -90.0, 90.0)))
+
+    def neutral(self, seat_id: str) -> Optional[float]:
+        history = self._samples.get(seat_id)
+        if not history or len(history) < self.min_samples:
+            return None
+        return float(np.median([yaw for _, yaw in history]))
+
+    def reset_seat(self, seat_id: str) -> None:
+        self._samples.pop(seat_id, None)
 
 
 def create_head_pose_provider(

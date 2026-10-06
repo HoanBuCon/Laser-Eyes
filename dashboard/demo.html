@@ -94,6 +94,12 @@
     <!-- Main Content Container -->
     <main class="classroom-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 flex-1 w-full">
 
+        <!-- Run blocked / failed: reason and where to fix it -->
+        <div id="demoErrorBanner" role="alert" class="hidden rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-xs text-red-200 flex flex-wrap items-center justify-between gap-3">
+            <span id="demoErrorText"></span>
+            <a id="demoErrorLink" href="/calibration" class="hidden vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/40 font-semibold text-red-100">Open seat calibration</a>
+        </div>
+
         <!-- Control Toolbar Card -->
         <div class="session-toolbar bg-gray-900/90 border border-gray-800/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
             
@@ -101,10 +107,10 @@
             <div class="flex flex-wrap items-center gap-3">
                 <div class="segmented-control preset-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
                     <button type="button" id="btnPresetIndia" onclick="selectPreset('india')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
-                        India Classroom (21 Seats)
+                        India Classroom
                     </button>
                     <button type="button" id="btnPresetStudent" onclick="selectPreset('student')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
-                        Student Classroom (12 Seats)
+                        Student Classroom
                     </button>
                 </div>
 
@@ -120,6 +126,11 @@
                 <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
                     <input type="checkbox" id="chkDebugOverlay" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
                     <span>Debug Overlay</span>
+                </label>
+
+                <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800" title="Show what each student is doing (head turn, posture, hands). Display only: does not change scores or incidents. Can be switched while running.">
+                    <input type="checkbox" id="chkBehaviorLabels" onchange="toggleBehaviorLabels(this.checked)" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
+                    <span>Behavior Labels</span>
                 </label>
             </div>
 
@@ -198,7 +209,7 @@
                         </div>
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Calibrated Seats</div>
-                            <div id="lblCalibratedSeats" class="text-lg font-bold text-gray-100 mt-0.5">21</div>
+                            <div id="lblCalibratedSeats" class="text-lg font-bold text-gray-100 mt-0.5">--</div>
                         </div>
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Occupied Seats</div>

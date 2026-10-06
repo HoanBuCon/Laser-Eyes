@@ -327,12 +327,31 @@ class SeatContext:
         }
 
 
-class SeatGraph:
-    """Manages the full topological graph and spatial context of all seats in a room."""
+CAMERA_FACING_SUBJECTS = "facing_subjects"   # camera in front of the room, looking at faces
+CAMERA_BEHIND_SUBJECTS = "behind_subjects"   # camera behind the candidates
+CAMERA_VIEWS = (CAMERA_FACING_SUBJECTS, CAMERA_BEHIND_SUBJECTS)
 
-    def __init__(self, room_id: str = ""):
+
+class SeatGraph:
+    """Manages the full topological graph and spatial context of all seats in a room.
+
+    Neighbour directions are SUBJECT-centric: ``left_neighbor_id`` is the seat on
+    the candidate's own left, matching the head-turn and torso-lean episodes.
+    With the camera facing the candidates (``camera_view="facing_subjects"``)
+    the candidate's left is the RIGHT side of the image.
+    """
+
+    def __init__(self, room_id: str = "", camera_view: str = CAMERA_FACING_SUBJECTS):
         self.room_id = room_id
+        if camera_view not in CAMERA_VIEWS:
+            raise ValueError(f"camera_view must be one of {CAMERA_VIEWS}, got '{camera_view}'")
+        self.camera_view = camera_view
         self.seats_context: Dict[str, SeatContext] = {}
+
+    @property
+    def mirrors_image(self) -> bool:
+        """True when the candidate's left/right are the image's right/left."""
+        return self.camera_view == CAMERA_FACING_SUBJECTS
 
     def add_seat_context(self, context: SeatContext) -> None:
         self.seats_context[context.seat_id] = context
@@ -367,25 +386,35 @@ class SeatGraph:
                 ctx = SeatContext(seat_id=s_id, room_id=self.room_id, seat_code=s_id)
                 self.add_seat_context(ctx)
 
-            # Find closest left neighbor (cx_other < cx, same row |cy - cy_other| < y_thresh)
+            # Closest seat on the image-left (cx_other < cx, same row |cy - cy_other| < y_thresh)
             left_candidates = [
                 (other_id, cx - other_cx)
                 for other_id, other_cx, other_cy in centroids
                 if other_id != s_id and (cx - other_cx) > 0 and (cx - other_cx) < x_dist_threshold and abs(cy - other_cy) < 100.0
             ]
+            image_left_id = None
             if left_candidates:
                 left_candidates.sort(key=lambda item: item[1])
-                ctx.neighbors.left_neighbor_id = left_candidates[0][0]
+                image_left_id = left_candidates[0][0]
 
-            # Find closest right neighbor (cx_other > cx)
+            # Closest seat on the image-right (cx_other > cx)
             right_candidates = [
                 (other_id, other_cx - cx)
                 for other_id, other_cx, other_cy in centroids
                 if other_id != s_id and (other_cx - cx) > 0 and (other_cx - cx) < x_dist_threshold and abs(cy - other_cy) < 100.0
             ]
+            image_right_id = None
             if right_candidates:
                 right_candidates.sort(key=lambda item: item[1])
-                ctx.neighbors.right_neighbor_id = right_candidates[0][0]
+                image_right_id = right_candidates[0][0]
+
+            # Image sides -> the candidate's own sides
+            if self.mirrors_image:
+                ctx.neighbors.left_neighbor_id = image_right_id
+                ctx.neighbors.right_neighbor_id = image_left_id
+            else:
+                ctx.neighbors.left_neighbor_id = image_left_id
+                ctx.neighbors.right_neighbor_id = image_right_id
 
             # Find front neighbor (cy_other > cy in overhead perspective)
             front_candidates = [
@@ -404,13 +433,14 @@ class SeatGraph:
     def to_dict(self) -> Dict[str, Any]:
         return {
             "room_id": self.room_id,
+            "camera_view": self.camera_view,
             "seats": {sid: ctx.to_dict() for sid, ctx in self.seats_context.items()},
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> SeatGraph:
         room_id = str(data.get("room_id") or data.get("room_code", ""))
-        graph = cls(room_id=room_id)
+        graph = cls(room_id=room_id, camera_view=str(data.get("camera_view") or CAMERA_FACING_SUBJECTS))
         seats_data = data.get("seats", [])
         if isinstance(seats_data, dict):
             for sid, s_dict in seats_data.items():

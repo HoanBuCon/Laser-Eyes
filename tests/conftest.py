@@ -38,11 +38,13 @@ def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
 
 @pytest.fixture(scope="session")
 def calibrated_demo_rooms() -> None:
-    """Calibrate both demo rooms in the test database the way an operator does:
-    import the bundled starting layout through the calibration API."""
+    """Calibrate every demo room in the test database the way an operator does:
+    save Seat ROIs for the room's camera through the calibration API (a 4x3
+    grid over the 1920x1080 frame stands in for hand-drawn seats)."""
     from fastapi.testclient import TestClient
 
     from api.main import app
+    from classroom_monitor.demo.config import DEMO_PRESETS
     from server import ensure_calibration_sources
     from storage.database import SessionLocal, init_db
     from storage.db_models import ExamRoom
@@ -51,10 +53,27 @@ def calibrated_demo_rooms() -> None:
     db = SessionLocal()
     try:
         ensure_calibration_sources(db)
-        room_ids = [r.id for r in db.query(ExamRoom).filter(ExamRoom.room_code.in_(["ROOM-CALIB-01", "ROOM-STUDENT-01"]))]
+        codes = [p["room_code"] for p in DEMO_PRESETS.values()]
+        room_ids = [r.id for r in db.query(ExamRoom).filter(ExamRoom.room_code.in_(codes))]
     finally:
         db.close()
+    assert len(room_ids) == len(DEMO_PRESETS)
     with TestClient(app) as client:
         for room_id in room_ids:
-            res = client.post(f"/api/v1/rooms/{room_id}/seats/import-template", params={"replace": True})
+            camera_id = client.get(f"/api/v1/rooms/{room_id}/cameras").json()[0]["id"]
+            seats = [
+                {
+                    "room_id": room_id,
+                    "camera_id": camera_id,
+                    "seat_code": f"S{row * 4 + col + 1:02d}",
+                    "polygon_json": [[x, y], [x + 480, y], [x + 480, y + 360], [x, y + 360]],
+                }
+                for row in range(3)
+                for col in range(4)
+                for x, y in [(col * 480, row * 360)]
+            ]
+            res = client.post(
+                f"/api/v1/rooms/{room_id}/seats/bulk",
+                json={"room_id": room_id, "camera_id": camera_id, "seats": seats},
+            )
             assert res.status_code == 200, res.text

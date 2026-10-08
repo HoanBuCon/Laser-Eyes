@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from api.dependencies import get_db
 from api.realtime import realtime_manager
 from classroom_monitor.demo.paths import demo_final_root, demo_runs_root, replay_package_dir
-from classroom_monitor.demo.config import DEMO_PRESETS, get_demo_config
+from classroom_monitor.demo.config import DEFAULT_PRESET, DEMO_PRESETS, get_demo_config
 from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState
 from classroom_monitor.demo.seating import CalibrationMismatchError, build_scene_seating
 from classroom_monitor.async_evidence_writer import compute_file_sha256
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"])
 
 
 class DemoStartRequest(BaseModel):
-    preset: str = Field("india", description="Demo preset name: 'india' or 'student'")
+    preset: str = Field(DEFAULT_PRESET, description="Demo preset name (see GET /api/v1/demo/presets)")
     mode: str = Field("LIVE", description="Execution mode: 'LIVE' or 'REPLAY'")
     debug_overlay: bool = Field(False, description="Render advanced developer overlay")
     behavior_labels: Optional[bool] = Field(None, description="Show display-only behaviour tags on the stream")
@@ -83,11 +83,12 @@ def list_presets() -> List[Dict[str, Any]]:
 
         presets.append({
             "name": name,
-            "title": f"{name.capitalize()} Classroom",
+            "title": p_cfg.get("title", name),
+            "has_seat_template": bool(p_cfg.get("seat_template_path")),
             "video_path": str(video_p),
             "room_code": room_c,
             "camera_id": cam_id,
-            "resolution": f"{imgsz}x{imgsz}" if imgsz else "HD",
+            "resolution": p_cfg.get("resolution") or (f"{imgsz}x{imgsz}" if imgsz else "HD"),
             "seat_count": calibration["seat_count"],
             "calibrated": calibration["calibrated"],
             "calibration_error": calibration["error"],
@@ -97,13 +98,16 @@ def list_presets() -> List[Dict[str, Any]]:
 
 
 class OverlayRequest(BaseModel):
-    behavior_labels: bool = Field(..., description="Show display-only behaviour tags (no effect on scoring)")
+    behavior_labels: Optional[bool] = Field(None, description="Show display-only behaviour tags (no effect on scoring)")
+    debug_overlay: Optional[bool] = Field(None, description="Show the developer overlay (skeletons, ROIs, telemetry)")
 
 
 @router.post("/overlay")
 def set_overlay(payload: OverlayRequest) -> Dict[str, Any]:
-    """Toggle display-only behaviour tags on the live stream while a run is in progress."""
-    return DemoRuntime.get_instance().set_behavior_labels(payload.behavior_labels)
+    """Toggle display-only overlays on the live stream while a run is in progress."""
+    return DemoRuntime.get_instance().set_overlay(
+        behavior_labels=payload.behavior_labels, debug_overlay=payload.debug_overlay
+    )
 
 
 @router.post("/start")

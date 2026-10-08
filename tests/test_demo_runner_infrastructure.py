@@ -1,7 +1,7 @@
 """Unit & Regression Tests for VIGIL AI SRS v2.0 Demo Runner Infrastructure.
 
 Validates Requirements D1 through D12:
-- D1: Demo video config resolves aliases ('india', 'student') and custom paths.
+- D1: Demo video config resolves the demo presets (china1..china3) and custom paths.
 - D2: Scene profile loads correctly from YAML configuration.
 - D3: Canonical episodes.json export deduplicates by episode_id and includes required fields.
 - D4: Events export contains canonical review states (FLAGGED_FOR_REVIEW, no auto CHEATING).
@@ -50,19 +50,15 @@ from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType,
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 
 
-# D1: Demo video config resolves aliases ('india', 'student') and custom paths
+# D1: Demo video config resolves the demo presets and custom paths
 def test_d1_demo_config_resolution():
-    cfg_india = get_demo_config("india")
-    assert cfg_india.name == "india"
-    assert cfg_india.room_code == "ROOM-CALIB-01"
-    assert cfg_india.pose_imgsz == 1280
-    assert cfg_india.video_path.exists()
-
-    cfg_student = get_demo_config("student")
-    assert cfg_student.name == "student"
-    assert cfg_student.room_code == "ROOM-STUDENT-01"
-    assert cfg_student.pose_imgsz == 640
-    assert cfg_student.video_path.exists()
+    for n in (1, 2, 3):
+        cfg = get_demo_config(f"china{n}")
+        assert cfg.name == f"china{n}"
+        assert cfg.room_code == f"ROOM-CHINA-0{n}"
+        assert cfg.camera_id == f"CAM-CHINA-0{n}"
+        assert cfg.video_path.exists()
+        assert cfg.seats_preset is None  # seats come from the web calibration
 
 
 # D2: Scene profile loads correctly from YAML configuration
@@ -440,12 +436,11 @@ def test_d11_evidence_clip_and_hash():
 # D12: Batch orchestrator smoke test for presets and arguments
 def test_d12_demo_arg_parser_and_presets():
     parser = build_arg_parser()
-    args = parser.parse_args(["--video", "student", "--hz", "6.0", "--show", "--debug-overlay"])
-    assert args.video == "student"
+    args = parser.parse_args(["--video", "china2", "--hz", "6.0", "--show", "--debug-overlay"])
+    assert args.video == "china2"
     assert args.hz == 6.0
     assert args.show is True
     assert args.debug_overlay is True
 
     # Check preset mapping
-    assert "india" in DEMO_PRESETS
-    assert "student" in DEMO_PRESETS
+    assert list(DEMO_PRESETS) == ["china1", "china2", "china3"]

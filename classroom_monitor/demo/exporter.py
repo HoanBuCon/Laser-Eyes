@@ -107,6 +107,7 @@ def export_demo_artifacts(
             "seat_code": getattr(evt, "seat_id", getattr(evt, "seat_code", "")),
             "actor_track_id": getattr(evt, "track_id", None) if getattr(evt, "track_id", None) != 0 else None,
             "timestamp_ms": round(float(ts_ms), 1),
+            "behavior_start_ms": round(float(meta.get("behavior_start_ms", first_seen_ms)), 1),
             "first_seen_ms": round(float(first_seen_ms), 1),
             "last_seen_ms": round(float(last_seen_ms), 1),
             "occurrence_count": int(occ_count),

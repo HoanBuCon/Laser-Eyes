@@ -33,6 +33,10 @@ The UI includes guided calibration, an explicit Recalibrate action and an allowe
 
 (Or double-click `start_vigil.bat`.) On the first run it creates the Python environment. Each start checks the GPU, models, `ffmpeg` and the seat calibration of every room, starts the server on `http://localhost:8000` and opens the browser. Arguments are passed through, e.g. `.\start_vigil.bat --port 8080`, or `.\start_vigil.bat --host 0.0.0.0 --demo-token "choose-a-secret"` for LAN access (a token is mandatory beyond localhost). Stop the system with `Ctrl+C` in that window.
 
+### Demo videos
+
+The demo videos are `demo_video/china1_classroom.mp4`, `china2_classroom.mp4` and `china3_classroom.mp4` (1920×1080, 30 FPS), one calibration room each (`ROOM-CHINA-01..03`). The list lives only in `DEMO_PRESETS` (`classroom_monitor/demo/config.py`); the calibration page, the live monitor, the server and the CLI all read it. The earlier India/Student videos are no longer offered as demos.
+
 ### Operate — the website is the only interface
 
 | Page | Purpose |
@@ -47,7 +51,7 @@ For best speed keep a laptop on AC power: a GPU in power-saving state (for examp
 
 ### Developer tools (not for operators)
 
-`scripts/run_demo_video.py --video student|india` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
+`scripts/run_demo_video.py --video china1|china2|china3` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
 
 ## Real, degraded and mock modes
 
@@ -73,7 +77,7 @@ See [the acceptance checklist](docs/PROCTOR_SUPPORT_ACCEPTANCE.md) for the manua
 venv\Scripts\python.exe -m pytest
 ```
 
-The suite runs against a temporary database and temporary demo folders; it passed 294 tests on 2026-10-06. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
+The suite runs against a temporary database and temporary demo folders; it passed 299 tests on 2026-10-07. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
 
 ## Documentation status
 

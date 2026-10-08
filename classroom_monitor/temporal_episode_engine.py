@@ -42,6 +42,9 @@ class EpisodeType(str, Enum):
     WRIST_WRITING = "WRIST_WRITING"
     SEAT_EMPTY = "SEAT_EMPTY"
     MULTI_PERSON_NEAR_SEAT = "MULTI_PERSON_NEAR_SEAT"
+    # Head moved over the shoulders toward a side, vs the student's usual posture
+    HEAD_OFFSET_LEFT = "HEAD_OFFSET_LEFT"
+    HEAD_OFFSET_RIGHT = "HEAD_OFFSET_RIGHT"
 
 
 @dataclass
@@ -111,6 +114,8 @@ class TemporalEpisodeEngine:
         lean_activation_deg: float = 15.0,
         lean_release_deg: float = 8.0,
         pitch_down_activation_deg: float = 20.0,
+        head_offset_activation: float = 0.20,
+        head_offset_release: float = 0.10,
     ):
         self.min_persistence_ms = min_persistence_ms
         self.release_hysteresis_ms = release_hysteresis_ms
@@ -120,6 +125,9 @@ class TemporalEpisodeEngine:
         self.lean_activation_deg = lean_activation_deg
         self.lean_release_deg = lean_release_deg
         self.pitch_down_activation_deg = pitch_down_activation_deg
+        # Head offset thresholds are in shoulder widths
+        self.head_offset_activation = head_offset_activation
+        self.head_offset_release = head_offset_release
         self.median_filter_window = 3
 
         # (seat_id, episode_type) -> _EpisodeTrackerState
@@ -377,6 +385,33 @@ class TemporalEpisodeEngine:
             )
             if ep_lean_r:
                 active_episodes.append(ep_lean_r)
+
+        # 3b. Evaluate Head Offset Left / Right (subject-centric, negative = left)
+        # Only once related to the student's usual posture: the raw image-space
+        # offset includes how each student normally sits.
+        offset_obs = obs_map.get(ObservationType.HEAD_OFFSET_X.value)
+        offset = None
+        if (
+            offset_obs is not None
+            and offset_obs.value is not None
+            and (offset_obs.metadata or {}).get("relative_to") == "student_baseline"
+        ):
+            offset = self._apply_median_smoothing(seat_id, "head_offset", float(offset_obs.value), timestamp_ms)
+        for ep_type, sign in ((EpisodeType.HEAD_OFFSET_LEFT.value, -1.0), (EpisodeType.HEAD_OFFSET_RIGHT.value, 1.0)):
+            toward = None if offset is None else sign * offset
+            ep_offset = self._update_channel(
+                seat_id=seat_id,
+                ep_type=ep_type,
+                is_active_condition=toward is not None and toward >= self.head_offset_activation,
+                is_released_condition=toward is not None and toward < self.head_offset_release,
+                intensity=0.0 if toward is None else toward,
+                quality=offset_obs.quality if offset_obs is not None else 0.0,
+                confidence=offset_obs.confidence if offset_obs is not None else 0.0,
+                timestamp_ms=timestamp_ms,
+                is_missing=toward is None,
+            )
+            if ep_offset:
+                active_episodes.append(ep_offset)
 
         # 4. Evaluate Wrist Zones
         lw_obs = obs_map.get(ObservationType.LEFT_WRIST_ZONE.value)

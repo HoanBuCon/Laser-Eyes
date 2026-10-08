@@ -281,6 +281,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 raw_observations=seat_observations,
                 detections=detections,
                 roaming_detections=unmapped_dets,
+                head_unreliable_seats=frame_result.head_unreliable_seats,
                 runtime_metrics=runtime_metrics,
             )
             t_ren = (time.perf_counter() - t0) * 1000.0

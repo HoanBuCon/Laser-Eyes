@@ -578,16 +578,14 @@ def test_reference_upload_rejects_unsafe_or_unsupported_file(monkeypatch, tmp_pa
     assert list(tmp_path.iterdir()) == []
 
 
-def test_student_calibration_preset_returns_real_video_frame():
+def test_demo_video_calibration_presets_return_real_video_frames():
     with TestClient(app) as client:
-        response = client.get(
-            "/api/v1/cameras/calibration-presets/student/reference-frame"
-        )
-
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "image/jpeg"
-    assert response.headers["x-vigil-reference-source"] == "preset:student"
-    assert response.content.startswith(b"\xff\xd8")
+        for preset in ("china1", "china2", "china3"):
+            response = client.get(f"/api/v1/cameras/calibration-presets/{preset}/reference-frame")
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "image/jpeg"
+            assert response.headers["x-vigil-reference-source"] == f"preset:{preset}"
+            assert response.content.startswith(b"\xff\xd8")
 
 
 def test_evidence_lookup_rejects_traversal_and_ambiguous_basename(tmp_path: Path, monkeypatch):
@@ -692,12 +690,16 @@ def test_classroom_demo_uses_local_gaze_shell_and_stable_state_hooks():
     assert "badge.dataset.connected" in javascript
     assert "stateBadge.dataset.state" in javascript
     assert "stateBadge.className" not in javascript
-    assert "btnIndia.className" not in javascript
+    assert ".className =" not in javascript.split("function selectPreset")[1].split("function selectMode")[0]
     assert '.text-white:not(.vigil-btn)' in shell
     assert 'color: var(--vigil-primary-text) !important;' in css
+    # Preset buttons are generated from the server's preset list; their template
+    # must follow the same no-hard-coded-colour rule as the static controls.
+    preset_template = re.search(r'<button type="button" data-preset=[^>]*>', javascript)
+    assert preset_template is not None
+    assert 'aria-pressed="false"' in preset_template.group(0)
+    assert not re.search(r'\b(?:text-white|text-gray-\d+|bg-(?:cyan|blue|gray)-\S+)', preset_template.group(0))
     for control_id, selected in (
-        ("btnPresetIndia", "true"),
-        ("btnPresetStudent", "false"),
         ("btnModeLive", "true"),
         ("btnModeReplay", "false"),
     ):

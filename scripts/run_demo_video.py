@@ -3,9 +3,9 @@
 
 Executes calibrated end-to-end proctoring on a single video feed:
 Examples:
-  python scripts/run_demo_video.py --video india
-  python scripts/run_demo_video.py --video student --show
-  python scripts/run_demo_video.py --video demo_video/india_classroom.mp4 --debug-overlay
+  python scripts/run_demo_video.py --video china1
+  python scripts/run_demo_video.py --video china2 --show --behavior-labels
+  python scripts/run_demo_video.py --video demo_video/china3_classroom.mp4 --debug-overlay
 """
 
 from __future__ import annotations

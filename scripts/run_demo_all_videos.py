@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 """Unified Batch Demonstration Runner for VIGIL AI SRS v2.0.
 
-Sequentially executes the calibrated SRS v2.0 pipeline across both classroom videos:
-1. India Classroom (`demo_video/india_classroom.mp4` - 1280x720, Room ROOM-CALIB-01)
-2. Student Classroom (`demo_video/student_classroom.mp4` - 640x352, Room ROOM-STUDENT-01)
+Sequentially executes the SRS v2.0 pipeline on every demo video listed in
+classroom_monitor.demo.config.DEMO_PRESETS, using the Seat ROIs drawn on the
+web calibration page.
 
-Exports complete standardized artifacts into:
-- data/demo_final/india/
-- data/demo_final/student/
-- data/demo_final/final_execution_manifest.json
+Exports standardized artifacts into data/demo_final/<preset>/ and
+data/demo_final/final_execution_manifest.json
 """
 
 from __future__ import annotations
@@ -52,14 +50,14 @@ def run_all_demos(
     max_frames: int | None = None,
     stride: int = 1,
 ) -> Dict[str, Any]:
-    """Execute both India and Student classroom demos sequentially and aggregate results."""
+    """Execute every demo preset sequentially and aggregate results."""
     output_root = Path(output_root)
     output_root.mkdir(parents=True, exist_ok=True)
 
     results: Dict[str, Any] = {}
     start_total_time = time.time()
 
-    demo_names = ["india", "student"]
+    demo_names = list(DEMO_PRESETS)
     print("\n" + "=" * 90)
     print(" VIGIL AI SRS v2.0 - BATCH DEMONSTRATION ORCHESTRATOR")
     print(f" Targets: {', '.join(demo_names).upper()} | Provider: {head_provider} @ {hpe_hz:.1f} Hz")

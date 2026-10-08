@@ -24,7 +24,7 @@ import threading
 import time
 from collections import deque
 from dataclasses import dataclass, replace
-from typing import Any, Deque, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -468,6 +468,107 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
         return results
 
 
+@dataclass
+class _GateState:
+    last_accepted: Optional[Tuple[float, float]] = None  # (ts, yaw) of the last trusted sample
+    pending: Optional[Tuple[float, float]] = None        # implausible sample awaiting confirmation
+    rejected: Optional[Deque[bool]] = None               # recent samples rejected as implausible
+    unreliable: bool = False
+
+
+class HeadPoseSampleGate:
+    """Rejects head-pose samples that a real head could not produce.
+
+    Measured on the demo videos, 9-30 % of consecutive 5 Hz head-model samples
+    jump by more than 40 degrees in 0.2 s while the student is writing; those
+    steps create fake head-turn episodes.  Two checks are applied per seat:
+
+    * Plausibility: a sample that jumps more than ``jump_deg`` from the last
+      trusted sample is held back (yaw UNKNOWN) and only accepted when the next
+      sample confirms it.  A genuine turn is delayed by one sample (~0.2 s);
+      an isolated spike or a flip back and forth is discarded.
+    * Reliability: when rejected samples make up at least ``unreliable_rate``
+      of the seat's recent samples, head orientation for that seat is reported
+      as unreliable (yaw UNKNOWN) until the rate falls to ``reliable_rate``.
+      A large step that the next sample confirms is a real head turn and is
+      not counted.  On the India video every seat with an annotated head turn
+      stays at or below 12 % rejected samples, while the noisiest seats reach
+      20-25 %.
+    """
+
+    def __init__(
+        self,
+        jump_deg: float = 40.0,
+        confirm_deg: float = 20.0,
+        max_gap_ms: float = 600.0,
+        window_samples: int = 50,
+        min_samples: int = 15,
+        unreliable_rate: float = 0.20,
+        reliable_rate: float = 0.12,
+    ):
+        self.jump_deg = jump_deg
+        self.confirm_deg = confirm_deg
+        self.max_gap_ms = max_gap_ms
+        self.window_samples = window_samples
+        self.min_samples = min_samples
+        self.unreliable_rate = unreliable_rate
+        self.reliable_rate = reliable_rate
+        self._state: Dict[str, _GateState] = {}
+
+    def apply(self, seat_id: str, estimate: HeadOrientationEstimate, timestamp_ms: float) -> HeadOrientationEstimate:
+        if estimate.yaw is None:
+            return estimate
+        state = self._state.setdefault(seat_id, _GateState(rejected=deque(maxlen=self.window_samples)))
+        yaw = float(estimate.yaw)
+
+        # Plausibility against the last trusted sample
+        accepted = True
+        last = state.last_accepted
+        if last is not None and (timestamp_ms - last[0]) <= self.max_gap_ms and abs(yaw - last[1]) > self.jump_deg:
+            pending = state.pending
+            confirmed = (
+                pending is not None
+                and (timestamp_ms - pending[0]) <= self.max_gap_ms
+                and abs(yaw - pending[1]) <= self.confirm_deg
+            )
+            if confirmed:
+                state.pending = None
+                if state.rejected and state.rejected[-1]:
+                    state.rejected[-1] = False  # the held sample was a real turn after all
+            else:
+                state.pending = (timestamp_ms, yaw)
+                accepted = False
+        else:
+            state.pending = None
+        if accepted:
+            state.last_accepted = (timestamp_ms, yaw)
+        state.rejected.append(not accepted)
+
+        # Reliability: share of recent samples rejected as implausible
+        if len(state.rejected) >= self.min_samples:
+            rate = sum(state.rejected) / len(state.rejected)
+            if state.unreliable and rate <= self.reliable_rate:
+                state.unreliable = False
+            elif not state.unreliable and rate >= self.unreliable_rate:
+                state.unreliable = True
+
+        if state.unreliable:
+            return replace(estimate, yaw=None, source=f"{estimate.source}_unreliable_seat")
+        if not accepted:
+            return replace(estimate, yaw=None, source=f"{estimate.source}_implausible_jump")
+        return estimate
+
+    def is_unreliable(self, seat_id: str) -> bool:
+        state = self._state.get(seat_id)
+        return bool(state and state.unreliable)
+
+    def unreliable_seats(self) -> Set[str]:
+        return {seat for seat, state in self._state.items() if state.unreliable}
+
+    def reset_seat(self, seat_id: str) -> None:
+        self._state.pop(seat_id, None)
+
+
 class AdaptiveYawBaseline:
     """Per-seat neutral head yaw learned from that seat's own head-pose samples.
 
@@ -475,9 +576,23 @@ class AdaptiveYawBaseline:
     "looking at my paper" yaw, measured on the demo videos between -55 and +70
     degrees, far from the hand-set calibration baselines.  A head turn is a
     deviation from this neutral, so the yaw passed on is relative to the
-    rolling median of the seat's recent samples.  Until enough samples exist
-    the yaw is UNKNOWN rather than judged against a guessed neutral.
+    seat's dominant posture: the median of the samples inside the most
+    populated yaw cluster of the recent window.  A plain median would drift
+    toward the turns themselves when a student turns often or the clip is
+    short.  Until enough samples exist the yaw is UNKNOWN rather than judged
+    against a guessed neutral.
     """
+
+    CLUSTER_HALF_WIDTH_DEG = 20.0
+
+    @classmethod
+    def _dominant_posture(cls, yaws: List[float]) -> float:
+        values = np.asarray(yaws, dtype=float)
+        counts, edges = np.histogram(values, bins=np.arange(-90.0, 100.0, 10.0))
+        smoothed = np.convolve(counts, np.ones(3), mode="same")
+        peak = float((edges[int(np.argmax(smoothed))] + edges[int(np.argmax(smoothed)) + 1]) / 2.0)
+        cluster = values[np.abs(values - peak) <= cls.CLUSTER_HALF_WIDTH_DEG]
+        return float(np.median(cluster)) if cluster.size else float(np.median(values))
 
     def __init__(self, window_ms: float = 60000.0, min_samples: int = 10):
         self.window_ms = window_ms
@@ -493,14 +608,40 @@ class AdaptiveYawBaseline:
             history.popleft()
         if len(history) < self.min_samples:
             return replace(estimate, yaw=None, source=f"{estimate.source}_baseline_warmup")
-        neutral = float(np.median([yaw for _, yaw in history]))
+        neutral = self._dominant_posture([yaw for _, yaw in history])
         return replace(estimate, yaw=float(np.clip(estimate.yaw - neutral, -90.0, 90.0)))
 
     def neutral(self, seat_id: str) -> Optional[float]:
         history = self._samples.get(seat_id)
         if not history or len(history) < self.min_samples:
             return None
-        return float(np.median([yaw for _, yaw in history]))
+        return self._dominant_posture([yaw for _, yaw in history])
+
+    def reset_seat(self, seat_id: str) -> None:
+        self._samples.pop(seat_id, None)
+
+
+class HeadOffsetBaseline:
+    """Head offset over the shoulders relative to the student's own usual posture.
+
+    Students sit and write with their head somewhat to one side; only a
+    change from that is a movement toward a neighbour.  The neutral is the
+    median of the recent window, UNKNOWN until enough samples exist.
+    """
+
+    def __init__(self, window_ms: float = 30000.0, min_samples: int = 30):
+        self.window_ms = window_ms
+        self.min_samples = min_samples
+        self._samples: Dict[str, Deque[Tuple[float, float]]] = {}
+
+    def apply(self, seat_id: str, offset: float, timestamp_ms: float) -> Optional[float]:
+        history = self._samples.setdefault(seat_id, deque())
+        history.append((timestamp_ms, float(offset)))
+        while history and (timestamp_ms - history[0][0]) > self.window_ms:
+            history.popleft()
+        if len(history) < self.min_samples:
+            return None
+        return float(offset) - float(np.median([value for _, value in history]))
 
     def reset_seat(self, seat_id: str) -> None:
         self._samples.pop(seat_id, None)

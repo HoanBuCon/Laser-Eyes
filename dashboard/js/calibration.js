@@ -30,9 +30,23 @@ let editorMode = 'SELECT'; // 'SELECT' (default cursor/select) or 'DRAW' (polygo
 const canvas = document.getElementById('calibrationCanvas');
 const ctx = canvas.getContext('2d');
 
-document.addEventListener('DOMContentLoaded', () => {
+// Demo videos offered for calibration (GET /api/v1/demo/presets), keyed by preset name
+let calibrationPresets = {};
+
+document.addEventListener('DOMContentLoaded', async () => {
     initCanvasEvents();
-    loadRooms();
+    // Load rooms without opening one, then open exactly one room: the first demo
+    // video's.  Opening two rooms concurrently let a late camera list overwrite
+    // the selected room's cameras (seats could then be saved on the wrong camera).
+    await Promise.all([loadRooms(false), loadCalibrationPresets()]);
+    const firstPreset = Object.keys(calibrationPresets)[0];
+    if (firstPreset) {
+        await loadCalibrationPreset(firstPreset);
+    } else if (rooms.length > 0) {
+        currentRoomId = rooms[0].id;
+        document.getElementById('selectRoom').value = currentRoomId;
+        loadCamerasForRoom(currentRoomId);
+    }
     window.addEventListener('keydown', handleGlobalKeydown);
     setEditorMode('SELECT');
 });
@@ -40,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
 // ==============================================================================
 // 1. Room & Camera Loading
 // ==============================================================================
-async function loadRooms() {
+async function loadRooms(openFirstRoom = true) {
     try {
         const res = await fetch('/api/v1/rooms');
         if (!res.ok) return;
@@ -56,8 +70,10 @@ async function loadRooms() {
             <option value="${r.id}">${r.room_code ? `[${r.room_code}] ` : ''}${r.name}</option>
         `).join('');
 
-        currentRoomId = rooms[0].id;
-        loadCamerasForRoom(currentRoomId);
+        if (openFirstRoom) {
+            currentRoomId = rooms[0].id;
+            loadCamerasForRoom(currentRoomId);
+        }
     } catch (err) {
         console.error('Failed to load rooms:', err);
     }
@@ -74,11 +90,8 @@ async function loadCamerasForRoom(roomId, autoLoadReference = true) {
             cameras = [];
         }
 
-        if (cameras.length === 0) {
-            // Fallback: list all cameras or allow default
-            const allCamRes = await fetch('/api/v1/cameras');
-            if (allCamRes.ok) cameras = await allCamRes.json();
-        }
+        // Only this room's cameras: seats saved on another room's camera would
+        // never be used for this room's video.
 
         // Prefer the idempotently seeded competition source over stale camera
         // rows that may still reference renamed/missing demo files.
@@ -148,8 +161,29 @@ async function fetchCameraReferenceFrame() {
     }
 }
 
+async function loadCalibrationPresets() {
+    try {
+        const res = await fetch('/api/v1/demo/presets');
+        if (!res.ok) return;
+        const presets = await res.json();
+        calibrationPresets = Object.fromEntries(presets.map(p => [p.name, p]));
+        const container = document.getElementById('presetVideoButtons');
+        if (container) {
+            container.innerHTML = presets.map(p => `
+                <button onclick="loadCalibrationPreset('${p.name}')" class="vigil-btn px-3.5 py-1.5 rounded-lg bg-blue-600/80 hover:bg-blue-500 text-xs font-semibold text-white transition border border-blue-400/40" title="Select ${p.room_code} and load ${p.title}">
+                    ${p.title}
+                </button>`).join('');
+        }
+        // Starting layouts exist only for some rooms; hide the import button when none does
+        const importBtn = document.getElementById('btnImportTemplate');
+        if (importBtn) importBtn.classList.toggle('hidden', !presets.some(p => p.has_seat_template));
+    } catch (err) {
+        console.error('Failed to load demo videos:', err);
+    }
+}
+
 async function loadCalibrationPreset(preset) {
-    const roomCode = preset === 'student' ? 'ROOM-STUDENT-01' : 'ROOM-CALIB-01';
+    const roomCode = calibrationPresets[preset] ? calibrationPresets[preset].room_code : null;
     const room = rooms.find(item => item.room_code === roomCode);
     if (!room) {
         setDrawingStatus(`${roomCode} NOT CONFIGURED — RESTART SERVER`, 'text-red-400');

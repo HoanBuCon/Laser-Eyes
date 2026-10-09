@@ -1,8 +1,9 @@
-"""End-to-End Video Processor for Classroom Cheating Surveillance.
+"""[LEGACY / DEPRECATED] End-to-End Video Processor for Classroom Surveillance.
 
-Reads camera streams or video files, executes YOLO inference (with optional SAHI),
-runs EventEngine, manages 10s video evidence buffer, renders rich HUD overlays,
-saves peak-confidence snapshots, and dispatches real-time callbacks.
+NOTE: This module belongs to the legacy 1-Stage inference pipeline and is retained solely
+for backward compatibility. The canonical SRS v2 proctoring architecture is implemented
+under `classroom_monitor.demo.*` (DemoRuntime, DemoHUDOverlayRenderer, SeatRiskTracker).
+DO NOT use this module for new development or competition demos.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import cv2
 import numpy as np
 
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
-from classroom_monitor.detector import ClassroomDetector
+from classroom_monitor.detector import ClassroomDetector, PoseClassroomDetector, create_detector
 from classroom_monitor.event_engine import EventEngine
 from classroom_monitor.models import ClassroomEvent, Detection, EventStatus, SeverityLevel
 
@@ -42,7 +43,7 @@ class VideoProcessor:
         on_frame: Optional[Callable[[np.ndarray, List[Detection], List[ClassroomEvent]], None]] = None,
     ):
         self.config = config or DEFAULT_CONFIG
-        self.detector = ClassroomDetector(model_path=model_path, config=self.config)
+        self.detector = create_detector(config=self.config, model_path=model_path)
         self.event_engine = EventEngine(fps=self.config.default_fps, config=self.config)
         self.on_event = on_event
         self.on_frame = on_frame
@@ -175,11 +176,11 @@ class VideoProcessor:
         # Draw Detections
         for det in detections:
             x1, y1, x2, y2 = det.bbox
-            is_cheating = det.class_name in self.config.cheating_classes
+            is_suspicious = det.class_name in getattr(self.config, "suspicious_classes", self.config.cheating_classes)
 
             if det.class_name == "phone using":
                 color = COLOR_PURPLE
-            elif is_cheating:
+            elif is_suspicious:
                 color = COLOR_HIGH
             else:
                 color = COLOR_NORMAL
@@ -214,11 +215,11 @@ class VideoProcessor:
             cv2.LINE_AA,
         )
 
-        # Highlight Active Cheating Events
+        # Highlight Active Events
         if active_events:
             has_recidivist = any(getattr(e, "is_recidivist", False) for e in active_events)
             if has_recidivist:
-                alert_text = f"CRITICAL ALERT: RECIDIVIST CHEATING ({len(active_events)} EVENTS)"
+                alert_text = f"CRITICAL ALERT: RECIDIVIST FLAGGED ({len(active_events)} EVENTS)"
                 alert_color = (0, 0, 255)
             else:
                 alert_text = f"ALERT: {len(active_events)} EVENT(S) FLAGGED FOR REVIEW"

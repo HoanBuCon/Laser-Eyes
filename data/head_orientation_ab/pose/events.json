@@ -1,0 +1,1678 @@
+[
+  {
+    "event_id": "e5ab3e1a-5ac4-4181-8a1a-fdf61e5510ab",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "NEIGHBOR_ORIENTED_LEAN",
+    "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      838,
+      143,
+      938,
+      214
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 2900.0,
+    "metadata": {
+      "risk_score": 87.5,
+      "peak_risk_score": 87.5,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.933,
+      "component_episode_ids": [
+        "ce25cb7d-1f6d-4030-917c-d8cf020f98c6"
+      ]
+    },
+    "created_at": 1789644944.4217575
+  },
+  {
+    "event_id": "390f8eee-cbd0-4c06-8250-ad782c7e076f",
+    "track_id": 8,
+    "seat_id": "SEAT-ROOM-CALIB-01-08",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "MEDIUM",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      551,
+      115,
+      612,
+      206
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 5800.0,
+    "metadata": {
+      "risk_score": 82.7,
+      "peak_risk_score": 82.7,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "ac6f207b-a74b-4ac9-b186-e3ca80350622"
+      ]
+    },
+    "created_at": 1789644947.4570372
+  },
+  {
+    "event_id": "be1a239e-a765-4d41-bd9c-0ebaeae56098",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 7800.0,
+    "metadata": {
+      "risk_score": 89.1,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "61faef41-bfe9-4ba3-8b32-c3790cf3b621"
+      ]
+    },
+    "created_at": 1789644949.4590018
+  },
+  {
+    "event_id": "4eeef4a6-aefd-448d-b853-23982e9f93c2",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      838,
+      143,
+      938,
+      214
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 12166.666666666666,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 87.5,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.708,
+      "component_episode_ids": [
+        "f0e3e2ea-2cc2-4138-9623-da76080c1992",
+        "e12a3804-d449-4ece-9801-721764a5fc64"
+      ]
+    },
+    "created_at": 1789644953.7515755
+  },
+  {
+    "event_id": "87440fd3-6823-4ecf-923c-9fcb7e38d96c",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "NEIGHBOR_ORIENTED_LEAN",
+    "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      838,
+      143,
+      938,
+      214
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 17166.666666666668,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 87.5,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [
+        "Corroborated by concurrent HEAD_TURN_LEFT"
+      ],
+      "observation_quality": 0.937,
+      "component_episode_ids": [
+        "d745c830-b0c8-40cd-aadc-c0c91ef00ec5"
+      ]
+    },
+    "created_at": 1789644959.3479438
+  },
+  {
+    "event_id": "e9e44e97-9693-4d9a-a053-fa1c00e54295",
+    "track_id": 7,
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      568,
+      170,
+      650,
+      260
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 20100.0,
+    "metadata": {
+      "risk_score": 96.6,
+      "peak_risk_score": 96.6,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "818e5380-f4d8-441d-8eb6-f735ca7dbb51"
+      ]
+    },
+    "created_at": 1789644962.4151695
+  },
+  {
+    "event_id": "f240592f-95c2-499b-af57-e44272b7b92c",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 22166.666666666668,
+    "metadata": {
+      "risk_score": 100.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 3 in 25s window"
+      ],
+      "observation_quality": 0.518,
+      "component_episode_ids": [
+        "f0e3e2ea-2cc2-4138-9623-da76080c1992",
+        "e12a3804-d449-4ece-9801-721764a5fc64",
+        "36fc6b71-0168-4428-b8ac-ac751808bd39"
+      ]
+    },
+    "created_at": 1789644964.825662
+  },
+  {
+    "event_id": "1d182af2-748d-4c5f-91f6-3518bce8f6bc",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 22800.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 6.8s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "7a6abe25-c469-4ca6-9bdc-7d17bd64c561"
+      ]
+    },
+    "created_at": 1789644965.508288
+  },
+  {
+    "event_id": "b22a7dfc-9129-4194-8050-0457b8bd2b2b",
+    "track_id": 22,
+    "seat_id": "SEAT-ROOM-CALIB-01-22",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "MEDIUM",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      512,
+      478,
+      678,
+      632
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 24366.666666666668,
+    "metadata": {
+      "risk_score": 83.9,
+      "peak_risk_score": 83.9,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "74a75a4b-0f4c-43ac-aa30-8661ed894322"
+      ]
+    },
+    "created_at": 1789644967.1523793
+  },
+  {
+    "event_id": "39fd7e03-79c2-4ee0-b2e5-19610cb87ac2",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 27800.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 6.8s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "7a6abe25-c469-4ca6-9bdc-7d17bd64c561"
+      ]
+    },
+    "created_at": 1789644970.6056404
+  },
+  {
+    "event_id": "8c804524-4584-4c88-a86e-ebae623d9afe",
+    "track_id": 7,
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      568,
+      170,
+      650,
+      260
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 29066.666666666668,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 96.6,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "818e5380-f4d8-441d-8eb6-f735ca7dbb51"
+      ]
+    },
+    "created_at": 1789644971.9087656
+  },
+  {
+    "event_id": "b5256afa-fcb1-4b3e-a404-47e533beec8d",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 32200.000000000004,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 4 in 25s window"
+      ],
+      "observation_quality": 0.47,
+      "component_episode_ids": [
+        "e12a3804-d449-4ece-9801-721764a5fc64",
+        "36fc6b71-0168-4428-b8ac-ac751808bd39",
+        "ece048b2-6b28-4937-a6fd-18c5a80b6ab1",
+        "d227cfb9-321b-4cc7-8690-320108b87d3b"
+      ]
+    },
+    "created_at": 1789644975.3751602
+  },
+  {
+    "event_id": "995c9660-9778-40ba-a22c-a173db2ee62e",
+    "track_id": 16,
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      332,
+      140,
+      434,
+      263
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 34066.66666666667,
+    "metadata": {
+      "risk_score": 88.1,
+      "peak_risk_score": 88.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "3c30189b-b076-446d-adf7-97244b29e638"
+      ]
+    },
+    "created_at": 1789644977.3477943
+  },
+  {
+    "event_id": "ec37eef3-0073-4425-ae5b-3e348716c1bf",
+    "track_id": 7,
+    "seat_id": "SEAT-ROOM-CALIB-01-07",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      568,
+      170,
+      650,
+      260
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 35100.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 96.6,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 6.4s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "1c85059d-abf0-46f9-8f79-6927316e8450"
+      ]
+    },
+    "created_at": 1789644978.384051
+  },
+  {
+    "event_id": "c6917da2-7316-4e40-901e-6cee9b6cd868",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 36266.666666666664,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 6.8s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "7a6abe25-c469-4ca6-9bdc-7d17bd64c561"
+      ]
+    },
+    "created_at": 1789644979.590985
+  },
+  {
+    "event_id": "647aa289-6e4f-40ac-844e-7e43d9f81e81",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 37233.333333333336,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "190fdfc6-0502-4261-85f7-f8377a62b585"
+      ]
+    },
+    "created_at": 1789644980.5823045
+  },
+  {
+    "event_id": "ee594914-6c60-4f8a-8806-317b3c3b0978",
+    "track_id": 16,
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      332,
+      140,
+      434,
+      263
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 39066.66666666667,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 88.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "3c30189b-b076-446d-adf7-97244b29e638"
+      ]
+    },
+    "created_at": 1789644982.487285
+  },
+  {
+    "event_id": "94eb442d-c080-411c-a4b3-6a4ed55062e5",
+    "track_id": 22,
+    "seat_id": "SEAT-ROOM-CALIB-01-22",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      512,
+      478,
+      678,
+      632
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 39400.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 83.9,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 3.7s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "4016a280-b324-4e24-b86d-5888aecd203a"
+      ]
+    },
+    "created_at": 1789644982.859641
+  },
+  {
+    "event_id": "75386e7b-60c4-426a-a7be-529b79ede89e",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 42233.333333333336,
+    "metadata": {
+      "risk_score": 83.1,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 3 in 25s window"
+      ],
+      "observation_quality": 0.457,
+      "component_episode_ids": [
+        "36fc6b71-0168-4428-b8ac-ac751808bd39",
+        "ece048b2-6b28-4937-a6fd-18c5a80b6ab1",
+        "d227cfb9-321b-4cc7-8690-320108b87d3b"
+      ]
+    },
+    "created_at": 1789644985.8102405
+  },
+  {
+    "event_id": "6a29eb13-030c-42c8-aa28-a049ddb237a8",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 43000.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "bed36cad-deba-4773-863f-30a91dc3067f"
+      ]
+    },
+    "created_at": 1789644986.5733514
+  },
+  {
+    "event_id": "5de19326-c085-4482-aab7-aba566b51b65",
+    "track_id": 16,
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      332,
+      140,
+      434,
+      263
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 44066.66666666667,
+    "metadata": {
+      "risk_score": 82.8,
+      "peak_risk_score": 88.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.689,
+      "component_episode_ids": [
+        "591d8989-203c-4112-b018-f0c482ce000c",
+        "735269af-4d42-4296-99fd-3c700004d70e"
+      ]
+    },
+    "created_at": 1789644987.6674137
+  },
+  {
+    "event_id": "3287ace8-9d69-45b1-b38d-125378dea1ad",
+    "track_id": 22,
+    "seat_id": "SEAT-ROOM-CALIB-01-22",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      484,
+      479,
+      671,
+      638
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 44400.0,
+    "metadata": {
+      "risk_score": 88.4,
+      "peak_risk_score": 91.9,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 3.7s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "4016a280-b324-4e24-b86d-5888aecd203a"
+      ]
+    },
+    "created_at": 1789644988.0270724
+  },
+  {
+    "event_id": "6e5692c1-518c-4731-aa41-1404cd0f87cb",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 47233.333333333336,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 3 in 25s window"
+      ],
+      "observation_quality": 0.457,
+      "component_episode_ids": [
+        "36fc6b71-0168-4428-b8ac-ac751808bd39",
+        "ece048b2-6b28-4937-a6fd-18c5a80b6ab1",
+        "d227cfb9-321b-4cc7-8690-320108b87d3b"
+      ]
+    },
+    "created_at": 1789644991.0486493
+  },
+  {
+    "event_id": "9f8e44e5-d038-4ded-ac33-20bdccd77099",
+    "track_id": 4,
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      502,
+      273,
+      637,
+      454
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 47566.66666666667,
+    "metadata": {
+      "risk_score": 85.1,
+      "peak_risk_score": 85.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 47.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "6ef113b8-b648-475b-b4c5-82e8ced6d2b6"
+      ]
+    },
+    "created_at": 1789644991.4254029
+  },
+  {
+    "event_id": "105ef3f0-79fa-437d-a474-40852b2bce6c",
+    "track_id": 16,
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      332,
+      140,
+      434,
+      263
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 51400.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 88.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 5.9s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "4a2ca4f6-58e0-452b-a326-0c9421cbe8d2"
+      ]
+    },
+    "created_at": 1789644995.6047962
+  },
+  {
+    "event_id": "aabbaf7a-bde1-43eb-ba52-c9eb200848d8",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 52233.333333333336,
+    "metadata": {
+      "risk_score": 99.4,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.58,
+      "component_episode_ids": [
+        "d227cfb9-321b-4cc7-8690-320108b87d3b",
+        "55a8809c-6503-4624-bc05-8a5b54f5ea19"
+      ]
+    },
+    "created_at": 1789644996.5122461
+  },
+  {
+    "event_id": "a5f9bb46-46c2-4eea-8cc3-f4b7f5997db1",
+    "track_id": 4,
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      502,
+      273,
+      637,
+      454
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 53466.66666666667,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 85.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.8,
+      "component_episode_ids": [
+        "5fc8957d-7b69-467f-9dd7-5318f405bb44",
+        "82ad5a22-e033-492f-8501-d5d2df28eeb0"
+      ]
+    },
+    "created_at": 1789644997.7434695
+  },
+  {
+    "event_id": "3b5ab56b-f233-4812-8e5c-453fae828b86",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 57233.333333333336,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.58,
+      "component_episode_ids": [
+        "d227cfb9-321b-4cc7-8690-320108b87d3b",
+        "55a8809c-6503-4624-bc05-8a5b54f5ea19"
+      ]
+    },
+    "created_at": 1789645001.7754807
+  },
+  {
+    "event_id": "30fc0fe9-13e6-4a6b-964c-7bebe6bfb98f",
+    "track_id": 6,
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "NEIGHBOR_ORIENTED_LEAN",
+    "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      841,
+      141,
+      946,
+      280
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 59133.333333333336,
+    "metadata": {
+      "risk_score": 86.4,
+      "peak_risk_score": 86.4,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.968,
+      "component_episode_ids": [
+        "e0dc6e25-a923-470b-a255-4a6631bd7b6f"
+      ]
+    },
+    "created_at": 1789645003.979586
+  },
+  {
+    "event_id": "f649f141-31c9-4cdc-bd3e-10f3ab5a49fd",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 61200.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "1be82469-52f9-43cf-9503-47c5faf18ba1"
+      ]
+    },
+    "created_at": 1789645006.2078006
+  },
+  {
+    "event_id": "2a7b28d9-e165-4c79-bb36-c4e329c6a2c4",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "NEIGHBOR_ORIENTED_LEAN",
+    "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 62233.333333333336,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "NEIGHBOR_ORIENTED_LEAN",
+      "supporting_cues": [],
+      "observation_quality": 0.959,
+      "component_episode_ids": [
+        "2740efdc-61cd-4c95-8790-25e9a412ad2d"
+      ]
+    },
+    "created_at": 1789645007.3040013
+  },
+  {
+    "event_id": "78fbadf0-dabf-425f-be25-ce748ec369d9",
+    "track_id": 6,
+    "seat_id": "SEAT-ROOM-CALIB-01-06",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      841,
+      141,
+      946,
+      280
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 64133.33333333334,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 86.4,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "0bf027e1-9fa5-465f-b2b7-009b7ff9872d"
+      ]
+    },
+    "created_at": 1789645009.3463268
+  },
+  {
+    "event_id": "96825a78-4d8d-40ee-80b0-c8f64de1222b",
+    "track_id": 9,
+    "seat_id": "SEAT-ROOM-CALIB-01-09",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      840,
+      155,
+      940,
+      216
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 67266.66666666667,
+    "metadata": {
+      "risk_score": 90.2,
+      "peak_risk_score": 100.0,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.735,
+      "component_episode_ids": [
+        "55a8809c-6503-4624-bc05-8a5b54f5ea19",
+        "a43a8df7-0613-4350-91a2-4eb09ebda56f"
+      ]
+    },
+    "created_at": 1789645012.8462148
+  },
+  {
+    "event_id": "13e01b6d-374c-46c7-be32-9a1b1efcba8f",
+    "track_id": 4,
+    "seat_id": "SEAT-ROOM-CALIB-01-04",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      502,
+      273,
+      637,
+      454
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 68266.66666666667,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 85.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.795,
+      "component_episode_ids": [
+        "5fc8957d-7b69-467f-9dd7-5318f405bb44",
+        "82ad5a22-e033-492f-8501-d5d2df28eeb0"
+      ]
+    },
+    "created_at": 1789645013.9058769
+  },
+  {
+    "event_id": "f6a01795-407b-45a7-aef7-325564966761",
+    "track_id": 18,
+    "seat_id": "SEAT-ROOM-CALIB-01-18",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      395,
+      61,
+      487,
+      134
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 69566.66666666666,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 89.1,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 2.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "1be82469-52f9-43cf-9503-47c5faf18ba1"
+      ]
+    },
+    "created_at": 1789645015.261228
+  },
+  {
+    "event_id": "8dc79c14-27ba-4e7d-b794-5c8afd259c82",
+    "track_id": 16,
+    "seat_id": "SEAT-ROOM-CALIB-01-16",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "REPEATED_NEIGHBOR_GLANCE",
+    "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "HIGH",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      332,
+      140,
+      434,
+      263
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": true,
+    "requires_human_review": true,
+    "timestamp_ms": 70700.0,
+    "metadata": {
+      "risk_score": 80.0,
+      "peak_risk_score": 88.1,
+      "primary_pattern": "REPEATED_NEIGHBOR_GLANCE",
+      "supporting_cues": [
+        "Glance Count: 2 in 25s window"
+      ],
+      "observation_quality": 0.819,
+      "component_episode_ids": [
+        "fce17c6e-1c3a-42fe-b208-7805fda2e982",
+        "36a77617-04f4-4a34-8148-388630cb0836"
+      ]
+    },
+    "created_at": 1789645016.4542735
+  },
+  {
+    "event_id": "991d1623-7e55-4a26-9989-e05265af403e",
+    "track_id": 2,
+    "seat_id": "SEAT-ROOM-CALIB-01-02",
+    "room_id": "ROOM-CALIB-01",
+    "camera_id": null,
+    "behavior": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+    "supporting_patterns": [],
+    "observation_quality": 1.0,
+    "severity": "MEDIUM",
+    "confidence_avg": 0.85,
+    "confidence_peak": 0.85,
+    "start_frame": 0,
+    "end_frame": 0,
+    "duration_seconds": 0.0,
+    "status": "suspicious",
+    "peak_frame_idx": 0,
+    "bbox": [
+      1006,
+      380,
+      1148,
+      631
+    ],
+    "evidence_path": null,
+    "evidence_video_path": null,
+    "room_context": null,
+    "reviewer_note": "",
+    "is_recidivist": false,
+    "requires_human_review": true,
+    "timestamp_ms": 70900.0,
+    "metadata": {
+      "risk_score": 80.6,
+      "peak_risk_score": 80.6,
+      "primary_pattern": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "supporting_cues": [
+        "Dwell duration: 62.5s"
+      ],
+      "observation_quality": 1.0,
+      "component_episode_ids": [
+        "708bea33-2cb1-454f-8eb2-7545a7e4d3b9"
+      ]
+    },
+    "created_at": 1789645016.6587465
+  }
+]

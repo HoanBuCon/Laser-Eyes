@@ -1,0 +1,12 @@
+{
+  "diagnosis_type": "ALERT_QUALITY_AND_ATTENTION_LOAD",
+  "video_file": "india_classroom.mp4",
+  "raw_frame_level_spikes_avoided": 1782,
+  "temporal_episodes_formed": 492,
+  "behavior_patterns_aggregated": 153,
+  "review_queue_events_emitted": 92,
+  "cooldown_suppression_window_sec": 5.0,
+  "alert_fatigue_reduction_pct": 94.8,
+  "verdict_philosophy": "Zero Automated Cheating Verdicts - Strict Human-in-the-Loop Review Queue",
+  "explanation": "H\u1ec7 th\u1ed1ng \u0111\u00e3 gom nh\u00f3m v\u00e0 ph\u00e2n r\u00e3 t\u00edn hi\u1ec7u, gi\u1ea3m 94.8% c\u1ea3nh b\u00e1o r\u00e1c, ch\u1ec9 ph\u00e1t sinh 92 s\u1ef1 ki\u1ec7n nghi v\u1ea5n ch\u00ednh x\u00e1c c\u00f3 k\u00e8m video b\u1eb1ng ch\u1ee9ng 10s MP4."
+}

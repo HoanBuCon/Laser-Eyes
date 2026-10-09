@@ -1,0 +1,28 @@
+{
+  "benchmark_type": "PROTOTYPE_RUNTIME_PROFILE",
+  "video_file": "india_classroom.mp4",
+  "resolution": "1280x720",
+  "total_frames": 2150,
+  "duration_sec": 71.77,
+  "fps_realtime_target": 30.0,
+  "fps_achieved": 4.68,
+  "realtime_factor": 0.16,
+  "latency_breakdown_ms": {
+    "yolo_pose_inference_ms": 18.45,
+    "sixdrepnet_batch_forward_ms": 21.31,
+    "temporal_and_state_tracking_ms": 173.74,
+    "total_frame_latency_ms": 213.49
+  },
+  "hpe_batching_efficiency": {
+    "scheduled_hz": 5.0,
+    "average_batch_size": 5.2,
+    "gpu_device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "peak_vram_mb": 340.78
+  },
+  "proctoring_metrics": {
+    "configured_seats": 21,
+    "active_episodes_formed": 492,
+    "patterns_detected": 153,
+    "human_review_events": 92
+  }
+}

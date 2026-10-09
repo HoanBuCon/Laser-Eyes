@@ -1,0 +1,28 @@
+{
+  "benchmark_type": "PROTOTYPE_RUNTIME_PROFILE",
+  "video_file": "student_classroom.mp4",
+  "resolution": "640x352",
+  "total_frames": 219,
+  "duration_sec": 10.95,
+  "fps_realtime_target": 20.0,
+  "fps_achieved": 6.93,
+  "realtime_factor": 0.35,
+  "latency_breakdown_ms": {
+    "yolo_pose_inference_ms": 28.85,
+    "sixdrepnet_batch_forward_ms": 26.6,
+    "temporal_and_state_tracking_ms": 88.84,
+    "total_frame_latency_ms": 144.28
+  },
+  "hpe_batching_efficiency": {
+    "scheduled_hz": 5.0,
+    "average_batch_size": 4.1,
+    "gpu_device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "peak_vram_mb": 340.78
+  },
+  "proctoring_metrics": {
+    "configured_seats": 12,
+    "active_episodes_formed": 59,
+    "patterns_detected": 15,
+    "human_review_events": 3
+  }
+}

@@ -18,12 +18,28 @@ class ClassroomConfig:
     """Enterprise Configuration parameters for Classroom Surveillance."""
 
     # ---- Model & Perception Settings ----
+    pipeline_mode: str = "1stage_yolo"  # "1stage_yolo" or "2stage_pose"
     model_path: str = "models/classroom_best.pt"
+    pose_model_path: str = "yolo11n-pose.pt"
     fallback_model: str = "yolov8n.pt"
     confidence_threshold: float = 0.45
+    pose_confidence_threshold: float = 0.20
     nms_iou_threshold: float = 0.45
     default_fps: float = 30.0
     input_resolution: int = 640
+    pose_input_resolution: int = 1280
+    pose_ai_fps_target: int = 10
+    phone_wrist_ratio_threshold: float = 0.28
+    head_provider: str = "pose_heuristic"  # "pose_heuristic" (default) or "sixdrepnet"
+    head_hpe_hz: float = 5.0              # Scheduled HPE update frequency (Hz)
+    head_estimate_max_age_ms: float = 600.0 # Maximum age before cached estimate expires to UNKNOWN
+    head_min_crop_size: int = 24          # Minimum crop width/height in pixels
+    head_min_quality: float = 0.35        # Quality threshold below which head pose is marked UNKNOWN
+    head_median_window: int = 3           # Temporal median filter window size (samples)
+    head_merge_gap_ms: float = 500.0      # Maximum gap in ms to merge noise-induced fragmented episodes
+    head_yaw_activation_deg: float = 32.0 # Minimum relative yaw to activate head turn episode
+    head_yaw_release_deg: float = 16.0    # Release threshold for head turn episode
+    head_min_persistence_ms: float = 500.0 # Minimum persistence before candidate becomes active episode
 
     # ---- High-Resolution Slicing (SAHI / Dynamic Tiling) ----
     enable_sahi_tiling: bool = False
@@ -54,8 +70,39 @@ class ClassroomConfig:
     escalation_duration_seconds: float = 5.0 # After 5s continuous, escalate MEDIUM -> HIGH
     silent_cooldown_tracking: bool = True    # Maintain score accumulation silently during cooldown
     recidivism_escalation: bool = True       # If cheating repeats during cooldown, escalate to HIGH instantly
+    recidivism_window_seconds: float = 15.0  # Window for recidivism escalation
     recidivism_score_threshold: float = 3.0  # Lower threshold for instant recidivism trigger
+    decay_rate_per_sec: float = 8.0          # Risk score decay rate per second when no signals
     require_human_review: bool = True        # Human-in-the-Loop decision support model
+
+    # ---- Behavior Signal Thresholds (v1.1) ----
+    head_turn_yaw_threshold: float = 35.0
+    body_lean_angle_threshold: float = 18.0
+    look_down_pitch_threshold: float = 40.0
+    hand_motion_threshold: float = 6.0
+    under_desk_min_duration_ms: float = 1000.0
+    composite_suppression: bool = True  # Suppress component signals when composite is active
+    
+    # ---- Risk Weights (Base rate per second - v1.1 Taxonomy) ----
+    risk_weights: Dict[str, float] = field(
+        default_factory=lambda: {
+            "PROLONGED_HEAD_TURN": 18.0,
+            "BODY_LEAN_SIDE": 15.0,
+            "SUSPICIOUS_BELOW_DESK_ACTIVITY": 24.0, # P0 Composite Suspicious Signal
+            "LOOK_DOWN_LONG": 1.0,                 # Context observation (very low)
+            "LOW_HAND_POSTURE": 3.0,               # Context observation
+            "MULTIPLE_PERSON_NEAR_SEAT": 20.0,
+        }
+    )
+
+    # ---- Contextual Signal Combinations (Bonus rate per second when signals co-occur) ----
+    combination_weights: Dict[str, float] = field(
+        default_factory=lambda: {
+            "PROLONGED_HEAD_TURN+BODY_LEAN_SIDE": 18.0,   # Active side peeking at peer's paper
+            "PROLONGED_HEAD_TURN+LOW_HAND_POSTURE": 15.0, # Multi-cue cheating posture
+            "BODY_LEAN_SIDE+LOW_HAND_POSTURE": 15.0,      # Leaning with concealed hands
+        }
+    )
 
     # ---- Crowd Room Context ----
     collective_suppress_ratio: float = 0.40 # >40% of room doing same act -> Suppress alert
@@ -72,7 +119,7 @@ class ClassroomConfig:
             "side peeking",
         ]
     )
-    cheating_classes: Set[str] = field(
+    suspicious_classes: Set[str] = field(
         default_factory=lambda: {
             "back peeking",
             "front peeking",
@@ -81,6 +128,11 @@ class ClassroomConfig:
         }
     )
     normal_classes: Set[str] = field(default_factory=lambda: {"no cheating"})
+
+    @property
+    def cheating_classes(self) -> Set[str]:
+        """Backward compatibility for legacy references."""
+        return self.suspicious_classes
 
     # ---- Severity Mapping ----
     severity_map: Dict[str, str] = field(
@@ -139,3 +191,79 @@ class ClassroomConfig:
 
 # Global default instance
 DEFAULT_CONFIG = ClassroomConfig()
+
+
+def resolve_runtime_config(
+    scene_profile: Optional[Any] = None,
+    demo_config: Optional[Any] = None,
+    base_config: Optional[ClassroomConfig] = None,
+) -> Dict[str, Dict[str, Any]]:
+    """Resolve single source of truth for runtime execution parameters.
+
+    Precedence: Scene Profile explicit override > DemoVideoConfig / ClassroomConfig > Engine Defaults.
+    """
+    base = base_config or DEFAULT_CONFIG
+
+    # Extract raw scene overrides if present
+    scene_raw = scene_profile.raw_config if (scene_profile and hasattr(scene_profile, "raw_config")) else {}
+    scene_thresholds = scene_raw.get("thresholds", {}) if isinstance(scene_raw, dict) else {}
+
+    # 1. Head Pose & HPE
+    hpe_hz = getattr(demo_config, "hpe_hz", None) or scene_thresholds.get("hpe_hz", base.head_hpe_hz)
+    provider = getattr(demo_config, "head_provider", None) or scene_thresholds.get("head_provider", base.head_provider)
+    head_cfg = {
+        "provider": provider,
+        "hpe_hz": float(hpe_hz),
+        "cache_max_age_ms": float(scene_thresholds.get("cache_max_age_ms", base.head_estimate_max_age_ms)),
+        "min_crop_size": int(scene_thresholds.get("min_crop_size", base.head_min_crop_size)),
+        "min_quality": float(scene_thresholds.get("min_quality", base.head_min_quality)),
+        "plausibility_gate": bool(scene_thresholds.get("plausibility_gate", True)),
+        "adaptive_baseline": bool(scene_thresholds.get("adaptive_baseline", True)),
+        "baseline_window_ms": float(scene_thresholds.get("baseline_window_ms", 60000.0)),
+        "baseline_min_samples": int(scene_thresholds.get("baseline_min_samples", 10)),
+    }
+
+    # 2. Temporal Episodes
+    temp_scene = scene_thresholds.get("temporal", {}) if isinstance(scene_thresholds, dict) else {}
+    temporal_cfg = {
+        "min_persistence_ms": float(temp_scene.get("min_persistence_ms", 400.0)),
+        "release_hysteresis_ms": float(temp_scene.get("release_hysteresis_ms", 350.0)),
+        "missing_observation_grace_ms": float(temp_scene.get("missing_observation_grace_ms", 1200.0)),
+        "yaw_activation_deg": float(temp_scene.get("yaw_activation_deg", 28.0)),
+        "yaw_release_deg": float(temp_scene.get("yaw_release_deg", 16.0)),
+        "lean_activation_deg": float(temp_scene.get("lean_activation_deg", 15.0)),
+        "lean_release_deg": float(temp_scene.get("lean_release_deg", 8.0)),
+        "pitch_down_activation_deg": float(temp_scene.get("pitch_down_activation_deg", 20.0)),
+    }
+
+    # 3. Behavior Patterns
+    pat_scene = scene_thresholds.get("patterns", {}) if isinstance(scene_thresholds, dict) else {}
+    pattern_cfg = {
+        "glance_rolling_window_ms": float(pat_scene.get("glance_rolling_window_ms", 25000.0)),
+        "min_glance_episodes": int(pat_scene.get("min_glance_episodes", 2)),
+        "lean_min_duration_ms": float(pat_scene.get("lean_min_duration_ms", 1000.0)),
+        "seat_left_timeout_ms": float(pat_scene.get("seat_left_timeout_ms", 15000.0)),
+        "multi_person_dwell_ms": float(pat_scene.get("multi_person_dwell_ms", 2500.0)),
+        "below_desk_min_duration_ms": float(pat_scene.get("below_desk_min_duration_ms", 1500.0)),
+        "glance_merge_gap_ms": float(pat_scene.get("glance_merge_gap_ms", base.head_merge_gap_ms)),
+    }
+
+    # 4. Seat Risk Tracker
+    risk_scene = scene_thresholds.get("risk", {}) if isinstance(scene_thresholds, dict) else {}
+    risk_cfg = {
+        "observe_threshold": float(risk_scene.get("observe_threshold", 30.0)),
+        "suspicious_threshold": float(risk_scene.get("suspicious_threshold", 60.0)),
+        "flagged_threshold": float(risk_scene.get("flagged_threshold", 80.0)),
+        "post_event_reset_score": float(risk_scene.get("post_event_reset_score", 45.0)),
+        "decay_rate_per_sec": float(risk_scene.get("decay_rate_per_sec", 2.5)),
+        "cooldown_duration_ms": float(risk_scene.get("cooldown_duration_ms", 5000.0)),
+        "recidivism_window_ms": float(risk_scene.get("recidivism_window_ms", 15000.0)),
+        "incident_merge_window_ms": float(risk_scene.get("incident_merge_window_ms", 15000.0)),
+    }
+
+    return {
+        "head_pose": head_cfg,
+        "temporal": temporal_cfg,
+        "patterns": pattern_cfg,
+        "risk": risk_cfg,
+    }

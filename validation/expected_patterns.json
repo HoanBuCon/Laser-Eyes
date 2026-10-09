@@ -1,0 +1,46 @@
+{
+  "specification_version": "2.0.0",
+  "p0_patterns": [
+    {
+      "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+      "scope": "P0",
+      "required_capability": "HEAD_ORIENTATION",
+      "activation_condition": ">= 2 head-turn episodes toward same neighbor direction within rolling window (<= 25.0s) with baseline return",
+      "suppression_condition": "Single short glance, low head quality (< 0.25), or turn toward empty aisle",
+      "forbidden_verdicts": ["COPYING", "CHEATING"]
+    },
+    {
+      "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+      "scope": "P0",
+      "required_capability": "BODY_LEAN",
+      "activation_condition": "Torso lean angle >= 15.0 deg toward a configured neighbor persisting >= 1.0s",
+      "suppression_condition": "Normal writing posture, short stretch (< 0.8s), or lean toward aisle",
+      "corroborating_cue": "Concurrent head turn in same direction"
+    },
+    {
+      "pattern_type": "SEAT_LEFT",
+      "scope": "P0",
+      "required_capability": "SEAT_OCCUPANCY",
+      "activation_condition": "Seat occupied -> empty duration >= 15.0s without foreground occlusion",
+      "suppression_condition": "Temporary proctor crossing (grace period <= 4.0s)"
+    },
+    {
+      "pattern_type": "MULTI_PERSON_DWELL_NEAR_SEAT",
+      "scope": "P0",
+      "required_capability": "SEAT_OCCUPANCY",
+      "activation_condition": ">= 2 persons inside/bordering seat ROI persisting >= 2.5s",
+      "suppression_condition": "Person walking through seat ROI (< 2.0s)",
+      "forbidden_verdicts": ["COLLUSION", "CHEATING"]
+    }
+  ],
+  "p1_experimental_patterns": [
+    {
+      "pattern_type": "BELOW_DESK_INTERACTION",
+      "scope": "P1",
+      "required_capability": "DESK_HAND_INTERACTION",
+      "activation_condition": "Desk geometry calibrated + wrist crosses desk boundary + persists >= 1.5s + motion",
+      "mandatory_suppression": "Wrists inside writing zone -> BELOW_DESK = False",
+      "gating": "DISABLED if desk geometry is uncalibrated"
+    }
+  ]
+}

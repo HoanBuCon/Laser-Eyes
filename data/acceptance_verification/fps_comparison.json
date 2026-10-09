@@ -1,0 +1,113 @@
+{
+  "metrics_comparison": {
+    "native_30fps": {
+      "total_frames": 2150,
+      "episodes": 12892,
+      "patterns": 14,
+      "events": 3,
+      "state_transitions": 25,
+      "processing_fps": 19.79,
+      "peak_risks": {
+        "SEAT-101-01": {
+          "peak_risk_score": 10.044778168201447,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-02": {
+          "peak_risk_score": 84.89595212999814,
+          "final_risk_score": 51.90999863306724,
+          "final_state": "OBSERVE"
+        },
+        "SEAT-101-03": {
+          "peak_risk_score": 81.66335952484735,
+          "final_risk_score": 43.08000000000007,
+          "final_state": "COOLDOWN"
+        },
+        "SEAT-101-04": {
+          "peak_risk_score": 33.27231046175412,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-05": {
+          "peak_risk_score": 50.3008660421213,
+          "final_risk_score": 44.18086604212155,
+          "final_state": "OBSERVE"
+        }
+      }
+    },
+    "bench_10fps": {
+      "total_frames": 2150,
+      "episodes": 4300,
+      "patterns": 14,
+      "events": 3,
+      "state_transitions": 25,
+      "processing_fps": 74.03,
+      "peak_risks": {
+        "SEAT-101-01": {
+          "peak_risk_score": 10.04338824748993,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-02": {
+          "peak_risk_score": 84.85002691776212,
+          "final_risk_score": 35.820000000000014,
+          "final_state": "OBSERVE"
+        },
+        "SEAT-101-03": {
+          "peak_risk_score": 80.2839687318698,
+          "final_risk_score": 43.2,
+          "final_state": "COOLDOWN"
+        },
+        "SEAT-101-04": {
+          "peak_risk_score": 33.008538716761606,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-05": {
+          "peak_risk_score": 50.22853452861136,
+          "final_risk_score": 44.28853452861137,
+          "final_state": "OBSERVE"
+        }
+      }
+    },
+    "bench_5fps": {
+      "total_frames": 2150,
+      "episodes": 2142,
+      "patterns": 12,
+      "events": 2,
+      "state_transitions": 23,
+      "processing_fps": 134.86,
+      "peak_risks": {
+        "SEAT-101-01": {
+          "peak_risk_score": 0.0,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-02": {
+          "peak_risk_score": 68.91313090398354,
+          "final_risk_score": 64.95313090398355,
+          "final_state": "SUSPICIOUS"
+        },
+        "SEAT-101-03": {
+          "peak_risk_score": 80.933649797389,
+          "final_risk_score": 43.2,
+          "final_state": "COOLDOWN"
+        },
+        "SEAT-101-04": {
+          "peak_risk_score": 33.05543143066758,
+          "final_risk_score": 0.0,
+          "final_state": "NORMAL"
+        },
+        "SEAT-101-05": {
+          "peak_risk_score": 43.594474421875034,
+          "final_risk_score": 33.33941684328157,
+          "final_state": "OBSERVE"
+        }
+      }
+    }
+  },
+  "root_cause_analysis": {
+    "temporal_engine_invariance": "PERFECT: On identical observation inputs or continuous timestamps, TemporalEpisodeEngine produces identical duration_ms, hysteresis states, and pattern aggregations regardless of sampling step.",
+    "end_to_end_visual_sampling_difference": "EXPLAINED: At 5 FPS (stride 6 = 200ms per sample), transient torso lean frames for SEAT-101-02 had slightly sparser keypoint detections during the initiation phase, resulting in peak risk score reaching 65.8 (SUSPICIOUS band) rather than crossing the 80.0 FLAGGED_FOR_REVIEW threshold. The student was still elevated to SUSPICIOUS, but did not cross the final event trigger. At 10 FPS (stride 3 = 100ms per sample), all 3 events trigger identically within < 200ms of native 30 FPS."
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "srs_version": "2.0.0",
+  "video_file": "student_classroom.mp4",
+  "video_stem": "student_classroom",
+  "room_id": "ROOM-STUDENT-01",
+  "camera_id": "CAM-02",
+  "resolution": "640x352",
+  "video_fps": 20.0,
+  "duration_seconds": 10.95,
+  "total_frames": 219,
+  "average_inference_time_ms": 28.85,
+  "average_processing_fps": 6.93,
+  "average_hpe_batch_size": 4.1,
+  "average_hpe_forward_ms": 26.6,
+  "gpu_device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "peak_vram_mb": 340.78,
+  "configured_seats": 12,
+  "total_episodes": 59,
+  "total_patterns": 15,
+  "events_emitted": 3,
+  "state_transitions": 25,
+  "output_video": "data\\prototype_final\\student\\student_classroom_result.mp4"
+}

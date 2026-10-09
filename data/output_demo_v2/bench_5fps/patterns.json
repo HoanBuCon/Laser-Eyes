@@ -1,0 +1,219 @@
+[
+  {
+    "pattern_id": "aae23582-b5ca-46e8-8d61-e6e1f8008a62",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 31000.0,
+    "end_timestamp_ms": 38000.0,
+    "confidence": 0.786,
+    "quality": 0.975,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "141da0f1-275b-4a8e-a8b3-eb4d8de4d1cd"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "e61432c9-b0b8-477e-89d2-3dc030358fdb",
+    "seat_id": "SEAT-101-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33800.0,
+    "end_timestamp_ms": 42400.0,
+    "confidence": 0.776,
+    "quality": 0.797,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "3766f9f6-b899-4bb7-9dd3-9323649d583c",
+      "a4605ef2-ae61-4b33-bd9e-dc3d431b3687"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "ed1fae58-7583-47a9-99ce-c65d404dc52f",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 23200.0,
+    "end_timestamp_ms": 43600.0,
+    "confidence": 0.812,
+    "quality": 0.793,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "0e844c84-c5c8-42ef-a6de-5e5677451d0a",
+      "e986777a-2889-4b23-8244-7b1e292d1131"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "79f2258d-0f41-4971-a0dd-13022b636996",
+    "seat_id": "SEAT-101-04",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 33800.0,
+    "end_timestamp_ms": 52400.0,
+    "confidence": 0.768,
+    "quality": 0.801,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "3766f9f6-b899-4bb7-9dd3-9323649d583c",
+      "a4605ef2-ae61-4b33-bd9e-dc3d431b3687"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "c2f1b3e3-a494-4453-b1fb-583affc8681d",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 43200.0,
+    "end_timestamp_ms": 53600.0,
+    "confidence": 0.83,
+    "quality": 0.797,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "e986777a-2889-4b23-8244-7b1e292d1131",
+      "ea42504c-8e69-484a-84bc-7ff657caac2c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "3dd2d6cf-bba9-4ea6-a6f0-96acdeec9e99",
+    "seat_id": "SEAT-101-03",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 53200.0,
+    "end_timestamp_ms": 54200.0,
+    "confidence": 0.88,
+    "quality": 0.986,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "acbf4d79-ca4d-44f8-85e3-5330131549af"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "74dfff7e-8c52-4a66-b272-76074db39e5e",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 55800.0,
+    "end_timestamp_ms": 56800.0,
+    "confidence": 0.497,
+    "quality": 0.962,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "60580384-d85b-43d7-8f96-614cba9e9551"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "cffccd0b-344e-463f-85e7-b9f2e25ffeb0",
+    "seat_id": "SEAT-101-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 45400.0,
+    "end_timestamp_ms": 59000.0,
+    "confidence": 0.909,
+    "quality": 0.827,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "71601552-9724-42a5-a113-a7e757304fcb",
+      "6108ab98-b1fb-4f99-92b7-a7a08a6d4696"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "310329f3-25af-4b12-b837-a1ba4c615587",
+    "seat_id": "SEAT-101-05",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 43200.0,
+    "end_timestamp_ms": 63600.0,
+    "confidence": 0.827,
+    "quality": 0.792,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": "SEAT-101-04",
+    "component_episode_ids": [
+      "e986777a-2889-4b23-8244-7b1e292d1131",
+      "ea42504c-8e69-484a-84bc-7ff657caac2c"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "acc466f8-a383-4b05-ad67-3d4b3334515e",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "NEIGHBOR_ORIENTED_LEAN",
+    "start_timestamp_ms": 55800.0,
+    "end_timestamp_ms": 64800.0,
+    "confidence": 0.604,
+    "quality": 0.967,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "60580384-d85b-43d7-8f96-614cba9e9551"
+    ],
+    "supporting_cues": [],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "befd9044-dec7-46d4-b882-af843e9ca8f6",
+    "seat_id": "SEAT-101-02",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 41400.0,
+    "end_timestamp_ms": 68000.0,
+    "confidence": 0.738,
+    "quality": 0.842,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "6323cf5b-4c29-4894-ba61-6d34bd7d054c",
+      "a0c95fb7-b84f-48a5-8152-578e59ba3507"
+    ],
+    "supporting_cues": [
+      "Glance Count: 2 in 25s window"
+    ],
+    "metadata": {}
+  },
+  {
+    "pattern_id": "61760255-b1e1-42c3-a6fc-f28fc4ad41a9",
+    "seat_id": "SEAT-101-03",
+    "pattern_type": "REPEATED_NEIGHBOR_GLANCE",
+    "start_timestamp_ms": 45400.0,
+    "end_timestamp_ms": 69000.0,
+    "confidence": 0.908,
+    "quality": 0.836,
+    "primary_direction": "LEFT",
+    "target_neighbor_id": null,
+    "component_episode_ids": [
+      "71601552-9724-42a5-a113-a7e757304fcb",
+      "6108ab98-b1fb-4f99-92b7-a7a08a6d4696",
+      "e640e130-ed8d-4127-b1c9-5d3f83b5d38a"
+    ],
+    "supporting_cues": [
+      "Glance Count: 3 in 25s window"
+    ],
+    "metadata": {}
+  }
+]

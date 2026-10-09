@@ -1,0 +1,139 @@
+{
+  "video_path": "demo_video\\india_classroom.mp4",
+  "resolution": "1280x720",
+  "video_fps": 30.0,
+  "total_frames_processed": 2150,
+  "elapsed_seconds": 65.08,
+  "average_fps": 33.0,
+  "latency_metrics": {
+    "mean_inference_latency_ms": 13.18,
+    "mean_tracking_latency_ms": 1.51,
+    "mean_total_frame_latency_ms": 14.69
+  },
+  "tracking_metrics": {
+    "total_unique_tracks": 1,
+    "tracker_type": "kalman_iou"
+  },
+  "event_metrics": {
+    "total_events_detected": 4,
+    "events_by_behavior": {
+      "side peeking": 4
+    },
+    "events_by_severity": {
+      "MEDIUM": 4
+    },
+    "saved_evidence_snapshots_count": 4,
+    "saved_evidence_video_clips_count": 0
+  },
+  "output_video_path": "data\\output_demo\\india_classroom_annotated.mp4",
+  "events": [
+    {
+      "event_id": "EVT-C68C132F",
+      "track_id": 14,
+      "behavior": "side peeking",
+      "severity": "MEDIUM",
+      "confidence_avg": 0.2036,
+      "confidence_peak": 0.2036,
+      "start_frame": 672,
+      "end_frame": 672,
+      "duration_seconds": 0.0,
+      "status": "suspicious",
+      "peak_frame_idx": 672,
+      "bbox": [
+        551,
+        464,
+        658,
+        574
+      ],
+      "evidence_path": "data\\evidence\\EVT-C68C132F.jpg",
+      "evidence_video_path": "data\\evidence_clips\\EVT-C68C132F_T14_side_peeking.mp4",
+      "room_context": null,
+      "reviewer_note": "",
+      "is_recidivist": false,
+      "requires_human_review": true,
+      "timestamp_ms": 23200.0,
+      "created_at": 1789549271.2443736
+    },
+    {
+      "event_id": "EVT-C68C132F",
+      "track_id": 14,
+      "behavior": "side peeking",
+      "severity": "MEDIUM",
+      "confidence_avg": 0.1878,
+      "confidence_peak": 0.216,
+      "start_frame": 672,
+      "end_frame": 729,
+      "duration_seconds": 1.1,
+      "status": "suspicious",
+      "peak_frame_idx": 702,
+      "bbox": [
+        551,
+        465,
+        658,
+        574
+      ],
+      "evidence_path": "data\\evidence\\EVT-C68C132F.jpg",
+      "evidence_video_path": "data\\evidence_clips\\EVT-C68C132F_T14_side_peeking.mp4",
+      "room_context": null,
+      "reviewer_note": "",
+      "is_recidivist": false,
+      "requires_human_review": true,
+      "timestamp_ms": 23200.0,
+      "created_at": 1789549271.2443736
+    },
+    {
+      "event_id": "EVT-A3AEBF0B",
+      "track_id": 15,
+      "behavior": "side peeking",
+      "severity": "MEDIUM",
+      "confidence_avg": 0.197,
+      "confidence_peak": 0.197,
+      "start_frame": 735,
+      "end_frame": 735,
+      "duration_seconds": 0.0,
+      "status": "suspicious",
+      "peak_frame_idx": 735,
+      "bbox": [
+        552,
+        462,
+        660,
+        574
+      ],
+      "evidence_path": "data\\evidence\\EVT-A3AEBF0B.jpg",
+      "evidence_video_path": "data\\evidence_clips\\EVT-A3AEBF0B_T15_side_peeking.mp4",
+      "room_context": null,
+      "reviewer_note": "",
+      "is_recidivist": false,
+      "requires_human_review": true,
+      "timestamp_ms": 25233.333333333336,
+      "created_at": 1789549272.9039168
+    },
+    {
+      "event_id": "EVT-A3AEBF0B",
+      "track_id": 15,
+      "behavior": "side peeking",
+      "severity": "MEDIUM",
+      "confidence_avg": 0.2321,
+      "confidence_peak": 0.4575,
+      "start_frame": 735,
+      "end_frame": 918,
+      "duration_seconds": 5.37,
+      "status": "flagged_for_human_review",
+      "peak_frame_idx": 877,
+      "bbox": [
+        533,
+        467,
+        659,
+        583
+      ],
+      "evidence_path": "data\\evidence\\EVT-A3AEBF0B.jpg",
+      "evidence_video_path": null,
+      "room_context": null,
+      "reviewer_note": "",
+      "is_recidivist": false,
+      "requires_human_review": true,
+      "timestamp_ms": 25233.333333333336,
+      "created_at": 1789549272.9039168
+    }
+  ]
+}

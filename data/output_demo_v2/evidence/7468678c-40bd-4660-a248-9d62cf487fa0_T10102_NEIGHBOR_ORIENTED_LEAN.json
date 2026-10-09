@@ -1,0 +1,11 @@
+{
+  "event_id": "7468678c-40bd-4660-a248-9d62cf487fa0",
+  "track_id": 10102,
+  "behavior": "NEIGHBOR_ORIENTED_LEAN",
+  "trigger_frame_idx": 1991,
+  "trigger_timestamp_ms": 66366.66666666666,
+  "video_file": "7468678c-40bd-4660-a248-9d62cf487fa0_T10102_NEIGHBOR_ORIENTED_LEAN.mp4",
+  "sha256_hash": "3ce78d5a596a77194800f1ef47148e6066443e75173247c4367ab195d9e6bf9f",
+  "room_id": "ROOM-101",
+  "camera_id": "CAM-01"
+}

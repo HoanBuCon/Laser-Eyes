@@ -1,0 +1,30 @@
+{
+  "report_name": "India Classroom Ground Truth Temporal Integrity Audit",
+  "audit_timestamp": "2026-09-18T17:05:00Z",
+  "gt_file": "data/ground_truth/india_classroom_gt.json",
+  "total_records": 13,
+  "total_head_records": 10,
+  "valid_head_records": 9,
+  "malformed_records_count": 1,
+  "status": "HUMAN_ACTION_REQUIRED",
+  "policy": "EXCLUDE_MALFORMED_FROM_BENCHMARK",
+  "malformed_entries": [
+    {
+      "episode_id": "b2c6d58d-d99c-4343-af34-5595b19770db",
+      "seat_code": "SEAT-ROOM-CALIB-01-20",
+      "label": "HEAD_TURN_RIGHT",
+      "start_ms": 0.0,
+      "peak_ms": 2459.0,
+      "end_ms": 20354.0,
+      "stored_duration_ms": 6407.0,
+      "computed_duration_ms": 20354.0,
+      "discrepancy_ms": 13947.0,
+      "issue": "Severe duration mismatch: stored duration_ms (6407.0ms) does not equal end_ms - start_ms (20354.0ms). Start time is set to 0.0ms while end time is 20354.0ms. Requires human annotator review to confirm whether intended range is 0.0-6407.0ms or 13947.0-20354.0ms.",
+      "action_required": "HUMAN_ACTION_REQUIRED"
+    }
+  ],
+  "valid_entries_summary": {
+    "valid_head_turn_episodes": 9,
+    "valid_other_episodes": 3
+  }
+}

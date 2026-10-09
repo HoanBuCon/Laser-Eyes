@@ -1,4 +1,6 @@
 # BÁO CÁO REVIEW CODEBASE TOÀN DIỆN VÀ ĐÁNH GIÁ MỨC ĐỘ ĐÁP ỨNG THIẾT KẾ
+
+> **HISTORICAL / SUPERSEDED.** Production-readiness and performance claims below were not revalidated. Use `docs/PROTOTYPE_CURRENT_STATUS.md` for current measured facts.
 ## HỆ THỐNG GIÁM SÁT PHÒNG THI & THI TRỰC TUYẾN VIGIL AI
 
 > **Ngày thực hiện:** 15/09/2026  

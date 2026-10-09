@@ -1,0 +1,11 @@
+{
+  "event_id": "7875e38b-177c-4c74-b8cb-ca2822c5ceca",
+  "track_id": 0,
+  "behavior": "BODY_LEAN_SIDE",
+  "trigger_frame_idx": 1670,
+  "trigger_timestamp_ms": 55666.666666666664,
+  "video_file": "7875e38b-177c-4c74-b8cb-ca2822c5ceca_T0_BODY_LEAN_SIDE.mp4",
+  "sha256_hash": "566ba84955f515e3041d54e95fc1feb461ec46e41f7b374bf58d3be6012328ae",
+  "room_id": "ROOM-101",
+  "camera_id": "CAM-01"
+}

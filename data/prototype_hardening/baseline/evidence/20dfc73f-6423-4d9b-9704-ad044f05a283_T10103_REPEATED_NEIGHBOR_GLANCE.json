@@ -1,0 +1,11 @@
+{
+  "event_id": "20dfc73f-6423-4d9b-9704-ad044f05a283",
+  "track_id": 10103,
+  "behavior": "REPEATED_NEIGHBOR_GLANCE",
+  "trigger_frame_idx": 1767,
+  "trigger_timestamp_ms": 58900.0,
+  "video_file": "20dfc73f-6423-4d9b-9704-ad044f05a283_T10103_REPEATED_NEIGHBOR_GLANCE.mp4",
+  "sha256_hash": "f03f0a12386c94932ccd010512f37d82a9a5e7ea7072772f306b70f0dd53a70b",
+  "room_id": "ROOM-101",
+  "camera_id": "CAM-01"
+}

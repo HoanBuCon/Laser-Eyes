@@ -1,0 +1,11 @@
+{
+  "event_id": "379df333-432f-48f6-8fbc-8ffb0bd98d41",
+  "track_id": 9,
+  "behavior": "REPEATED_NEIGHBOR_GLANCE",
+  "trigger_frame_idx": 1417,
+  "trigger_timestamp_ms": 47233.333333333336,
+  "video_file": "379df333-432f-48f6-8fbc-8ffb0bd98d41_T9_REPEATED_NEIGHBOR_GLANCE.mp4",
+  "sha256_hash": "c4254a64ab96c3a8f38c34be1838396d52c2b12939c2ad40c41efb170e14f763",
+  "room_id": "ROOM-CALIB-01",
+  "camera_id": "CAM-01"
+}

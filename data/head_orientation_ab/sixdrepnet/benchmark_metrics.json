@@ -1,0 +1,200 @@
+{
+  "total_gt_head_episodes": 10,
+  "total_ai_head_episodes": 196,
+  "true_positives": 9,
+  "false_positives": 187,
+  "false_negatives": 1,
+  "precision": 0.0459,
+  "recall": 0.9,
+  "f1_score": 0.0874,
+  "avg_temporal_iou": 0.6067,
+  "mean_abs_start_error_ms": 1565.2,
+  "mean_abs_end_error_ms": 2163.5,
+  "wrong_direction_count": 0,
+  "wrong_direction_details": [],
+  "duplicate_episode_count": 3,
+  "class_breakdown": {
+    "HEAD_TURN_LEFT": {
+      "gt_count": 2,
+      "ai_count": 66,
+      "tp": 2,
+      "fp": 64,
+      "fn": 0,
+      "precision": 0.0303,
+      "recall": 1.0,
+      "f1_score": 0.0588,
+      "avg_iou": 0.8295
+    },
+    "HEAD_TURN_RIGHT": {
+      "gt_count": 8,
+      "ai_count": 130,
+      "tp": 7,
+      "fp": 123,
+      "fn": 1,
+      "precision": 0.0538,
+      "recall": 0.875,
+      "f1_score": 0.1014,
+      "avg_iou": 0.543
+    }
+  },
+  "matched_pairs": [
+    {
+      "gt_id": "b2c6d58d-d99c-4343-af34-5595b19770db",
+      "ai_id": "69429e45-aca2-4d97-8990-f3fe3932242d",
+      "seat_code": "SEAT-ROOM-CALIB-01-20",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        0.0,
+        20354.0
+      ],
+      "ai_range_ms": [
+        33.3,
+        9300.0
+      ],
+      "temporal_iou": 0.4553,
+      "start_time_error_ms": 33.3,
+      "end_time_error_ms": -11054.0
+    },
+    {
+      "gt_id": "28c7d28a-0eb7-4700-9a7f-6cbd45819fcd",
+      "ai_id": "5cab2264-1331-4de2-920a-ec8617736011",
+      "seat_code": "SEAT-ROOM-CALIB-01-04",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        23543.0,
+        25671.0
+      ],
+      "ai_range_ms": [
+        24700.0,
+        26666.7
+      ],
+      "temporal_iou": 0.3108,
+      "start_time_error_ms": 1157.0,
+      "end_time_error_ms": 995.7
+    },
+    {
+      "gt_id": "529e0d73-1569-4cf2-9e39-6353c73ce538",
+      "ai_id": "a259e242-3763-4d1d-a6f3-e8e549b862e4",
+      "seat_code": "SEAT-ROOM-CALIB-01-15",
+      "label": "HEAD_TURN_LEFT",
+      "gt_range_ms": [
+        25792.0,
+        29681.0
+      ],
+      "ai_range_ms": [
+        26066.7,
+        29300.0
+      ],
+      "temporal_iou": 0.8314,
+      "start_time_error_ms": 274.7,
+      "end_time_error_ms": -381.0
+    },
+    {
+      "gt_id": "b67545eb-0d41-42f0-a7a9-cdf9002b3960",
+      "ai_id": "6fed06b2-e654-4c06-9546-7c948fceb98d",
+      "seat_code": "SEAT-ROOM-CALIB-01-15",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        33456.0,
+        40287.0
+      ],
+      "ai_range_ms": [
+        33866.7,
+        39300.0
+      ],
+      "temporal_iou": 0.7954,
+      "start_time_error_ms": 410.7,
+      "end_time_error_ms": -987.0
+    },
+    {
+      "gt_id": "2a5ddceb-ed3a-4fde-924f-ba2aa55d83e9",
+      "ai_id": "b3c056ef-55c9-4376-8cf1-17b66ea40008",
+      "seat_code": "SEAT-ROOM-CALIB-01-16",
+      "label": "HEAD_TURN_LEFT",
+      "gt_range_ms": [
+        43591.0,
+        46783.0
+      ],
+      "ai_range_ms": [
+        43066.7,
+        46666.7
+      ],
+      "temporal_iou": 0.8276,
+      "start_time_error_ms": -524.3,
+      "end_time_error_ms": -116.3
+    },
+    {
+      "gt_id": "2dd333b5-713a-4e7c-bfd0-8c6cdab60817",
+      "ai_id": "f560a0af-df96-4d66-856c-f397501c9464",
+      "seat_code": "SEAT-ROOM-CALIB-01-02",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        45178.0,
+        56553.0
+      ],
+      "ai_range_ms": [
+        50700.0,
+        55100.0
+      ],
+      "temporal_iou": 0.3868,
+      "start_time_error_ms": 5522.0,
+      "end_time_error_ms": -1453.0
+    },
+    {
+      "gt_id": "88228af2-5e41-4fcd-9738-441b7d91fce5",
+      "ai_id": "d58da532-5649-4e91-987b-df16c6a0436b",
+      "seat_code": "SEAT-ROOM-CALIB-01-04",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        48501.0,
+        61706.0
+      ],
+      "ai_range_ms": [
+        45100.0,
+        62300.0
+      ],
+      "temporal_iou": 0.7677,
+      "start_time_error_ms": -3401.0,
+      "end_time_error_ms": 594.0
+    },
+    {
+      "gt_id": "e885a749-bb12-4499-bc7f-ee042bfbabd4",
+      "ai_id": "93d9588a-a792-4f94-81f7-bc8731c47996",
+      "seat_code": "SEAT-ROOM-CALIB-01-02",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        58650.0,
+        63650.0
+      ],
+      "ai_range_ms": [
+        59233.3,
+        64300.0
+      ],
+      "temporal_iou": 0.7817,
+      "start_time_error_ms": 583.3,
+      "end_time_error_ms": 650.0
+    },
+    {
+      "gt_id": "50b08113-1824-415d-a50b-afa9986161d3",
+      "ai_id": "df71b254-e110-4065-9f2b-b67e2ae1235f",
+      "seat_code": "SEAT-ROOM-CALIB-01-03",
+      "label": "HEAD_TURN_RIGHT",
+      "gt_range_ms": [
+        59286.0,
+        63826.0
+      ],
+      "ai_range_ms": [
+        61466.7,
+        67066.7
+      ],
+      "temporal_iou": 0.3032,
+      "start_time_error_ms": 2180.7,
+      "end_time_error_ms": 3240.7
+    }
+  ],
+  "runtime_benchmark": {
+    "total_elapsed_sec": 367.02,
+    "average_fps": 5.87,
+    "average_inference_ms": 18.48
+  }
+}

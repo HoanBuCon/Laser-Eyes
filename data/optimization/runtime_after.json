@@ -1,0 +1,72 @@
+{
+  "benchmark_name": "VIGIL AI SRS v2 Post-Optimization Correctness Benchmark",
+  "date": "2026-09-21",
+  "status": "READY_FOR_HUMAN_SCREENSHOT_REVIEW",
+  "pipeline_mode": "Scheduled 5Hz Batched 6DRepNet + Strict Temporal Calibration + Clean Proctor Overlay",
+  "hardware": {
+    "device": "cuda",
+    "gpu_name": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "torch_version": "2.6.0+cu124"
+  },
+  "india_classroom": {
+    "resolution": "1280x720",
+    "total_frames": 2150,
+    "video_duration_sec": 71.77,
+    "wall_clock_time_sec": 133.5,
+    "processing_fps": 16.1,
+    "realtime_factor": 0.54,
+    "episodes_detected": 491,
+    "head_turn_episodes": 220,
+    "patterns_detected": 198,
+    "review_events_emitted": 56,
+    "review_events_by_severity": {
+      "HIGH": 29,
+      "MEDIUM": 27
+    },
+    "ground_truth_integrity": {
+      "total_raw_gt_records": 13,
+      "valid_gt_records": 9,
+      "malformed_gt_excluded": 1,
+      "unsupported_label_excluded": 3,
+      "integrity_report_file": "data/ground_truth/india_classroom_gt_integrity_report.json"
+    },
+    "strict_ground_truth_matching": {
+      "matching_criteria": "Same Seat + Same Label + Temporal IoU >= 0.30 (1-to-1 greedy)",
+      "tp": 1,
+      "fp": 219,
+      "fn": 8,
+      "precision_percent": 0.45,
+      "recall_percent": 11.11,
+      "f1_percent": 0.87,
+      "avg_tp_iou": 0.786
+    },
+    "product_attention_metrics": {
+      "review_events_per_video_minute": 46.82,
+      "review_events_per_seat_minute": 6.69,
+      "episodes_per_review_event": 8.77,
+      "patterns_per_review_event": 3.54,
+      "unique_flagged_seats": 17
+    }
+  },
+  "student_classroom": {
+    "resolution": "640x352",
+    "total_frames": 219,
+    "video_duration_sec": 10.95,
+    "wall_clock_time_sec": 8.9,
+    "processing_fps": 24.5,
+    "realtime_factor": 1.23,
+    "episodes_detected": 55,
+    "patterns_detected": 21,
+    "review_events_emitted": 9,
+    "review_events_by_severity": {
+      "HIGH": 9
+    },
+    "product_attention_metrics": {
+      "review_events_per_video_minute": 49.32,
+      "review_events_per_seat_minute": 12.33,
+      "episodes_per_review_event": 6.11,
+      "patterns_per_review_event": 2.33,
+      "unique_flagged_seats": 9
+    }
+  }
+}

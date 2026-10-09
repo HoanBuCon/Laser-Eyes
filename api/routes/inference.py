@@ -1,12 +1,18 @@
-"""Inference Control and Video Stream API Endpoints."""
+"""[LEGACY / DEPRECATED] Inference Control and Video Stream API Endpoints.
+
+NOTE: This router runs the legacy VideoProcessor. The canonical SRS v2 competition demo
+pipeline is available under `/api/v1/demo/*` powered by `classroom_monitor.demo.runtime.DemoRuntime`.
+"""
 
 from __future__ import annotations
 
 import logging
+import os
+import secrets
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
@@ -21,7 +27,20 @@ from storage.evidence_store import EvidenceStore
 from storage.repositories import EventRepository, SessionRepository
 
 logger = logging.getLogger("InferenceRouter")
-router = APIRouter(prefix="/inference", tags=["Inference Engine"])
+def require_legacy_inference_enabled() -> None:
+    if os.getenv("VIGIL_ENABLE_LEGACY_INFERENCE", "0") != "1":
+        raise HTTPException(
+            status_code=410,
+            detail="Legacy inference is disabled. Use the canonical /api/v1/demo SRS v2 runtime.",
+        )
+
+
+router = APIRouter(
+    prefix="/inference",
+    tags=["Inference Engine (Legacy)"],
+    deprecated=True,
+    dependencies=[Depends(require_legacy_inference_enabled)],
+)
 
 # Active background runners tracking dict
 _active_runners: Dict[str, Dict[str, Any]] = {}
@@ -181,13 +200,23 @@ async def upload_exam_video(
     upload_dir = Path("data/uploads")
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    dest_file = upload_dir / f"{int(time.time())}_{file.filename}"
+    original_name = Path(file.filename or "upload.mp4").name
+    extension = Path(original_name).suffix.lower()
+    allowed_extensions = {".mp4", ".avi", ".mkv", ".mov"}
+    if extension not in allowed_extensions:
+        raise HTTPException(status_code=415, detail="Unsupported video extension")
+    if file.content_type and not file.content_type.startswith(("video/", "application/octet-stream")):
+        raise HTTPException(status_code=415, detail="Unsupported video MIME type")
+    max_bytes = 500 * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail="Upload exceeds 500 MiB limit")
+    dest_file = upload_dir / f"{int(time.time())}_{secrets.token_hex(8)}{extension}"
     with open(dest_file, "wb") as f:
-        content = await file.read()
         f.write(content)
 
     return {
-        "filename": file.filename,
+        "filename": original_name,
         "saved_path": str(dest_file).replace("\\", "/"),
         "size_bytes": len(content),
     }

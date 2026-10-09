@@ -1,0 +1,45 @@
+{
+  "srs_version": "2.0.0",
+  "input_video": "demo_video\\india_classroom.mp4",
+  "resolution": "1280x720",
+  "video_fps": 30.0,
+  "duration_seconds": 71.77,
+  "total_frames_read": 2150,
+  "inference_frames": 2150,
+  "average_inference_time_ms": 20.66,
+  "average_processing_fps": 24.24,
+  "maximum_persons_detected": 32,
+  "configured_seats_count": 5,
+  "total_episodes_extracted": 12892,
+  "total_patterns_detected": 14,
+  "events_generated_count": 3,
+  "state_transitions_count": 25,
+  "peak_risk_per_seat": {
+    "SEAT-101-01": {
+      "peak_risk_score": 10.044778168201447,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-101-02": {
+      "peak_risk_score": 84.89595212999814,
+      "final_risk_score": 51.90999863306724,
+      "final_state": "OBSERVE"
+    },
+    "SEAT-101-03": {
+      "peak_risk_score": 81.66335952484735,
+      "final_risk_score": 43.08000000000007,
+      "final_state": "COOLDOWN"
+    },
+    "SEAT-101-04": {
+      "peak_risk_score": 33.27231046175412,
+      "final_risk_score": 0.0,
+      "final_state": "NORMAL"
+    },
+    "SEAT-101-05": {
+      "peak_risk_score": 50.3008660421213,
+      "final_risk_score": 44.18086604212155,
+      "final_state": "OBSERVE"
+    }
+  },
+  "output_video": "data\\prototype_hardening\\baseline\\india_classroom_result.mp4"
+}

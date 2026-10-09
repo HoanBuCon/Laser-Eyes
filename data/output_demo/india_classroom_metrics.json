@@ -1,0 +1,26 @@
+{
+  "video_path": "demo_video\\india_classroom.mp4",
+  "resolution": "1280x720",
+  "video_fps": 30.0,
+  "total_frames_processed": 250,
+  "elapsed_seconds": 7.58,
+  "average_fps": 33.0,
+  "latency_metrics": {
+    "mean_inference_latency_ms": 15.08,
+    "mean_tracking_latency_ms": 0.6,
+    "mean_total_frame_latency_ms": 15.69
+  },
+  "tracking_metrics": {
+    "total_unique_tracks": 1,
+    "tracker_type": "kalman_iou"
+  },
+  "event_metrics": {
+    "total_events_detected": 0,
+    "events_by_behavior": {},
+    "events_by_severity": {},
+    "saved_evidence_snapshots_count": 0,
+    "saved_evidence_video_clips_count": 0
+  },
+  "output_video_path": "data\\output_demo\\india_classroom_annotated.mp4",
+  "events": []
+}

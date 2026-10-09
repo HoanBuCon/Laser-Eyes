@@ -1,0 +1,4 @@
+# Optional Head Pose Estimation (HPE) Dependencies for VIGIL AI
+# Base VIGIL AI installation functions with PoseHeuristicHeadOrientationProvider without this package.
+sixdrepnet>=0.1.6
+pandas>=2.0.0

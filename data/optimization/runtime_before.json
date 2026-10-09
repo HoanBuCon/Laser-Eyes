@@ -1,0 +1,34 @@
+{
+  "benchmark_name": "VIGIL AI SRS v2 Core Runtime & Event Quality Benchmark (BEFORE OPTIMIZATION)",
+  "date": "2026-09-18",
+  "pipeline_mode": "Unscheduled sequential 6DRepNet + Unaggregated Risk Tracker",
+  "hardware": "NVIDIA GeForce RTX GPU (CUDA)",
+  "india_classroom": {
+    "resolution": "1280x720",
+    "total_frames": 2153,
+    "video_duration_sec": 71.83,
+    "wall_clock_time_sec": 285.2,
+    "processing_fps": 7.55,
+    "realtime_factor": "0.25x realtime",
+    "gpu_forward_passes_per_100_frames": 1276,
+    "episodes_detected": 412,
+    "patterns_detected": 235,
+    "review_events_emitted": 204,
+    "spam_factor": "Severe (1 event every 0.35 seconds)",
+    "human_proctor_reviewability": "Unusable / Overwhelming"
+  },
+  "student_classroom": {
+    "resolution": "640x352",
+    "total_frames": 900,
+    "video_duration_sec": 30.0,
+    "wall_clock_time_sec": 72.5,
+    "processing_fps": 12.4,
+    "realtime_factor": "0.41x realtime",
+    "gpu_forward_passes_per_100_frames": 680,
+    "episodes_detected": 68,
+    "patterns_detected": 24,
+    "review_events_emitted": 15,
+    "spam_factor": "Moderate (1 event every 2.0 seconds)",
+    "human_proctor_reviewability": "Borderline"
+  }
+}

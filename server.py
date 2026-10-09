@@ -18,7 +18,7 @@ import sys
 import uvicorn
 
 from storage.database import SessionLocal, init_db
-from storage.db_mode    ls import Camera, ExamRoom, ExamSession, ExamSite
+from storage.db_models import Camera, ExamRoom, ExamSession, ExamSite
 
 logging.basicConfig(
     level=logging.INFO,

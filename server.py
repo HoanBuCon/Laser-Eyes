@@ -18,7 +18,7 @@ import sys
 import uvicorn
 
 from storage.database import SessionLocal, init_db
-from storage.db_models import Camera, ExamRoom, ExamSession, ExamSite
+from storage.db_mode    ls import Camera, ExamRoom, ExamSession, ExamSite
 
 logging.basicConfig(
     level=logging.INFO,
@@ -27,24 +27,24 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VigilServer")
 
-CALIBRATION_SOURCES = (
-    {
-        "room_code": "ROOM-CALIB-01",
-        "room_name": "India Classroom Calibration",
-        "capacity": 21,
-        "camera_name": "VIGIL India Calibration Video",
-        "source_uri": "demo_video/india_classroom.mp4",
-        "resolution": "1280x720",
-    },
-    {
-        "room_code": "ROOM-STUDENT-01",
-        "room_name": "Student Classroom Calibration",
-        "capacity": 12,
-        "camera_name": "VIGIL Student Calibration Video",
-        "source_uri": "demo_video/student_classroom.mp4",
-        "resolution": "640x352",
-    },
-)
+def _calibration_sources() -> tuple:
+    """One calibration room and camera per demo video (classroom_monitor.demo.config.DEMO_PRESETS)."""
+    from classroom_monitor.demo.config import DEMO_PRESETS
+
+    return tuple(
+        {
+            "room_code": preset["room_code"],
+            "room_name": preset.get("title", name),
+            "capacity": None,
+            "camera_name": f"VIGIL {preset.get('title', name)} Video",
+            "source_uri": preset["video_path"],
+            "resolution": preset.get("resolution"),
+        }
+        for name, preset in DEMO_PRESETS.items()
+    )
+
+
+CALIBRATION_SOURCES = _calibration_sources()
 
 
 def ensure_calibration_sources(db) -> None:

@@ -105,17 +105,17 @@ def test_dr1_singleton_and_init():
 
 
 def test_dr2_live_mode_start_and_short_run():
-    """DR2: DemoRuntime starts in LIVE mode on student preset and processes frames."""
+    """DR2: DemoRuntime starts in LIVE mode on a demo preset and processes frames."""
     runtime = DemoRuntime.get_instance()
     res = runtime.start(
-        preset="student",
+        preset="china1",
         mode=DemoMode.LIVE.value,
         debug_overlay=True,
         max_frames=10,
         stride=1,
     )
     assert res["state"] in (DemoState.RUNNING.value, DemoState.COMPLETED.value)
-    assert res["preset"] == "student"
+    assert res["preset"] == "china1"
 
     # Wait for worker thread to process initial frames
     for _ in range(40):
@@ -133,7 +133,7 @@ def test_dr3_replay_mode_dispatch_sync():
     runtime = DemoRuntime.get_instance()
     
     res = runtime.start(
-        preset="student",
+        preset="china1",
         mode=DemoMode.REPLAY.value,
         debug_overlay=False,
         max_frames=15,
@@ -150,7 +150,7 @@ def test_dr3_replay_mode_dispatch_sync():
 def test_dr4_pause_and_resume():
     """DR4: DemoRuntime pause sets PAUSED state, and resume returns to RUNNING."""
     runtime = DemoRuntime.get_instance()
-    runtime.start(preset="student", mode=DemoMode.LIVE.value, max_frames=50)
+    runtime.start(preset="china1", mode=DemoMode.LIVE.value, max_frames=50)
     
     # Pause
     res_pause = runtime.pause()
@@ -166,7 +166,7 @@ def test_dr4_pause_and_resume():
 def test_dr5_stop_graceful():
     """DR5: DemoRuntime stop terminates background execution thread gracefully."""
     runtime = DemoRuntime.get_instance()
-    runtime.start(preset="student", mode=DemoMode.LIVE.value, max_frames=100)
+    runtime.start(preset="china1", mode=DemoMode.LIVE.value, max_frames=100)
     for _ in range(30):
         if runtime.status.frame_index > 0 or runtime.status.state in (DemoState.COMPLETED.value, DemoState.STOPPED.value):
             break
@@ -205,7 +205,7 @@ def test_dr7_callbacks_invocation():
     runtime.register_frame_callback(on_frame)
     runtime.register_status_callback(on_status)
 
-    runtime.start(preset="student", mode=DemoMode.LIVE.value, max_frames=5)
+    runtime.start(preset="china1", mode=DemoMode.LIVE.value, max_frames=5)
     for _ in range(40):
         if len(frame_called) > 0 or len(status_called) > 0:
             break
@@ -258,8 +258,7 @@ def test_api1_list_presets(client: TestClient):
     data = resp.json()
     assert isinstance(data, list)
     preset_names = [p["name"] for p in data]
-    assert "india" in preset_names
-    assert "student" in preset_names
+    assert preset_names == ["china1", "china2", "china3"]
     for p in data:
         assert "room_code" in p
         assert "camera_id" in p
@@ -274,11 +273,11 @@ def test_api2_start_validation(client: TestClient):
     assert r_bad_preset.status_code == 400
 
     # Invalid mode
-    r_bad_mode = client.post("/api/v1/demo/start", json={"preset": "student", "mode": "INVALID_MODE"})
+    r_bad_mode = client.post("/api/v1/demo/start", json={"preset": "china1", "mode": "INVALID_MODE"})
     assert r_bad_mode.status_code == 400
 
     # Valid start
-    r_valid = client.post("/api/v1/demo/start", json={"preset": "student", "mode": "LIVE", "max_frames": 5})
+    r_valid = client.post("/api/v1/demo/start", json={"preset": "china1", "mode": "LIVE", "max_frames": 5})
     assert r_valid.status_code == 200
     res = r_valid.json()
     assert res["state"] in ("RUNNING", "COMPLETED")
@@ -286,7 +285,7 @@ def test_api2_start_validation(client: TestClient):
 
 def test_api3_control_endpoints(client: TestClient):
     """API3: POST /pause, /resume, /stop, /reset execute transitions."""
-    client.post("/api/v1/demo/start", json={"preset": "student", "mode": "LIVE", "max_frames": 500})
+    client.post("/api/v1/demo/start", json={"preset": "china1", "mode": "LIVE", "max_frames": 500})
     
     r_pause = client.post("/api/v1/demo/pause")
     assert r_pause.status_code == 200

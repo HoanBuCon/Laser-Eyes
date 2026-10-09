@@ -93,6 +93,7 @@ class DemoHUDOverlayRenderer:
         runtime_metrics: Optional[Dict[str, float]] = None,
         debug_overlay: Optional[bool] = None,
         all_events: Optional[List[ClassroomEvent]] = None,
+        head_unreliable_seats: Optional[set] = None,
     ) -> np.ndarray:
         """Render HUD overlay according to active display mode."""
         show_debug = self.debug_overlay if debug_overlay is None else debug_overlay
@@ -109,7 +110,9 @@ class DemoHUDOverlayRenderer:
             self._render_debug_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_debug_roaming(canvas, roam_list)
             if self.behavior_labels:
-                self._render_behavior_labels(canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms)
+                self._render_behavior_labels(
+                    canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms, head_unreliable_seats or set()
+                )
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
             self._render_bottom_ticker(canvas, events_list, timestamp_ms, risk_tracker)
             self._render_debug_panel(canvas, runtime_metrics or {}, episodes_list, obs_dict)
@@ -118,7 +121,9 @@ class DemoHUDOverlayRenderer:
             self._render_proctor_seats(canvas, seat_mgr, risk_tracker, episodes_list, events_list, timestamp_ms)
             self._render_proctor_roaming(canvas, roam_list)
             if self.behavior_labels:
-                self._render_behavior_labels(canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms)
+                self._render_behavior_labels(
+                    canvas, seat_mgr, seat_graph, episodes_list, obs_dict, timestamp_ms, head_unreliable_seats or set()
+                )
             self._render_top_hud(canvas, room_code, camera_id, timestamp_ms, fps, seat_mgr, risk_tracker, events_list)
             self._render_bottom_ticker(canvas, events_list, timestamp_ms, risk_tracker)
 
@@ -386,8 +391,10 @@ class DemoHUDOverlayRenderer:
         active_episodes: List[TemporalEpisode],
         raw_observations: Dict[str, List[RawObservation]],
         timestamp_ms: float,
+        head_unreliable_seats: Optional[set] = None,
     ) -> None:
         """Draw behaviour tags on each seated student's box (no scoring meaning)."""
+        unreliable = head_unreliable_seats or set()
         mirrors_image = True if seat_graph is None else bool(getattr(seat_graph, "mirrors_image", True))
         small = canvas.shape[1] < 800
         scale = 0.30 if small else 0.38
@@ -402,6 +409,9 @@ class DemoHUDOverlayRenderer:
                 mirrors_image,
                 timestamp_ms,
             )
+            if seat_code in unreliable:
+                # Head orientation is suppressed for this seat; say so instead of staying silent
+                tags.insert(0, ("Head pose unreliable", (140, 140, 140)))
             if not tags or det is None:
                 continue
             x1, y1, x2, _y2 = [int(v) for v in det.bbox]

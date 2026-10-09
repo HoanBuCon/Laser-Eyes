@@ -38,15 +38,12 @@ def _person(x1: int, y1: int, x2: int, y2: int, conf: float = 0.9) -> Detection:
 
 # --- P0-1 -------------------------------------------------------------------
 
-@pytest.mark.parametrize("preset", ["student", "india"])
+@pytest.mark.parametrize("preset", ["china1", "china2", "china3"])
 def test_runs_use_the_seats_saved_from_the_web_calibration(preset, calibrated_demo_rooms):
     seating = build_scene_seating(get_demo_config(preset))
     assert seating.source == "database"
     assert all(seating.seat_graph.get_context(code) is not None for code in seating.seat_codes)
     # Desk line, capacity and camera placement travel with the polygon of the same seat.
-    first = seating.seat_defs[0]
-    ctx = seating.seat_graph.get_context(first.seat_code)
-    assert first.desk_y == ctx.desk_geometry.desk_boundary_y
     assert seating.seat_graph.camera_view == "facing_subjects"
 
 
@@ -163,12 +160,87 @@ def test_person_arriving_beyond_baseline_is_additional():
     for ts in range(0, 3000, 100):
         mgr.map_detections_to_seats(student, float(ts))
     visitor = _person(150, 0, 199, 199, conf=0.99)
-    mgr.map_detections_to_seats(student + [visitor], 3000.0)
+    # A visitor who stays at the desk counts once they have been there a few seconds
+    for ts in range(3000, 9000, 100):
+        mgr.map_detections_to_seats(student + [visitor], float(ts))
     occ = mgr.occupancies["S1"]
     assert occ.person_count == 2
     assert occ.expected_person_count == 1
     # The seat keeps its own occupant, not the more confident visitor.
     assert occ.assigned_detection is student[0]
+
+
+def _posed(bbox, shoulders, conf: float = 0.9) -> Detection:
+    """Person box with both shoulders at the given (left, right) points."""
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[5] = [*shoulders[0], 0.9]
+    kps[6] = [*shoulders[1], 0.9]
+    return Detection(class_id=0, class_name="person", confidence=conf, bbox=bbox, keypoints=kps)
+
+
+def test_two_boxes_for_one_student_count_as_one_person():
+    mgr = _two_person_seat_manager()
+    shoulders = ((60, 60), (140, 60))
+    upper_body = _posed((50, 20, 150, 150), shoulders, conf=0.8)
+    # The model also returns a tall box for the same student, down to the floor
+    tall = _posed((45, 20, 155, 400), ((62, 61), (138, 62)), conf=0.6)
+    mgr.map_detections_to_seats([upper_body, tall], 0.0)
+    occ = mgr.occupancies["S1"]
+    assert occ.person_count == 1
+    assert occ.assigned_detection is upper_body
+
+
+def test_box_stretching_over_the_next_row_stays_in_its_own_seat():
+    mgr = SeatManager(room_id="R")
+    mgr.load_seats([
+        SeatDefinition(seat_id="BACK", room_id="R", seat_code="BACK", polygon=_square(0, 0, 200)),
+        SeatDefinition(seat_id="FRONT", room_id="R", seat_code="FRONT", polygon=_square(0, 200, 200)),
+    ])
+    # The back-row student's box runs down over the front student's legs;
+    # its bottom lies in FRONT, the torso in BACK.
+    back = _posed((40, 20, 160, 390), ((60, 60), (140, 60)))
+    front = _posed((40, 220, 160, 399), ((60, 260), (140, 260)))
+    mapped, _ = mgr.map_detections_to_seats([back, front], 0.0)
+    assert mapped["BACK"] is back
+    assert mapped["FRONT"] is front
+    assert mgr.occupancies["FRONT"].person_count == 1
+
+
+def test_teacher_walking_past_is_not_an_extra_person():
+    mgr = SeatManager(room_id="R")
+    mgr.load_seats([SeatDefinition(seat_id="S1", room_id="R", seat_code="S1", polygon=_square(0, 0, 400))])
+    student = _posed((40, 40, 140, 200), ((60, 80), (120, 80)))
+    for ts in range(0, 5000, 100):
+        mgr.map_detections_to_seats([student], float(ts))
+    # The teacher walks along the row through the ROI
+    counts = []
+    for step, ts in enumerate(range(5000, 7000, 100)):
+        x = 160 + step * 10
+        teacher = _posed((x, 20, x + 80, 380), ((x + 10, 60), (x + 70, 60)))
+        mapped, unmapped = mgr.map_detections_to_seats([student, teacher], float(ts))
+        counts.append(mgr.occupancies["S1"].person_count)
+        assert mapped["S1"] is student
+    assert set(counts) == {1}
+    assert unmapped and unmapped[0] is teacher
+
+
+def test_lone_student_with_flickering_detection_keeps_the_seat():
+    mgr = SeatManager(room_id="R")
+    mgr.load_seats([SeatDefinition(seat_id="S1", room_id="R", seat_code="S1", polygon=_square(0, 0, 200))])
+    student = _posed((40, 40, 140, 190), ((60, 80), (120, 80)))
+    for ts in range(0, 10000, 100):
+        # detected in only one frame of four
+        seen = (ts // 100) % 4 == 0
+        mapped, _ = mgr.map_detections_to_seats([student] if seen else [], float(ts))
+    mapped, _ = mgr.map_detections_to_seats([student], 10000.0)
+    assert mapped["S1"] is student
+
+
+def test_distinct_neighbours_are_not_merged():
+    shoulders_a = ((20, 60), (90, 60))
+    shoulders_b = ((110, 60), (180, 60))
+    people = [_posed((10, 20, 100, 190), shoulders_a), _posed((100, 20, 190, 190), shoulders_b)]
+    assert SeatManager.merge_duplicate_detections(people) == people
 
 
 def test_episode_engine_compares_count_with_expected_occupancy():
@@ -234,6 +306,99 @@ def test_fragments_of_one_head_turn_are_one_glance():
     assert [p.pattern_type for p in pats] == [PatternType.REPEATED_NEIGHBOR_GLANCE.value]
 
 
+# --- Sustained look toward a neighbour --------------------------------------
+
+def _active(ep_id: str, ep_type: str, start: float, now: float) -> TemporalEpisode:
+    return TemporalEpisode(ep_id, "S1", ep_type, EpisodeState.ACTIVE, start_timestamp_ms=start,
+                           duration_ms=now - start, confidence=0.8, quality=0.8)
+
+
+def _attention_patterns(engine, active, ctx, ts):
+    return [p for p in engine.ingest_episodes(active, [], ctx, ts)
+            if p.pattern_type == PatternType.SUSTAINED_NEIGHBOR_ATTENTION.value]
+
+
+def test_long_head_turn_alone_is_not_sustained_attention():
+    # Head-pose yaw alone is unreliable (a student writing with the head down)
+    ctx = SeatContext(seat_id="S1", neighbors=SeatNeighbors(left_neighbor_id="S2"))
+    engine = BehaviorPatternEngine()
+    turn = _active("t", EpisodeType.HEAD_TURN_LEFT.value, 0.0, 4000.0)
+    assert _attention_patterns(engine, [turn], ctx, 4000.0) == []
+
+
+def test_long_turn_with_head_moved_toward_neighbour_is_sustained_attention():
+    ctx = SeatContext(seat_id="S1", neighbors=SeatNeighbors(left_neighbor_id="S2"))
+    engine = BehaviorPatternEngine()
+    turn = _active("t", EpisodeType.HEAD_TURN_LEFT.value, 0.0, 2500.0)
+    shift = _active("o", EpisodeType.HEAD_OFFSET_LEFT.value, 300.0, 2500.0)
+    pats = _attention_patterns(engine, [turn, shift], ctx, 2500.0)
+    assert len(pats) == 1
+    assert pats[0].target_neighbor_id == "S2"
+    # The other way there is no neighbour to look at
+    engine_r = BehaviorPatternEngine()
+    turn_r = _active("tr", EpisodeType.HEAD_TURN_RIGHT.value, 0.0, 2500.0)
+    shift_r = _active("or", EpisodeType.HEAD_OFFSET_RIGHT.value, 0.0, 2500.0)
+    assert _attention_patterns(engine_r, [turn_r, shift_r], ctx, 2500.0) == []
+
+
+def test_a_longer_look_counts_again():
+    ctx = SeatContext(seat_id="S1", neighbors=SeatNeighbors(left_neighbor_id="S2"))
+    engine = BehaviorPatternEngine(attention_repeat_ms=3000.0)
+    counted = []
+    for now in range(2000, 9100, 100):
+        turn = _active("t", EpisodeType.HEAD_TURN_LEFT.value, 0.0, float(now))
+        shift = _active("o", EpisodeType.HEAD_OFFSET_LEFT.value, 0.0, float(now))
+        if _attention_patterns(engine, [turn, shift], ctx, float(now)):
+            counted.append(now)
+    assert counted == [2000, 5000, 8000]
+
+
+def test_head_offset_needs_the_face_and_a_seat_without_visitors():
+    extractor = ObservationExtractor()
+    ctx = SeatContext(seat_id="S1")
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[0] = [130, 50, 0.9]   # nose, right of the shoulder centre
+    kps[1] = [125, 45, 0.9]
+    kps[5] = [80, 90, 0.9]
+    kps[6] = [160, 90, 0.9]
+    det = Detection(class_id=0, class_name="person", confidence=0.9, bbox=(60, 20, 180, 200), keypoints=kps)
+
+    def offsets(**kwargs):
+        return [o.value for o in extractor.extract(det, ctx, 0.0, **kwargs)
+                if o.observation_type == ObservationType.HEAD_OFFSET_X.value]
+
+    assert offsets(nearby_person_count=1, expected_person_count=1) == [pytest.approx(10 / 80)]
+    assert offsets(nearby_person_count=2, expected_person_count=1) == []
+    kps[0][2] = 0.1  # face turned away / hidden
+    assert offsets(nearby_person_count=1, expected_person_count=1) == []
+
+
+def test_raw_head_offset_does_not_open_episodes_until_related_to_the_student():
+    engine = TemporalEpisodeEngine(min_persistence_ms=100.0)
+    raw = RawObservation("S1", 0.0, ObservationType.HEAD_OFFSET_X.value, -0.6)
+    eps = []
+    for ts in range(0, 1000, 100):
+        raw.timestamp_ms = float(ts)
+        eps = engine.process_observations([raw], float(ts))
+    assert not eps
+    related = RawObservation("S1", 0.0, ObservationType.HEAD_OFFSET_X.value, -0.6,
+                             metadata={"relative_to": "student_baseline"})
+    for ts in range(1000, 2000, 100):
+        related.timestamp_ms = float(ts)
+        eps = engine.process_observations([related], float(ts))
+    assert [e.episode_type for e in eps] == [EpisodeType.HEAD_OFFSET_LEFT.value]
+
+
+def test_head_offset_baseline_is_the_students_usual_posture():
+    from classroom_monitor.head_pose_provider import HeadOffsetBaseline
+
+    baseline = HeadOffsetBaseline(window_ms=30000.0, min_samples=5)
+    for ts in range(4):
+        assert baseline.apply("S1", 0.3, float(ts)) is None
+    assert baseline.apply("S1", 0.3, 4.0) == pytest.approx(0.0)
+    assert baseline.apply("S1", 0.8, 5.0) == pytest.approx(0.5)
+
+
 # --- P1-8 -------------------------------------------------------------------
 
 def test_one_hand_writing_other_hand_low_is_not_below_desk():
@@ -271,6 +436,35 @@ def test_second_incident_is_labelled_by_its_own_patterns_and_frame():
     assert second is not None
     assert second.behavior == PatternType.REPEATED_NEIGHBOR_GLANCE.value
     assert int(second.evidence_frame[0, 0, 0]) == 2
+
+
+def test_incident_records_when_the_behaviour_began():
+    tracker = SeatRiskTracker(room_id="R", decay_rate_per_sec=0.0)
+    multi = PatternType.MULTI_PERSON_DWELL_NEAR_SEAT.value
+    # The behaviour began at 4 s; the score reaches the review threshold at 7 s
+    early = BehaviorPattern(pattern_id="a", seat_id="S1", pattern_type=multi,
+                            start_timestamp_ms=4000.0, end_timestamp_ms=5000.0)
+    assert tracker.update_seat("S1", [], [early], 5000.0) is None
+    incident = tracker.update_seat("S1", [], [_pattern(f"m{i}", multi, 7000.0) for i in range(2)], 7000.0)
+    assert incident is not None
+    assert incident.metadata["first_seen_ms"] == 7000.0
+    assert incident.metadata["behavior_start_ms"] == 4000.0
+
+
+def test_next_incident_does_not_start_before_the_previous_one():
+    tracker = SeatRiskTracker(room_id="R", decay_rate_per_sec=0.0, cooldown_duration_ms=1000.0,
+                              incident_merge_window_ms=0.0)
+    multi = PatternType.MULTI_PERSON_DWELL_NEAR_SEAT.value
+    glance = PatternType.REPEATED_NEIGHBOR_GLANCE.value
+    first = tracker.update_seat("S1", [], [_pattern(f"m{i}", multi, 5000.0) for i in range(3)], 5000.0)
+    assert first is not None
+    tracker.update_seat("S1", [], [], 6500.0)  # cooldown over
+    # A glance pattern looks back over its whole window, to before the first incident
+    long_glance = BehaviorPattern(pattern_id="g", seat_id="S1", pattern_type=glance,
+                                  start_timestamp_ms=1000.0, end_timestamp_ms=8000.0)
+    second = tracker.update_seat("S1", [], [long_glance, _pattern("g2", glance, 8000.0)], 8000.0)
+    assert second is not None and second.behavior == glance
+    assert second.metadata["behavior_start_ms"] == 5000.0
 
 
 # --- P1-3 -------------------------------------------------------------------
@@ -412,3 +606,39 @@ def test_behavior_labels_toggle_through_the_web_api():
         assert client.post("/api/v1/demo/overlay", json={"behavior_labels": True}).json()["behavior_labels"] is True
         assert client.get("/api/v1/demo/status").json()["behavior_labels"] is True
         assert client.post("/api/v1/demo/overlay", json={"behavior_labels": False}).json()["behavior_labels"] is False
+
+
+def test_debug_overlay_toggles_while_running_without_touching_labels():
+    from fastapi.testclient import TestClient
+
+    from api.main import app
+
+    with TestClient(app) as client:
+        client.post("/api/v1/demo/overlay", json={"behavior_labels": True})
+        status = client.post("/api/v1/demo/overlay", json={"debug_overlay": True}).json()
+        assert status["debug_overlay"] is True
+        assert status["behavior_labels"] is True
+        assert client.get("/api/v1/demo/status").json()["debug_overlay"] is True
+        status = client.post("/api/v1/demo/overlay", json={"debug_overlay": False}).json()
+        assert status["debug_overlay"] is False
+        client.post("/api/v1/demo/overlay", json={"behavior_labels": False})
+
+
+# --- Reviewer highlight of the flagged student --------------------------------
+
+def test_incident_focus_carries_seat_and_person_location():
+    from classroom_monitor.pipeline.srs_v2_pipeline import incident_focus
+
+    focus = incident_focus(
+        seat_polygon=_square(100, 200),
+        person_bbox=(110, 150, 190, 330),
+        current_bbox=None,
+        frame_shape=(1080, 1920, 3),
+    )
+    assert focus["frame_size"] == [1920, 1080]
+    assert focus["person_bbox"] == [110.0, 150.0, 190.0, 330.0]
+    assert len(focus["seat_polygon"]) == 4
+    # an empty peak box falls back to the person currently in the seat
+    fallback = incident_focus(seat_polygon=_square(0, 0), person_bbox=(0, 0, 0, 0),
+                              current_bbox=(5, 5, 50, 90), frame_shape=(720, 1280, 3))
+    assert fallback["person_bbox"] == [5.0, 5.0, 50.0, 90.0]

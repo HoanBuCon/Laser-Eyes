@@ -3,7 +3,8 @@
  * Handles live MJPEG stream, WebSocket telemetry, Review Queue, and Human-in-the-Loop Adjudication.
  */
 
-let activePreset = 'india';
+// Set from the first demo video reported by the server (GET /api/v1/demo/presets)
+let activePreset = null;
 // Room, camera and seat count per preset as reported by the server (seats come
 // from the web calibration page).
 let presetInfo = {};
@@ -58,6 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1500);
 });
 
+function clearVideoPlayer(player) {
+    if (!player) return;
+    player.removeAttribute('src');
+    player.load();
+}
+
 function initEvidenceVideoStatus() {
     const player = document.getElementById('modalVideoPlayer');
     const status = document.getElementById('modalVideoStatus');
@@ -71,6 +78,7 @@ function initEvidenceVideoStatus() {
         window.setTimeout(() => status.classList.add('hidden'), 1400);
     });
     player.addEventListener('error', () => {
+        if (!player.getAttribute('src')) return;  // cleared on purpose, nothing to play
         const mediaError = player.error;
         const detail = mediaError ? ` (media error ${mediaError.code})` : '';
         status.textContent = `Video could not be played${detail}. Use Open / download or check server logs.`;
@@ -149,11 +157,9 @@ function handleWebSocketMessage(msg) {
 
 function selectPreset(preset) {
     activePreset = preset;
-    const btnIndia = document.getElementById('btnPresetIndia');
-    const btnStudent = document.getElementById('btnPresetStudent');
-
-    btnIndia.setAttribute('aria-pressed', String(preset === 'india'));
-    btnStudent.setAttribute('aria-pressed', String(preset === 'student'));
+    document.querySelectorAll('#presetButtons [data-preset]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.preset === preset));
+    });
 
     renderPresetDetails();
 }
@@ -182,6 +188,22 @@ function selectMode(mode) {
     } else {
         modeText.textContent = 'RECORDED REPLAY';
     }
+
+    // A replay plays the video as it was rendered, so overlays cannot change
+    ['chkDebugOverlay', 'chkBehaviorLabels'].forEach((id) => {
+        const chk = document.getElementById(id);
+        if (!chk) return;
+        const label = chk.closest('label');
+        chk.disabled = mode === 'REPLAY';
+        if (label) {
+            if (label.dataset.liveTitle === undefined) label.dataset.liveTitle = label.title || '';
+            label.title = mode === 'REPLAY'
+                ? 'Not available in Recorded Replay: the replay shows the video as it was recorded. Use Live Analysis.'
+                : label.dataset.liveTitle;
+            label.classList.toggle('opacity-50', mode === 'REPLAY');
+            label.classList.toggle('cursor-not-allowed', mode === 'REPLAY');
+        }
+    });
 }
 
 // -----------------------------------------------------------------------------
@@ -275,15 +297,19 @@ function handleStreamError(img) {
 // API Polling & Telemetry Fetching
 // -----------------------------------------------------------------------------
 
-const PRESET_BUTTON_IDS = { india: 'btnPresetIndia', student: 'btnPresetStudent' };
-
 async function fetchPresets() {
     try {
         const res = await apiFetch('/api/v1/demo/presets');
         const presets = await res.json();
+        const container = document.getElementById('presetButtons');
+        if (container) {
+            container.innerHTML = presets.map((p) => `
+                <button type="button" data-preset="${p.name}" onclick="selectPreset('${p.name}')" aria-pressed="false"
+                    class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition"></button>`).join('');
+        }
         presets.forEach((p) => {
             presetInfo[p.name] = p;
-            const btn = document.getElementById(PRESET_BUTTON_IDS[p.name]);
+            const btn = container ? container.querySelector(`[data-preset="${p.name}"]`) : null;
             if (!btn) return;
             // Seat counts come from the web calibration, never from fixed numbers
             btn.textContent = p.calibrated
@@ -291,19 +317,20 @@ async function fetchPresets() {
                 : `${p.title} (not calibrated)`;
             btn.title = p.calibrated ? '' : (p.calibration_error || 'Draw Seat ROIs on the calibration page');
         });
-        renderPresetDetails();
+        if (!activePreset || !presetInfo[activePreset]) activePreset = presets.length ? presets[0].name : null;
+        selectPreset(activePreset);
     } catch (e) {}
 }
 
-async function toggleBehaviorLabels(enabled) {
+async function toggleOverlay(change) {
     try {
         await apiFetch('/api/v1/demo/overlay', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ behavior_labels: enabled }),
+            body: JSON.stringify(change),
         });
     } catch (e) {
-        console.error('Failed to toggle behavior labels:', e);
+        console.error('Failed to switch overlay:', e);
     }
 }
 
@@ -535,10 +562,7 @@ function renderReviewQueue() {
             const sourceSeconds = isManual
                 ? Number(ev.source_timestamp_ms || 0) / 1000
                 : Number(ev.first_seen_ms || 0) / 1000;
-            const firstSeen = sourceSeconds.toFixed(1);
-            const lastSeen = isManual
-                ? firstSeen
-                : (ev.last_seen_ms ? ev.last_seen_ms / 1000 : sourceSeconds).toFixed(1);
+            const timeText = isManual ? `Time: ${sourceSeconds.toFixed(1)}s` : incidentTimeText(ev, true);
 
             let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">PENDING REVIEW</span>`;
             if (ev.review_status === 'CONFIRMED') {
@@ -574,7 +598,7 @@ function renderReviewQueue() {
                     <div>
                         <div class="text-sm font-bold text-gray-100">${pattern}</div>
                         <div class="text-xs text-gray-400 font-mono mt-1 flex items-center gap-2">
-                            <span>Time: ${firstSeen}s – ${lastSeen}s</span>
+                            <span>${escapeHtml(timeText)}</span>
                             <span>&bull;</span>
                             <span class="text-amber-300 font-semibold">${isManual ? `Frame ${escapeHtml(ev.frame_id)}` : `x${occ} Occurrences`}</span>
                         </div>
@@ -602,6 +626,28 @@ function escapeHtml(value) {
         .replaceAll('>', '&gt;')
         .replaceAll('"', '&quot;')
         .replaceAll("'", '&#039;');
+}
+
+// When the behaviour began, when the AI flagged it, and until when it re-flagged
+function incidentTimeText(ev, compact) {
+    const flagged = Number(ev.first_seen_ms || 0) / 1000;
+    const hasStart = ev.behavior_start_ms !== undefined && ev.behavior_start_ms !== null;
+    const start = hasStart ? Number(ev.behavior_start_ms) / 1000 : flagged;
+    const last = Number(ev.last_seen_ms || ev.first_seen_ms || 0) / 1000;
+    const parts = [];
+    if (hasStart && flagged - start >= 0.1) {
+        parts.push(`Behavior ${start.toFixed(1)}s → ${flagged.toFixed(1)}s`);
+        parts.push(`flagged at ${flagged.toFixed(1)}s`);
+    } else {
+        parts.push(`Flagged at ${flagged.toFixed(1)}s`);
+    }
+    if ((ev.occurrence_count || 1) > 1 && last - flagged >= 0.1) {
+        parts.push(`re-flagged until ${last.toFixed(1)}s`);
+    }
+    if (!compact && hasStart && flagged - start >= 0.1) {
+        parts.push(`${(flagged - start).toFixed(1)}s before the alert`);
+    }
+    return parts.join(' · ');
 }
 
 function formatBehaviorLabel(raw) {
@@ -670,12 +716,15 @@ async function openBookmarkModal(bookmarkId) {
         return item;
     }));
     document.getElementById('modalVideoSection').classList.add('hidden');
-    document.getElementById('modalVideoPlayer').src = '';
+    clearVideoPlayer(document.getElementById('modalVideoPlayer'));
     activeEvidenceUrls = {
         overall: bookmark.snapshot_url ? authenticatedUrl(bookmark.snapshot_url) : '',
         crop: bookmark.crop_url ? authenticatedUrl(bookmark.crop_url) : '',
     };
     evidenceZoom = 1.0;
+    // A proctor bookmark has no AI-flagged person to highlight
+    activeFocus = { focus: null, label: '' };
+    document.getElementById('btnViewSuspect').classList.add('hidden');
     document.getElementById('btnViewCrop').classList.toggle('hidden', !activeEvidenceUrls.crop);
     setEvidenceView('overall');
     document.getElementById('modalReasonSelect').value = 'NONE';
@@ -700,9 +749,7 @@ async function openReviewModal(eventId) {
     document.getElementById('modalRiskScore').textContent = Number.isFinite(Number(modalRisk)) ? `${Math.round(Number(modalRisk))} / 100` : 'Not recorded';
     document.getElementById('modalOccurrence').textContent = `x${ev.occurrence_count || 1}`;
 
-    const firstSeen = (ev.first_seen_ms ? ev.first_seen_ms / 1000 : 0).toFixed(1);
-    const lastSeen = (ev.last_seen_ms ? ev.last_seen_ms / 1000 : firstSeen).toFixed(1);
-    document.getElementById('modalTimeRange').textContent = `${firstSeen}s – ${lastSeen}s (${((ev.last_seen_ms || 0) - (ev.first_seen_ms || 0)) / 1000}s span)`;
+    document.getElementById('modalTimeRange').textContent = incidentTimeText(ev, false);
 
     const hashEl = document.getElementById('modalSha256');
     const hashLabels = {
@@ -748,14 +795,20 @@ async function openReviewModal(eventId) {
         videoPlayer.src = videoUrl;
         videoPlayer.load();
         videoPlayer.play().catch(() => {
+            // Closed or switched to another incident meanwhile
+            if (videoPlayer.getAttribute('src') !== videoUrl) return;
             videoStatus.textContent = 'Evidence ready. Press Play to start.';
             videoStatus.classList.remove('hidden');
         });
     } else {
-        videoPlayer.src = '';
+        clearVideoPlayer(videoPlayer);
         videoDownload.href = '#';
         videoDownload.classList.add('hidden');
-        videoStatus.textContent = ev.evidence_error || 'No video clip is available for this incident.';
+        videoStatus.textContent = ev.evidence_error || (
+            ev.evidence_status === 'PENDING'
+                ? 'The evidence clip is still being recorded (about 5 seconds after the incident). Reopen this review in a moment.'
+                : 'No video clip is available for this incident.'
+        );
         videoStatus.classList.remove('hidden');
     }
 
@@ -769,19 +822,37 @@ async function openReviewModal(eventId) {
         snapshotImg.src = '';
     }
 
+    // Where to look: flagged student + seat ROI, drawn over clip and snapshot
+    activeFocus = {
+        focus: (ev.metadata && ev.metadata.focus) || null,
+        label: `${shortSeatLabel(ev.seat_id)} · ${formatBehaviorLabel(ev.primary_pattern || ev.behavior)}`,
+    };
+    const canZoomToSuspect = Boolean(ev.snapshot_url && focusBox(activeFocus.focus));
+    document.getElementById('btnViewSuspect').classList.toggle('hidden', !canZoomToSuspect);
+    if (canZoomToSuspect) {
+        setEvidenceView('suspect');
+    } else {
+        renderActiveFocus();
+    }
+
     // Reason & notes
     document.getElementById('modalReasonSelect').value = ev.decision_reason || 'NONE';
     document.getElementById('modalNotesText').value = ev.reviewer_notes || '';
 
     updateDecisionButtons();
     document.getElementById('reviewModal').classList.remove('hidden');
+    // Zoom and on-screen label sizes need the visible layout, so apply them once the modal is shown
+    requestAnimationFrame(() => {
+        renderActiveFocus();
+        if (document.getElementById('modalSnapshotImg').dataset.view === 'suspect') zoomToSuspect();
+    });
 }
 
 function closeReviewModal() {
     const videoPlayer = document.getElementById('modalVideoPlayer');
     if (videoPlayer) {
         videoPlayer.pause();
-        videoPlayer.src = '';
+        clearVideoPlayer(videoPlayer);
     }
     const videoDownload = document.getElementById('modalVideoDownload');
     if (videoDownload) {
@@ -789,6 +860,8 @@ function closeReviewModal() {
         videoDownload.classList.add('hidden');
     }
     document.getElementById('reviewModal').classList.add('hidden');
+    activeFocus = { focus: null, label: '' };
+    renderActiveFocus();
     activeEvidenceUrls = { overall: '', crop: '' };
     evidenceZoom = 1.0;
     activeEventId = null;
@@ -797,18 +870,167 @@ function closeReviewModal() {
 
 function setEvidenceView(view) {
     const image = document.getElementById('modalSnapshotImg');
-    const target = activeEvidenceUrls[view] || activeEvidenceUrls.overall || '';
-    image.src = target;
+    const source = view === 'crop' ? activeEvidenceUrls.crop : activeEvidenceUrls.overall;
+    image.src = source || activeEvidenceUrls.overall || '';
     image.dataset.view = view;
     evidenceZoom = 1.0;
-    image.style.transform = 'scale(1)';
+    document.getElementById('modalSnapshotStage').style.transform = 'none';
     document.getElementById('btnViewOverall').setAttribute('aria-pressed', String(view === 'overall'));
     document.getElementById('btnViewCrop').setAttribute('aria-pressed', String(view === 'crop'));
+    document.getElementById('btnViewSuspect').setAttribute('aria-pressed', String(view === 'suspect'));
+    renderActiveFocus();
+    if (view === 'suspect') {
+        // Wait for layout so the viewport size is known
+        requestAnimationFrame(zoomToSuspect);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    const image = document.getElementById('modalSnapshotImg');
+    if (image) {
+        image.addEventListener('load', () => {
+            if (image.dataset.view === 'suspect') zoomToSuspect();
+        });
+    }
+});
+
+function focusBox(focus) {
+    if (!focus || !Array.isArray(focus.frame_size)) return null;
+    if (Array.isArray(focus.person_bbox)) return focus.person_bbox;
+    const polygon = Array.isArray(focus.seat_polygon) ? focus.seat_polygon : [];
+    if (polygon.length < 3) return null;
+    const xs = polygon.map((p) => p[0]);
+    const ys = polygon.map((p) => p[1]);
+    return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+}
+
+function zoomToSuspect() {
+    const focus = activeFocus.focus;
+    const box = focusBox(focus);
+    const stage = document.getElementById('modalSnapshotStage');
+    if (!box || !stage) return;
+    const [w, h] = focus.frame_size;
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+    if (!stageW || !stageH) return;
+    // Where the frame is drawn inside the stage (object-contain letterboxing)
+    const fit = Math.min(stageW / w, stageH / h);
+    const offX = (stageW - w * fit) / 2;
+    const offY = (stageH - h * fit) / 2;
+    const cx = offX + ((box[0] + box[2]) / 2) * fit;
+    const cy = offY + ((box[1] + box[3]) / 2) * fit;
+    // Show the student about 2.5x their size so neighbours stay in view as context
+    const zoom = Math.max(1, Math.min(
+        6,
+        stageW / ((box[2] - box[0]) * fit * 2.5),
+        stageH / ((box[3] - box[1]) * fit * 2.5),
+    ));
+    evidenceZoom = zoom;
+    stage.style.transform = `translate(${stageW / 2 - cx * zoom}px, ${stageH / 2 - cy * zoom}px) scale(${zoom})`;
+    if (document.getElementById('chkFocusOverlay')?.checked !== false) {
+        drawFocusOverlay(document.getElementById('modalSnapshotFocus'), focus, activeFocus.label);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// Suspect highlight over review evidence (display only; files stay unmodified)
+// -----------------------------------------------------------------------------
+
+let activeFocus = { focus: null, label: '' };
+
+function shortSeatLabel(seatId) {
+    const digits = String(seatId || '').match(/(\d+)(?!.*\d)/);
+    return digits ? `S${digits[1].padStart(2, '0')}` : String(seatId || 'Seat');
+}
+
+function renderActiveFocus() {
+    const enabled = document.getElementById('chkFocusOverlay')?.checked !== false;
+    // The overall snapshot is the full camera frame; a seat crop has other coordinates.
+    const snapshotIsFullFrame = document.getElementById('modalSnapshotImg')?.dataset.view !== 'crop';  // overall + suspect
+    drawFocusOverlay(document.getElementById('modalVideoFocus'), enabled ? activeFocus.focus : null, activeFocus.label);
+    drawFocusOverlay(
+        document.getElementById('modalSnapshotFocus'),
+        enabled && snapshotIsFullFrame ? activeFocus.focus : null,
+        activeFocus.label,
+    );
+}
+
+function drawFocusOverlay(svg, focus, label) {
+    if (!svg) return;
+    const size = focus && Array.isArray(focus.frame_size) ? focus.frame_size : null;
+    const polygon = focus && Array.isArray(focus.seat_polygon) ? focus.seat_polygon : [];
+    if (!size || (!focus.person_bbox && polygon.length < 3)) {
+        svg.replaceChildren();
+        svg.classList.add('hidden');
+        return;
+    }
+    const [w, h] = size;
+    const ns = 'http://www.w3.org/2000/svg';
+    const el = (tag, attrs) => {
+        const node = document.createElementNS(ns, tag);
+        Object.entries(attrs).forEach(([k, v]) => node.setAttribute(k, String(v)));
+        return node;
+    };
+
+    // Region to keep bright: the person's box, or the seat ROI's bounds without one
+    let box = focus.person_bbox;
+    if (!box) {
+        const xs = polygon.map((p) => p[0]);
+        const ys = polygon.map((p) => p[1]);
+        box = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    }
+    // Measure how many screen pixels one frame pixel occupies (includes any zoom),
+    // so lines and the label keep a readable on-screen size at every view.
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    svg.classList.remove('hidden');
+    const rect = svg.getBoundingClientRect();
+    const screenScale = rect.width && rect.height ? Math.min(rect.width / w, rect.height / h) : 0;
+    const px = (screenPx, fallback) => (screenScale ? screenPx / screenScale : fallback);
+    const pad = px(4, Math.max(w, h) * 0.01);
+    const [x1, y1, x2, y2] = [box[0] - pad, box[1] - pad, box[2] + pad, box[3] + pad];
+    const stroke = px(2, Math.max(2, w / 360));
+    const maskId = `${svg.id}-mask`;
+
+    const defs = el('defs', {});
+    const mask = el('mask', { id: maskId });
+    mask.append(
+        el('rect', { x: 0, y: 0, width: w, height: h, fill: 'white' }),
+        el('rect', { x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: stroke * 2, fill: 'black' }),
+    );
+    defs.append(mask);
+
+    const children = [defs, el('rect', { x: 0, y: 0, width: w, height: h, fill: 'black', 'fill-opacity': 0.5, mask: `url(#${maskId})` })];
+    if (polygon.length >= 3) {
+        children.push(el('polygon', {
+            points: polygon.map((p) => p.join(',')).join(' '),
+            fill: 'none', stroke: '#fbbf24', 'stroke-width': stroke, 'stroke-dasharray': `${stroke * 4} ${stroke * 3}`,
+        }));
+    }
+    children.push(el('rect', {
+        x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: stroke * 2,
+        fill: 'none', stroke: '#ef4444', 'stroke-width': stroke * 1.6,
+    }));
+
+    if (label) {
+        const fontSize = px(13, Math.max(14, w / 70));
+        const textY = y1 - fontSize * 0.6 > fontSize ? y1 - fontSize * 0.6 : y2 + fontSize * 1.3;
+        const text = el('text', {
+            x: x1, y: textY, fill: '#ffffff', 'font-size': fontSize, 'font-family': 'monospace', 'font-weight': 700,
+            stroke: '#000000', 'stroke-width': fontSize / 6, 'paint-order': 'stroke',
+        });
+        text.textContent = label;
+        children.push(text);
+    }
+    svg.replaceChildren(...children);
 }
 
 function zoomEvidence(delta) {
     evidenceZoom = Math.min(3.0, Math.max(0.5, evidenceZoom + delta));
-    document.getElementById('modalSnapshotImg').style.transform = `scale(${evidenceZoom})`;
+    // Manual zoom is centred on the image
+    const stage = document.getElementById('modalSnapshotStage');
+    const dx = (stage.clientWidth * (1 - evidenceZoom)) / 2;
+    const dy = (stage.clientHeight * (1 - evidenceZoom)) / 2;
+    stage.style.transform = `translate(${dx}px, ${dy}px) scale(${evidenceZoom})`;
 }
 
 function selectDecision(decision) {

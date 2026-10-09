@@ -2,7 +2,7 @@
 
 Defines:
 - DemoVideoConfig: Dataclass encapsulating single-video run parameters.
-- DEMO_PRESETS: video/room bindings for 'india' (ROOM-CALIB-01) and 'student' (ROOM-STUDENT-01).
+- DEMO_PRESETS: video/room bindings for the demo videos (china1..china3, ROOM-CHINA-01..03).
   Seat ROIs are NOT part of a preset: they are drawn on the web calibration page
   and read from the database at run time (see classroom_monitor.demo.seating).
 - Utility functions for path resolution and command-line argument parsing.
@@ -11,7 +11,7 @@ Defines:
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
@@ -56,29 +56,23 @@ class DemoVideoConfig:
             self.gt_path = Path(self.gt_path)
 
 
+# The demo videos offered by the website, the calibration page and the CLI.
+# This is the only list: add or remove a video here and every interface follows.
+# Seat ROIs are drawn per room on the calibration page; no layout is bundled.
 DEMO_PRESETS: Dict[str, Dict[str, Any]] = {
-    "india": {
-        "name": "india",
-        "video_path": "demo_video/india_classroom.mp4",
-        "seat_template_path": "configs/scenes/india_classroom.yaml",
-        "room_code": "ROOM-CALIB-01",
-        "camera_id": "CAM-CALIB-01",
-        "output_dir": "data/demo_final/india",
-        # Annotated with the seat codes drawn on the calibration page.
-        "gt_path": "data/ground_truth/india_classroom_gt.json",
+    f"china{n}": {
+        "name": f"china{n}",
+        "title": f"China Classroom {n}",
+        "video_path": f"demo_video/china{n}_classroom.mp4",
+        "room_code": f"ROOM-CHINA-0{n}",
+        "camera_id": f"CAM-CHINA-0{n}",
+        "output_dir": f"data/demo_final/china{n}",
+        "resolution": "1920x1080",
         "pose_imgsz": 1280,
-    },
-    "student": {
-        "name": "student",
-        "video_path": "demo_video/student_classroom.mp4",
-        "seat_template_path": "configs/scenes/student_classroom.yaml",
-        "room_code": "ROOM-STUDENT-01",
-        "camera_id": "CAM-STUDENT-01",
-        "output_dir": "data/demo_final/student",
-        "gt_path": "data/ground_truth/student_classroom_gt.json",
-        "pose_imgsz": 640,
-    },
+    }
+    for n in (1, 2, 3)
 }
+DEFAULT_PRESET = "china1"
 
 
 def resolve_video_path(video_arg: Union[str, Path], video_dir: str = "demo_video") -> Path:
@@ -111,7 +105,7 @@ def resolve_video_path(video_arg: Union[str, Path], video_dir: str = "demo_video
 
 
 def get_demo_config(name_or_path: str, **kwargs: Any) -> DemoVideoConfig:
-    """Instantiate a DemoVideoConfig from a preset name ('india', 'student') or custom video path."""
+    """Instantiate a DemoVideoConfig from a preset name (see DEMO_PRESETS) or custom video path."""
     clean_name = name_or_path.lower().strip()
     # Check alias in presets
     if clean_name in DEMO_PRESETS:
@@ -129,7 +123,9 @@ def get_demo_config(name_or_path: str, **kwargs: Any) -> DemoVideoConfig:
         for k, v in kwargs.items():
             if v is not None:
                 preset[k] = v
-        return DemoVideoConfig(**preset)
+        # Display-only keys (title, resolution) are not run settings
+        run_fields = {f.name for f in fields(DemoVideoConfig)}
+        return DemoVideoConfig(**{k: v for k, v in preset.items() if k in run_fields})
 
     # Custom video path
     resolved_video = resolve_video_path(name_or_path)
@@ -174,8 +170,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--video",
         type=str,
-        default="india",
-        help="Demo preset ('india', 'student') or path to video file (.mp4).",
+        default=DEFAULT_PRESET,
+        help=f"Demo preset ({', '.join(DEMO_PRESETS)}) or path to video file (.mp4).",
     )
     parser.add_argument(
         "--input",
@@ -214,7 +210,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--imgsz",
         type=int,
         default=None,
-        help="YOLO-Pose input resolution (default: 1280 for india, 640 for student).",
+        help="YOLO-Pose input resolution.",
     )
     parser.add_argument(
         "--show",

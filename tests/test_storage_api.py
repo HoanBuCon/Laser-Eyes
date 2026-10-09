@@ -328,17 +328,12 @@ def test_competition_calibration_sources_are_seeded_idempotently(db_session):
     ensure_calibration_sources(db_session)
     ensure_calibration_sources(db_session)
 
-    india = db_session.query(ExamRoom).filter_by(room_code="ROOM-CALIB-01").one()
-    student = db_session.query(ExamRoom).filter_by(room_code="ROOM-STUDENT-01").one()
-    assert db_session.query(Camera).filter_by(
-        room_id=india.id, name="VIGIL India Calibration Video"
-    ).count() == 1
-    assert db_session.query(Camera).filter_by(
-        room_id=student.id, name="VIGIL Student Calibration Video"
-    ).count() == 1
-    student_camera = db_session.query(Camera).filter_by(
-        room_id=student.id, name="VIGIL Student Calibration Video"
-    ).one()
-    assert student_camera.source_uri == "demo_video/student_classroom.mp4"
+    # One calibration room + camera per demo video, created once
+    for n in (1, 2, 3):
+        room = db_session.query(ExamRoom).filter_by(room_code=f"ROOM-CHINA-0{n}").one()
+        camera = db_session.query(Camera).filter_by(
+            room_id=room.id, name=f"VIGIL China Classroom {n} Video"
+        ).one()
+        assert camera.source_uri == f"demo_video/china{n}_classroom.mp4"
 
 

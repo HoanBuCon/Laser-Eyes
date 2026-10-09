@@ -39,6 +39,7 @@ from classroom_monitor.contracts import (
     review_incident_from_classroom_event,
 )
 from classroom_monitor.demo.config import (
+    DEFAULT_PRESET,
     DEMO_PRESETS,
     DemoVideoConfig,
     get_demo_config,
@@ -155,9 +156,10 @@ class DemoRuntime:
         self._pause_event = threading.Event()
 
         self.status = DemoStatus()
-        # Display-only behaviour tags; read by the LIVE worker on every frame
-        # so the web toggle takes effect immediately.
+        # Display-only overlays; read by the LIVE worker on every frame so the
+        # web toggles take effect immediately.
         self.behavior_labels = False
+        self.debug_overlay = False
         self.latest_frame: Optional[np.ndarray] = None
         self.latest_raw_frame: Optional[np.ndarray] = None
         self.latest_jpeg: Optional[bytes] = None
@@ -207,13 +209,24 @@ class DemoRuntime:
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
             self.status.behavior_labels = self.behavior_labels
+            self.status.debug_overlay = self.debug_overlay
             return self.status.to_dict()
 
     def set_behavior_labels(self, enabled: bool) -> Dict[str, Any]:
         """Show or hide display-only behaviour tags on the live stream."""
+        return self.set_overlay(behavior_labels=enabled)
+
+    def set_overlay(
+        self, behavior_labels: Optional[bool] = None, debug_overlay: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """Switch display-only overlays of the live stream; None leaves one unchanged."""
         with self._lock:
-            self.behavior_labels = bool(enabled)
+            if behavior_labels is not None:
+                self.behavior_labels = bool(behavior_labels)
+            if debug_overlay is not None:
+                self.debug_overlay = bool(debug_overlay)
             self.status.behavior_labels = self.behavior_labels
+            self.status.debug_overlay = self.debug_overlay
             return self.status.to_dict()
 
     def get_events(self) -> List[Dict[str, Any]]:
@@ -305,7 +318,7 @@ class DemoRuntime:
 
     def start(
         self,
-        preset: str = "india",
+        preset: str = DEFAULT_PRESET,
         mode: str = "LIVE",
         debug_overlay: bool = False,
         show_window: bool = False,
@@ -327,7 +340,7 @@ class DemoRuntime:
 
     def _start_locked(
         self,
-        preset: str = "india",
+        preset: str = DEFAULT_PRESET,
         mode: str = "LIVE",
         debug_overlay: bool = False,
         show_window: bool = False,
@@ -362,7 +375,8 @@ class DemoRuntime:
             self.status.run_id = run_id
             self.status.preset = preset.lower()
             self.status.mode = mode_enum.value
-            self.status.debug_overlay = bool(debug_overlay)
+            self.debug_overlay = bool(debug_overlay)
+            self.status.debug_overlay = self.debug_overlay
             self.status.inference_mode = (
                 CapabilityMode.DEGRADED.value if mode_enum == DemoMode.REPLAY else CapabilityMode.ERROR.value
             )
@@ -428,7 +442,10 @@ class DemoRuntime:
             return self.status.to_dict()
 
     def reset_state(self) -> None:
-        self.status = DemoStatus(behavior_labels=getattr(self, "behavior_labels", False))
+        self.status = DemoStatus(
+            behavior_labels=getattr(self, "behavior_labels", False),
+            debug_overlay=getattr(self, "debug_overlay", False),
+        )
         self.latest_frame = None
         self.latest_raw_frame = None
         self.latest_jpeg = None
@@ -539,6 +556,7 @@ class DemoRuntime:
         event_dict["review_status"] = "PENDING"
         event_dict["occurrence_count"] = event.metadata.get("occurrence_count", 1)
         event_dict["first_seen_ms"] = event.metadata.get("first_seen_ms", getattr(event, "timestamp_ms", 0.0) or 0.0)
+        event_dict["behavior_start_ms"] = event.metadata.get("behavior_start_ms", event_dict["first_seen_ms"])
         event_dict["last_seen_ms"] = event.metadata.get("last_seen_ms", getattr(event, "timestamp_ms", 0.0) or 0.0)
         event_dict["peak_risk_score"] = float(event.metadata.get("peak_risk_score", event.metadata.get("risk_score", 0.0)) or 0.0)
         event_dict["primary_pattern"] = event.metadata.get("primary_pattern") or event.behavior
@@ -785,6 +803,23 @@ class DemoRuntime:
         all_events: List[ClassroomEvent] = []
         all_patterns: List[BehaviorPattern] = []
         evidence_jobs: Dict[str, Any] = {}
+        events_by_id: Dict[str, ClassroomEvent] = {}
+        evidence_published: set = set()
+
+        def publish_evidence(event: ClassroomEvent, job: Any) -> None:
+            """Report the clip's final state so reviewers can open it."""
+            event.metadata["evidence_status"] = job.status
+            if job.error_message:
+                event.metadata["evidence_error"] = job.error_message
+            refreshed = self._persist_or_update_event(
+                event=event,
+                session_id=self.status.session_id,
+                room_code=config.room_code,
+                camera_id=config.camera_id,
+                evidence_dir=evidence_dir,
+            )
+            self.add_or_update_event(event, refreshed)
+            evidence_published.add(event.event_id)
 
         frame_idx = 0
         processed_count = 0
@@ -830,6 +865,7 @@ class DemoRuntime:
 
                 for event in frame_result.incidents:
                     all_events.append(event)
+                    events_by_id[event.event_id] = event
                     if config.save_evidence:
                         clip_job = evidence_buffer.trigger_clip(
                             event_id=event.event_id,
@@ -854,6 +890,12 @@ class DemoRuntime:
                     )
                     self.add_or_update_event(event, ev_dict)
 
+                # Clips are written in the background ~5 s after the incident;
+                # publish each one as soon as it is on disk, not only at the end.
+                for event_id, job in evidence_jobs.items():
+                    if event_id not in evidence_published and job.status != "PENDING":
+                        publish_evidence(events_by_id[event_id], job)
+
                 # 5. Render Output Frame
                 active_seats_state = {}
                 for s_code, prof in risk_tracker.profiles.items():
@@ -876,6 +918,7 @@ class DemoRuntime:
                 }
 
                 renderer.behavior_labels = self.behavior_labels
+                renderer.debug_overlay = self.debug_overlay
                 annotated_frame = renderer.render_frame(
                     frame=frame,
                     frame_idx=frame_idx,
@@ -891,8 +934,8 @@ class DemoRuntime:
                     raw_observations=frame_result.observations,
                     detections=detections,
                     roaming_detections=unmapped_dets,
+                    head_unreliable_seats=frame_result.head_unreliable_seats,
                     runtime_metrics=metrics_telemetry,
-                    debug_overlay=debug_overlay,
                 )
                 if detector.inference_mode == CapabilityMode.MOCK.value:
                     cv2.putText(
@@ -949,17 +992,7 @@ class DemoRuntime:
             for completed_event in all_events:
                 job = evidence_jobs.get(completed_event.event_id)
                 if job is not None:
-                    completed_event.metadata["evidence_status"] = job.status
-                    if job.error_message:
-                        completed_event.metadata["evidence_error"] = job.error_message
-                    refreshed = self._persist_or_update_event(
-                        event=completed_event,
-                        session_id=self.status.session_id,
-                        room_code=config.room_code,
-                        camera_id=config.camera_id,
-                        evidence_dir=evidence_dir,
-                    )
-                    self.add_or_update_event(completed_event, refreshed)
+                    publish_evidence(completed_event, job)
             out_writer.release()
             cap.release()
             if show_window:

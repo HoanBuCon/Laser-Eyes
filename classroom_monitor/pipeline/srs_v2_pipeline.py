@@ -9,16 +9,22 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine
 from classroom_monitor.demo.config import DemoVideoConfig
 from classroom_monitor.detector import PoseClassroomDetector
-from classroom_monitor.head_pose_provider import AdaptiveYawBaseline, HeadOrientationEstimate, create_head_pose_provider
+from classroom_monitor.head_pose_provider import (
+    AdaptiveYawBaseline,
+    HeadOffsetBaseline,
+    HeadOrientationEstimate,
+    HeadPoseSampleGate,
+    create_head_pose_provider,
+)
 from classroom_monitor.models import ClassroomEvent, Detection
-from classroom_monitor.observation_extractor import ObservationExtractor, RawObservation
+from classroom_monitor.observation_extractor import ObservationExtractor, ObservationType, RawObservation
 from classroom_monitor.scene_context import CapabilityStatus, SceneProfile, SeatContext, SeatGraph
 from classroom_monitor.seat_manager import SeatManager, SeatState
 from classroom_monitor.seat_risk_tracker import SeatRiskTracker
@@ -34,7 +40,38 @@ class SRSv2FrameResult:
     patterns: List[BehaviorPattern] = field(default_factory=list)
     incidents: List[ClassroomEvent] = field(default_factory=list)
     occupied_seat_count: int = 0
+    # Seats whose head-pose samples are currently too noisy to trust
+    head_unreliable_seats: Set[str] = field(default_factory=set)
     timings_ms: Dict[str, float] = field(default_factory=dict)
+
+
+def incident_focus(
+    *,
+    seat_polygon: np.ndarray,
+    person_bbox: Optional[Any],
+    current_bbox: Optional[Any],
+    frame_shape: Tuple[int, ...],
+) -> Dict[str, Any]:
+    """Where the reviewer should look: the seat ROI and the flagged person's box.
+
+    Stored with the incident (pixel coordinates of the full camera frame) so the
+    review page can highlight the student on the snapshot and the clip without
+    altering the archived evidence files.
+    """
+    def as_box(bbox: Optional[Any]) -> Optional[List[float]]:
+        if bbox is None:
+            return None
+        values = [float(v) for v in bbox]
+        if len(values) != 4 or values[2] <= values[0] or values[3] <= values[1]:
+            return None
+        return values
+
+    box = as_box(person_bbox) or as_box(current_bbox)
+    return {
+        "frame_size": [int(frame_shape[1]), int(frame_shape[0])],
+        "seat_polygon": [[round(float(x), 1), round(float(y), 1)] for x, y in np.asarray(seat_polygon).reshape(-1, 2)],
+        "person_bbox": [round(v, 1) for v in box] if box else None,
+    }
 
 
 class SRSv2Pipeline:
@@ -80,6 +117,9 @@ class SRSv2Pipeline:
         self.hpe_interval_ms = (1000.0 / config.hpe_hz) if config.hpe_hz > 0 else 200.0
         head_cfg = runtime_config["head_pose"]
         self.hpe_max_age_ms = head_cfg["cache_max_age_ms"]
+        self.head_gate: Optional[HeadPoseSampleGate] = (
+            HeadPoseSampleGate() if head_cfg.get("plausibility_gate", True) else None
+        )
         self.yaw_baseline: Optional[AdaptiveYawBaseline] = (
             AdaptiveYawBaseline(
                 window_ms=float(head_cfg.get("baseline_window_ms", 60000.0)),
@@ -88,6 +128,7 @@ class SRSv2Pipeline:
             if head_cfg.get("adaptive_baseline", True)
             else None
         )
+        self.head_offset_baseline = HeadOffsetBaseline()
         self.seat_hpe_cache: Dict[str, Tuple[HeadOrientationEstimate, float]] = {}
         self.last_hpe_time: Dict[str, float] = {}
         self.scheduled_hpe_cycles = 0
@@ -145,15 +186,21 @@ class SRSv2Pipeline:
         if requests:
             self.scheduled_hpe_cycles += 1
             for seat_id, estimate in self.head_provider.estimate_batch(requests=requests, frame=frame).items():
+                # Physically implausible samples never reach the baseline or the episodes
+                if self.head_gate is not None:
+                    estimate = self.head_gate.apply(seat_id, estimate, timestamp_ms)
                 if self.yaw_baseline is not None:
                     estimate = self.yaw_baseline.apply(seat_id, estimate, timestamp_ms)
                 self.seat_hpe_cache[seat_id] = (estimate, timestamp_ms)
 
         # A seat that has been empty starts over: the next person has their own neutral.
-        if self.yaw_baseline is not None:
-            for seat_code, occupancy in self.seat_manager.occupancies.items():
-                if occupancy.state == SeatState.EMPTY:
+        for seat_code, occupancy in self.seat_manager.occupancies.items():
+            if occupancy.state == SeatState.EMPTY:
+                self.head_offset_baseline.reset_seat(seat_code)
+                if self.yaw_baseline is not None:
                     self.yaw_baseline.reset_seat(seat_code)
+                if self.head_gate is not None:
+                    self.head_gate.reset_seat(seat_code)
 
         observations: Dict[str, List[RawObservation]] = {}
         for seat_code, occupancy in self.seat_manager.occupancies.items():
@@ -178,6 +225,7 @@ class SRSv2Pipeline:
                 head_sample_timestamp_ms=sample_ts,
                 expected_person_count=getattr(occupancy, "expected_person_count", None),
             )
+            self._relate_head_offset(seat_code, observations[seat_code], timestamp_ms)
         timings["head_observation"] = (time.perf_counter() - started) * 1000.0
 
         started = time.perf_counter()
@@ -217,6 +265,21 @@ class SRSv2Pipeline:
                 seat_context=context,
             )
             if incident is not None:
+                # Reviewer highlight is display data: it must never stop the analysis
+                try:
+                    seat_def = self.seat_manager.seats.get(seat_code)
+                    polygon = (
+                        seat_def.polygon_for_frame(frame_w=frame.shape[1], frame_h=frame.shape[0])
+                        if hasattr(seat_def, "polygon_for_frame") else np.zeros((0, 2))
+                    )
+                    incident.metadata["focus"] = incident_focus(
+                        seat_polygon=polygon,
+                        person_bbox=incident.bbox,
+                        current_bbox=getattr(occupancy.assigned_detection, "bbox", None),
+                        frame_shape=frame.shape,
+                    )
+                except Exception:
+                    pass
                 incidents.append(incident)
         timings["risk"] = (time.perf_counter() - started) * 1000.0
 
@@ -231,8 +294,27 @@ class SRSv2Pipeline:
                 1 for occupancy in self.seat_manager.occupancies.values()
                 if occupancy.state in (SeatState.OCCUPIED, SeatState.MULTIPLE_PERSON)
             ),
+            head_unreliable_seats=self.head_gate.unreliable_seats() if self.head_gate is not None else set(),
             timings_ms=timings,
         )
+
+    def _relate_head_offset(self, seat_code: str, seat_observations: List[RawObservation], timestamp_ms: float) -> None:
+        """Express the head offset against the student's usual posture, subject-centric.
+
+        Negative is toward the student's own left, as for yaw.  With the camera
+        facing the students their left is the image's right.
+        """
+        for index, obs in enumerate(seat_observations):
+            if obs.observation_type != ObservationType.HEAD_OFFSET_X.value:
+                continue
+            relative = self.head_offset_baseline.apply(seat_code, float(obs.value), timestamp_ms)
+            if relative is None:
+                del seat_observations[index]
+                return
+            mirrored = getattr(self.seat_graph, "mirrors_image", True)
+            obs.value = -relative if mirrored else relative
+            obs.metadata = {**(obs.metadata or {}), "space": "subject", "relative_to": "student_baseline"}
+            return
 
     def flush(self, timestamp_ms: float) -> List[TemporalEpisode]:
         return self.episode_engine.flush_all(timestamp_ms=timestamp_ms)

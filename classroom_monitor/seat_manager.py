@@ -2,7 +2,8 @@
 
 Implements Scope 04 (FR-SEAT-001 to FR-SEAT-007) of SRS v1.0:
 - Seat ROI Configuration and Polygon Point-in-Polygon testing.
-- Person-to-Seat mapping (bottom-center anchor + polygon overlap).
+- Person-to-Seat mapping (torso anchor + polygon overlap, duplicate boxes merged,
+  people walking the room kept out of seat counts).
 - Stable seat identity under temporary proctor occlusions.
 - Multiple-person anomaly detection per seat.
 - Empty seat detection with configurable timeouts.
@@ -13,16 +14,24 @@ from __future__ import annotations
 import json
 import logging
 import time
+from collections import Counter, deque
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Deque, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
 
 from classroom_monitor.models import Detection
+from classroom_monitor.residency import ResidencyMap
 
 logger = logging.getLogger("SeatManager")
+
+# COCO shoulder keypoints must be at least this confident to place the anchor
+SHOULDER_KEYPOINT_CONF = 0.3
+# Two boxes whose shoulder midpoints are closer than this fraction of the
+# shoulder width are the same person
+DUPLICATE_SHOULDER_RATIO = 0.35
 
 
 class SeatState:
@@ -169,8 +178,7 @@ class SeatOccupancy:
     # additional person near the seat.
     person_count: int = 0
     established_person_count: Optional[int] = None
-    pending_person_count: Optional[int] = None
-    pending_since_ms: float = 0.0
+    count_history: Deque[Tuple[float, int]] = field(default_factory=deque)
     last_primary_bbox: Optional[Tuple[int, int, int, int]] = None
 
     @property
@@ -191,23 +199,23 @@ class SeatManager:
         empty_timeout_ms: float = 5000.0,
         occlusion_grace_period_ms: float = 4000.0,
         count_settle_ms: float = 1000.0,
-        count_decrease_ms: float = 10000.0,
-        count_increase_ms: float = 60000.0,
+        count_window_ms: float = 20000.0,
     ):
         self.room_id = room_id
         self.camera_id = camera_id
         self.empty_timeout_ms = empty_timeout_ms
         self.occlusion_grace_period_ms = occlusion_grace_period_ms
-        # Person-count baseline: settles on the first stable count, follows a
-        # lower count only after a long absence (brief missed detections must
-        # not make a returning desk mate look like a newcomer), and adopts a
-        # higher count only after it has persisted for a long time.
+        # Person-count baseline: the count seen most often in the recent window
+        # (a desk mate inside the ROI).  A majority vote tolerates the frequent
+        # one-frame detection dropouts that reset a "must persist" rule; a
+        # visitor only becomes "normal" after being present most of the window.
         self.count_settle_ms = count_settle_ms
-        self.count_decrease_ms = count_decrease_ms
-        self.count_increase_ms = count_increase_ms
+        self.count_window_ms = count_window_ms
 
         self.seats: Dict[str, SeatDefinition] = {}
         self.occupancies: Dict[str, SeatOccupancy] = {}
+        # People walking between the rows (teacher, proctor) are not seat occupants
+        self.residency = ResidencyMap()
 
     def load_seats(self, seat_defs: List[SeatDefinition] | List[Dict[str, Any]]) -> None:
         """Load or update seat definitions."""
@@ -238,11 +246,8 @@ class SeatManager:
         frame_h: Optional[int] = None,
     ) -> Optional[str]:
         """Find the best matching seat for a detection, including overlapping ROIs."""
-        x1, y1, x2, y2 = detection.bbox
-        ac_x = (x1 + x2) / 2.0
-        ac_y = y2 - (y2 - y1) * 0.15
         match = self._best_seat_for_point(
-            (ac_x, ac_y), frame_w=frame_w, frame_h=frame_h
+            self._anchor(detection), frame_w=frame_w, frame_h=frame_h
         )
         if match is not None:
             return match
@@ -326,20 +331,21 @@ class SeatManager:
 
         unmapped: List[Detection] = []
 
-        # Step 1: Assign each detection to candidate seats
-        for det in detections:
+        people = self.merge_duplicate_detections(detections)
+        passing = self.residency.passers_by([self._track_point(d) for d in people], timestamp_ms)
+        passers_by = {id(d) for d, flag in zip(people, passing) if flag}
+
+        # Step 1: Assign each person (once) to candidate seats
+        for det in people:
             x1, y1, x2, y2 = det.bbox
-            # Primary anchor: bottom center of bounding box (where chair/desk is located)
-            bottom_center = ((x1 + x2) / 2.0, float(y2) - (y2 - y1) * 0.15)
-            # Secondary anchor: bbox centroid
             centroid = ((x1 + x2) / 2.0, (y1 + y2) / 2.0)
 
             # Test all containing ROIs and choose the strongest spatial match.
             matched_seat_code = self._best_seat_for_point(
-                bottom_center, frame_w=frame_w, frame_h=frame_h
+                self._anchor(det), frame_w=frame_w, frame_h=frame_h
             )
 
-            # Fallback to centroid if bottom-center did not match
+            # Fallback to centroid if the torso anchor did not match
             if not matched_seat_code:
                 matched_seat_code = self._best_seat_for_point(
                     centroid, frame_w=frame_w, frame_h=frame_h
@@ -349,6 +355,16 @@ class SeatManager:
                 self.occupancies[matched_seat_code].candidate_detections.append(det)
             else:
                 unmapped.append(det)
+
+        # Someone walking past (teacher, proctor) is not an extra person at a
+        # seat that already has its resident.  A seat whose only person looks
+        # like a passer-by keeps them: that is usually its own student with a
+        # flickering detection.
+        for occ in self.occupancies.values():
+            residents = [d for d in occ.candidate_detections if id(d) not in passers_by]
+            if residents and len(residents) < len(occ.candidate_detections):
+                unmapped.extend(d for d in occ.candidate_detections if id(d) in passers_by)
+                occ.candidate_detections = residents
 
         # Step 2: Update Occupancy states and resolve multiple-person situations
         mapped_results: Dict[str, Optional[Detection]] = {}
@@ -405,9 +421,73 @@ class SeatManager:
         return mapped_results, unmapped
 
     @staticmethod
-    def _anchor(det: Detection) -> Tuple[float, float]:
+    def _shoulders(det: Detection) -> Optional[Tuple[float, float, float]]:
+        """Shoulder midpoint and shoulder width, or None without both shoulders."""
+        kps = det.keypoints
+        if kps is None or len(kps) < 7 or kps.shape[-1] < 3:
+            return None
+        left, right = kps[5], kps[6]
+        if left[2] < SHOULDER_KEYPOINT_CONF or right[2] < SHOULDER_KEYPOINT_CONF:
+            return None
+        x = float(left[0] + right[0]) / 2.0
+        y = float(left[1] + right[1]) / 2.0
         x1, y1, x2, y2 = det.bbox
-        return ((x1 + x2) / 2.0, float(y2) - (y2 - y1) * 0.15)
+        if not (x1 <= x <= x2 and y1 <= y <= y2):
+            return None  # keypoints that do not belong to this box
+        return (x, y, float(np.hypot(left[0] - right[0], left[1] - right[1])))
+
+    @classmethod
+    def _anchor(cls, det: Detection) -> Tuple[float, float]:
+        """Point on the upper torso, just below the shoulders.
+
+        The bottom of a pose box is unreliable in a crowded room: the box often
+        stretches down over the legs of the student in the next row, which put
+        the anchor in that student's seat.  The torso stays on the person.
+        """
+        shoulders = cls._shoulders(det)
+        if shoulders is None:
+            # Without shoulders, fall back to the desk-level point of the box
+            x1, y1, x2, y2 = det.bbox
+            return ((x1 + x2) / 2.0, float(y2) - (y2 - y1) * 0.15)
+        x, y, width = shoulders
+        return (x, y + 0.5 * max(width, 1.0))
+
+    @classmethod
+    def _track_point(cls, det: Detection) -> Tuple[float, float, float]:
+        """Torso anchor plus the person's shoulder width, the residency distance unit."""
+        shoulders = cls._shoulders(det)
+        x, y = cls._anchor(det)
+        if shoulders is not None:
+            return (x, y, shoulders[2])
+        return (x, y, 0.6 * float(det.bbox[2] - det.bbox[0]))
+
+    @classmethod
+    def merge_duplicate_detections(cls, detections: List[Detection]) -> List[Detection]:
+        """Drop extra boxes the pose model emits for the same person.
+
+        In crowded rows the model often returns a short upper-body box and a
+        tall box for one student; counted separately they look like a second
+        person at the seat.  Boxes whose shoulders coincide are one person, and
+        the most confident box is kept.
+        """
+        kept: List[Detection] = []
+        for det in sorted(detections, key=lambda d: -float(d.confidence)):
+            shoulders = cls._shoulders(det)
+            duplicate = False
+            if shoulders is not None:
+                for other in kept:
+                    other_shoulders = cls._shoulders(other)
+                    if other_shoulders is None:
+                        continue
+                    scale = max(shoulders[2], other_shoulders[2], 1.0)
+                    if np.hypot(shoulders[0] - other_shoulders[0], shoulders[1] - other_shoulders[1]) < DUPLICATE_SHOULDER_RATIO * scale:
+                        duplicate = True
+                        break
+            if not duplicate:
+                kept.append(det)
+        # Keep the caller's ordering for the boxes that remain
+        kept_ids = {id(d) for d in kept}
+        return [d for d in detections if id(d) in kept_ids]
 
     def _select_primary(
         self,
@@ -440,23 +520,18 @@ class SeatManager:
         return max(candidates, key=depth)
 
     def _update_person_baseline(self, occ: SeatOccupancy, count: int, timestamp_ms: float) -> None:
-        if occ.established_person_count is not None and count == occ.established_person_count:
-            occ.pending_person_count = None
-            return
-        if occ.pending_person_count != count:
-            occ.pending_person_count = count
-            occ.pending_since_ms = timestamp_ms
-            return
-        held_ms = timestamp_ms - occ.pending_since_ms
-        if occ.established_person_count is None:
-            required = self.count_settle_ms
-        elif count < occ.established_person_count:
-            required = self.count_decrease_ms
-        else:
-            required = self.count_increase_ms
-        if held_ms >= required:
-            occ.established_person_count = count
-            occ.pending_person_count = None
+        history = occ.count_history
+        history.append((timestamp_ms, count))
+        while history and (timestamp_ms - history[0][0]) > self.count_window_ms:
+            history.popleft()
+        if (timestamp_ms - history[0][0]) < self.count_settle_ms:
+            return  # not enough history yet; the current count counts as normal
+        votes = Counter(c for _, c in history)
+        best = max(votes.values())
+        leaders = [c for c, v in votes.items() if v == best]
+        if occ.established_person_count in leaders:
+            return  # keep the current baseline on a tie
+        occ.established_person_count = min(leaders)
 
     def to_seat_graph(self, camera_view: Optional[str] = None) -> Any:
         """Construct a connected SeatGraph representing all registered seats and spatial context."""

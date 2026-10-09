@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse
 
 from api.dependencies import get_camera_repo
 from api.schemas import CameraCreate, CameraResponse, CameraUpdate
+from classroom_monitor.demo.config import DEMO_PRESETS
 from storage.repositories import CameraRepository
 
 router = APIRouter(tags=["Cameras"])
@@ -21,10 +22,8 @@ router = APIRouter(tags=["Cameras"])
 REF_FRAME_DIR = Path("data/reference_frames")
 REF_FRAME_DIR.mkdir(parents=True, exist_ok=True)
 
-CALIBRATION_VIDEO_PRESETS = {
-    "india": Path("demo_video/india_classroom.mp4"),
-    "student": Path("demo_video/student_classroom.mp4"),
-}
+# Calibration videos are the demo presets (single list in classroom_monitor.demo.config)
+CALIBRATION_VIDEO_PRESETS = {name: Path(p["video_path"]) for name, p in DEMO_PRESETS.items()}
 
 
 def _read_video_reference_frame(source: str | Path) -> Optional[np.ndarray]:

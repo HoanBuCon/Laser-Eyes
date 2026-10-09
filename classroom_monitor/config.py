@@ -217,6 +217,7 @@ def resolve_runtime_config(
         "cache_max_age_ms": float(scene_thresholds.get("cache_max_age_ms", base.head_estimate_max_age_ms)),
         "min_crop_size": int(scene_thresholds.get("min_crop_size", base.head_min_crop_size)),
         "min_quality": float(scene_thresholds.get("min_quality", base.head_min_quality)),
+        "plausibility_gate": bool(scene_thresholds.get("plausibility_gate", True)),
         "adaptive_baseline": bool(scene_thresholds.get("adaptive_baseline", True)),
         "baseline_window_ms": float(scene_thresholds.get("baseline_window_ms", 60000.0)),
         "baseline_min_samples": int(scene_thresholds.get("baseline_min_samples", 10)),

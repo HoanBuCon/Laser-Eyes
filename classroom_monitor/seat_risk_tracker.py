@@ -62,6 +62,7 @@ PATTERN_PRIORITY_WEIGHTS: Dict[str, float] = {
     PatternType.NEIGHBOR_ORIENTED_LEAN.value: 32.0,
     PatternType.SEAT_LEFT.value: 45.0,
     PatternType.MULTI_PERSON_DWELL_NEAR_SEAT.value: 40.0,
+    PatternType.SUSTAINED_NEIGHBOR_ATTENTION.value: 45.0,
     PatternType.BELOW_DESK_INTERACTION.value: 35.0,
 }
 
@@ -361,6 +362,20 @@ class SeatRiskTracker:
                         if ep_id not in initial_ep_ids:
                             initial_ep_ids.append(ep_id)
 
+                # When the behaviour began: the earliest pattern of the kind that
+                # names this incident, not the moment the score crossed the
+                # review threshold, and never before the seat's previous incident.
+                pattern_starts = [
+                    float(pat.start_timestamp_ms)
+                    for pat in [item[2] for item in profile.window_patterns]
+                    + [p for p in detected_patterns if p.seat_id == seat_id]
+                    + ([profile.peak_pattern] if profile.peak_pattern else [])
+                    if pat.pattern_type == primary_pattern_name and getattr(pat, "start_timestamp_ms", None) is not None
+                ]
+                behavior_start_ms = min([timestamp_ms] + pattern_starts)
+                if profile.total_event_count > 0:
+                    behavior_start_ms = max(behavior_start_ms, profile.last_event_timestamp_ms)
+
                 profile.active_incident = {
                     "incident_id": new_inc_id,
                     "seat_id": seat_id,
@@ -414,6 +429,7 @@ class SeatRiskTracker:
                         "component_episode_ids": list(profile.active_incident["component_episode_ids"]),
                         "supporting_pattern_ids": list(profile.active_incident["supporting_pattern_ids"]),
                         "incident_id": new_inc_id,
+                        "behavior_start_ms": round(behavior_start_ms, 1),
                         "first_seen_ms": round(timestamp_ms, 1),
                         "last_seen_ms": round(timestamp_ms, 1),
                         "occurrence_count": 1,

@@ -29,6 +29,9 @@ class ObservationType(str, Enum):
     HEAD_PITCH_RELATIVE_DOWN = "HEAD_PITCH_RELATIVE_DOWN"
     TORSO_LEAN_X = "TORSO_LEAN_X"
     TORSO_ORIENTATION = "TORSO_ORIENTATION"
+    # Nose offset from the shoulder centre in shoulder widths, from pose
+    # keypoints (independent of the head-pose model); image space, + = right.
+    HEAD_OFFSET_X = "HEAD_OFFSET_X"
     LEFT_WRIST_ZONE = "LEFT_WRIST_ZONE"
     RIGHT_WRIST_ZONE = "RIGHT_WRIST_ZONE"
     WRIST_VELOCITY = "WRIST_VELOCITY"
@@ -243,6 +246,31 @@ class ObservationExtractor:
                         source="pose_torso",
                     )
                 )
+
+        # 3b. Head offset over the shoulders.  Only with the face visible, and
+        # not while someone else is at the seat (their keypoints and the
+        # student's are easily mixed up then).
+        expected = max(1, int(expected_person_count or 1))
+        if eff_person_count <= expected:
+            nose, l_eye, r_eye = keypoints[0], keypoints[1], keypoints[2]
+            ls, rs = keypoints[5], keypoints[6]
+            face_visible = nose[2] >= self.min_kp_conf and max(l_eye[2], r_eye[2]) >= self.min_kp_conf
+            if face_visible and ls[2] >= self.min_kp_conf and rs[2] >= self.min_kp_conf:
+                shoulder_width = float(np.hypot(ls[0] - rs[0], ls[1] - rs[1]))
+                if shoulder_width >= 1.0:
+                    offset = (float(nose[0]) - float(ls[0] + rs[0]) / 2.0) / shoulder_width
+                    observations.append(
+                        RawObservation(
+                            seat_id=seat_id,
+                            timestamp_ms=timestamp_ms,
+                            observation_type=ObservationType.HEAD_OFFSET_X.value,
+                            value=offset,
+                            quality=float(np.mean([nose[2], ls[2], rs[2]])),
+                            confidence=detection.confidence,
+                            source="pose_keypoints",
+                            metadata={"space": "image"},
+                        )
+                    )
 
         # 4. Wrist Zone & Trajectory Observations
         lw = keypoints[9]   # Left wrist

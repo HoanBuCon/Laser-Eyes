@@ -106,12 +106,8 @@
             <!-- Left: Preset & Mode Selection -->
             <div class="flex flex-wrap items-center gap-3">
                 <div class="segmented-control preset-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
-                    <button type="button" id="btnPresetIndia" onclick="selectPreset('india')" aria-pressed="true" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
-                        India Classroom
-                    </button>
-                    <button type="button" id="btnPresetStudent" onclick="selectPreset('student')" aria-pressed="false" class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition">
-                        Student Classroom
-                    </button>
+                    <!-- One button per demo video, built from GET /api/v1/demo/presets -->
+                    <span id="presetButtons" class="contents"></span>
                 </div>
 
                 <div class="segmented-control mode-switch flex items-center rounded-xl bg-gray-950 p-1 border border-gray-800">
@@ -123,13 +119,13 @@
                     </button>
                 </div>
 
-                <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800">
-                    <input type="checkbox" id="chkDebugOverlay" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
+                <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800" title="Developer view: skeletons, all Seat ROIs and timing. Can be switched while running.">
+                    <input type="checkbox" id="chkDebugOverlay" onchange="toggleOverlay({ debug_overlay: this.checked })" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
                     <span>Debug Overlay</span>
                 </label>
 
                 <label class="debug-toggle flex items-center gap-2 cursor-pointer text-xs text-gray-300 font-mono select-none px-2.5 py-1.5 rounded-lg bg-gray-950 border border-gray-800" title="Show what each student is doing (head turn, posture, hands). Display only: does not change scores or incidents. Can be switched while running.">
-                    <input type="checkbox" id="chkBehaviorLabels" onchange="toggleBehaviorLabels(this.checked)" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
+                    <input type="checkbox" id="chkBehaviorLabels" onchange="toggleOverlay({ behavior_labels: this.checked })" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
                     <span>Behavior Labels</span>
                 </label>
             </div>
@@ -201,11 +197,11 @@
                     <div class="telemetry-grid grid grid-cols-2 gap-3 mt-4">
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Room Context</div>
-                            <div id="lblRoomCode" class="text-sm font-bold text-gray-100 mt-0.5">ROOM-CALIB-01</div>
+                            <div id="lblRoomCode" class="text-sm font-bold text-gray-100 mt-0.5">--</div>
                         </div>
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Camera View</div>
-                            <div id="lblCameraId" class="text-sm font-bold text-cyan-400 mt-0.5">CAM-CALIB-01</div>
+                            <div id="lblCameraId" class="text-sm font-bold text-cyan-400 mt-0.5">--</div>
                         </div>
                         <div class="bg-gray-950/80 p-3 rounded-xl border border-gray-800/80">
                             <div class="text-[11px] font-mono text-gray-400 uppercase">Calibrated Seats</div>
@@ -344,10 +340,16 @@
                     <div id="modalVideoSection">
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Clip — up to 10 seconds:</div>
+                            <label class="flex items-center gap-1.5 cursor-pointer text-[11px] font-mono text-gray-300 select-none" title="Outline the flagged student and seat and dim the rest of the room. The archived evidence files are not modified.">
+                                <input type="checkbox" id="chkFocusOverlay" checked onchange="renderActiveFocus()" class="rounded border-gray-700 bg-gray-900 text-cyan-500 focus:ring-0">
+                                <span>Highlight suspect</span>
+                            </label>
                             <a id="modalVideoDownload" href="#" target="_blank" rel="noopener" class="text-[11px] font-mono text-cyan-400 hover:underline hidden">Open / download</a>
                         </div>
                         <div class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
                             <video id="modalVideoPlayer" controls class="w-full h-full object-contain"></video>
+                            <!-- Highlight of the flagged student; viewBox = camera frame, letterboxed like the video -->
+                            <svg id="modalVideoFocus" class="absolute inset-0 w-full h-full pointer-events-none hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
                             <div id="modalVideoStatus" class="absolute inset-x-3 bottom-3 rounded-lg bg-black/80 px-3 py-2 text-center text-xs font-mono text-gray-300">Select an AI incident to load evidence.</div>
                         </div>
                     </div>
@@ -356,14 +358,18 @@
                         <div class="flex items-center justify-between mb-1.5">
                             <div class="text-xs font-mono text-gray-400 uppercase font-bold">Evidence Frame:</div>
                             <div class="flex gap-1">
+                                <button id="btnViewSuspect" onclick="setEvidenceView('suspect')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded hidden" title="Zoom to the flagged student">Suspect</button>
                                 <button id="btnViewOverall" onclick="setEvidenceView('overall')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">Overall</button>
                                 <button id="btnViewCrop" onclick="setEvidenceView('crop')" class="vigil-btn vigil-btn--sm px-2 py-1 rounded hidden">Seat crop</button>
                                 <button onclick="zoomEvidence(-0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">−</button>
                                 <button onclick="zoomEvidence(0.25)" class="vigil-btn vigil-btn--sm px-2 py-1 rounded">+</button>
                             </div>
                         </div>
-                        <div id="modalSnapshotViewport" class="relative bg-black rounded-xl overflow-auto aspect-video border border-gray-800 flex items-center justify-center">
-                            <img id="modalSnapshotImg" src="" alt="Evidence Frame" class="w-full h-full object-contain transition-transform origin-center">
+                        <div id="modalSnapshotViewport" class="relative bg-black rounded-xl overflow-hidden aspect-video border border-gray-800 flex items-center justify-center">
+                            <div id="modalSnapshotStage" class="relative w-full h-full" style="transform-origin: 0 0">
+                                <img id="modalSnapshotImg" src="" alt="Evidence Frame" class="w-full h-full object-contain">
+                                <svg id="modalSnapshotFocus" class="absolute inset-0 w-full h-full pointer-events-none hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -386,7 +392,7 @@
                             <span id="modalOccurrence" class="text-amber-300 font-semibold">x1</span>
                         </div>
                         <div class="flex justify-between border-b border-gray-800/60 pb-1.5">
-                            <span class="text-gray-400">Time Range:</span>
+                            <span class="text-gray-400">Timing:</span>
                             <span id="modalTimeRange" class="text-gray-200">--</span>
                         </div>
                         <div>

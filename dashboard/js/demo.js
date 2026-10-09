@@ -13,6 +13,9 @@ let behaviorLabelsSynced = false;
 let activeMode = 'LIVE';
 let activeFilter = 'ALL';
 let activeSourceFilter = 'ALL';
+let activeSort = 'newest';
+// The room picker becomes a drop-down list beyond this many rooms
+const ROOM_BUTTON_LIMIT = 4;
 let activeEventId = null;
 let activeItemType = 'AI';
 let selectedDecision = 'CONFIRMED';
@@ -160,6 +163,8 @@ function selectPreset(preset) {
     document.querySelectorAll('#presetButtons [data-preset]').forEach((btn) => {
         btn.setAttribute('aria-pressed', String(btn.dataset.preset === preset));
     });
+    const roomSelect = document.getElementById('presetSelect');
+    if (roomSelect && preset) roomSelect.value = preset;
 
     renderPresetDetails();
 }
@@ -302,20 +307,32 @@ async function fetchPresets() {
         const res = await apiFetch('/api/v1/demo/presets');
         const presets = await res.json();
         const container = document.getElementById('presetButtons');
+        const roomSelect = document.getElementById('presetSelect');
+        // A few rooms fit as buttons; more rooms become a list so the toolbar keeps one row
+        const asList = presets.length > ROOM_BUTTON_LIMIT;
+        document.getElementById('presetSegment')?.classList.toggle('hidden', asList);
+        roomSelect?.classList.toggle('hidden', !asList);
         if (container) {
             container.innerHTML = presets.map((p) => `
                 <button type="button" data-preset="${p.name}" onclick="selectPreset('${p.name}')" aria-pressed="false"
-                    class="vigil-btn vigil-btn--sm px-3.5 py-1.5 rounded-lg text-xs font-semibold transition"></button>`).join('');
+                    class="vigil-btn vigil-btn--sm"></button>`).join('');
         }
+        if (roomSelect) roomSelect.replaceChildren();
         presets.forEach((p) => {
             presetInfo[p.name] = p;
+            // Seat counts come from the web calibration, never from fixed numbers
+            const seats = p.calibrated ? `${p.seat_count} seats` : 'not calibrated';
+            const hint = p.calibrated ? `${p.title} · ${seats}` : (p.calibration_error || 'Draw Seat ROIs on the calibration page');
+            if (roomSelect) {
+                const option = document.createElement('option');
+                option.value = p.name;
+                option.textContent = `${p.title} · ${seats}`;
+                roomSelect.append(option);
+            }
             const btn = container ? container.querySelector(`[data-preset="${p.name}"]`) : null;
             if (!btn) return;
-            // Seat counts come from the web calibration, never from fixed numbers
-            btn.textContent = p.calibrated
-                ? `${p.title} (${p.seat_count} seats)`
-                : `${p.title} (not calibrated)`;
-            btn.title = p.calibrated ? '' : (p.calibration_error || 'Draw Seat ROIs on the calibration page');
+            btn.textContent = p.calibrated ? `${p.title} · ${p.seat_count}` : `${p.title} · no seats`;
+            btn.title = hint;
         });
         if (!activePreset || !presetInfo[activePreset]) activePreset = presets.length ? presets[0].name : null;
         selectPreset(activePreset);
@@ -513,10 +530,48 @@ function filterQueue(status) {
     renderReviewQueue();
 }
 
+function setQueueSort(sort) {
+    activeSort = sort === 'priority' ? 'priority' : 'newest';
+    renderReviewQueue();
+}
+
+// Source-video time of an item, for "newest first"
+function queueItemTime(item) {
+    const ms = item._source === 'MANUAL' ? item.source_timestamp_ms : item.first_seen_ms;
+    return Number(ms || 0);
+}
+
+function queuePriority(item) {
+    const value = Number(item.peak_risk_score ?? item.risk_score);
+    return Number.isFinite(value) ? value : -1;
+}
+
+// "SEAT-ROOM-CHINA-03-15" -> "CHINA-03"
+function roomLabelFromSeat(seatId) {
+    const match = String(seatId || '').match(/^SEAT-(?:ROOM-)?(.+)-\d+$/);
+    return match ? match[1] : '';
+}
+
+// Compact "when": behaviour start → alert, as in the review modal
+function queueTimeText(item) {
+    if (item._source === 'MANUAL') return `${(Number(item.source_timestamp_ms || 0) / 1000).toFixed(1)}s`;
+    const flagged = Number(item.first_seen_ms || 0) / 1000;
+    const hasStart = item.behavior_start_ms !== undefined && item.behavior_start_ms !== null;
+    const start = hasStart ? Number(item.behavior_start_ms) / 1000 : flagged;
+    return flagged - start >= 0.1 ? `${start.toFixed(1)}→${flagged.toFixed(1)}s` : `${flagged.toFixed(1)}s`;
+}
+
+const QUEUE_STATUS_LABEL = {
+    PENDING: 'Pending',
+    CONFIRMED: 'Confirmed',
+    REJECTED: 'Rejected',
+    INCONCLUSIVE: 'Unsure',
+};
+
 function renderReviewQueue() {
-    const grid = document.getElementById('reviewQueueGrid');
+    const list = document.getElementById('reviewQueueGrid');
     const badgeCount = document.getElementById('queueBadgeCount');
-    if (!grid) return;
+    if (!list) return;
 
     const incidents = Array.from(allIncidents.values()).map((item) => ({ ...item, _source: 'AI' }));
     const bookmarks = Array.from(allBookmarks.values()).map((item) => ({
@@ -524,98 +579,73 @@ function renderReviewQueue() {
         _source: 'MANUAL',
         review_status: item.review_decision || item.review_status || 'PENDING',
     }));
-    const items = [...incidents, ...bookmarks].sort((left, right) => {
-        const leftTime = left.created_at || left.captured_at || '';
-        const rightTime = right.created_at || right.captured_at || '';
-        return rightTime.localeCompare(leftTime);
-    });
+    const items = [...incidents, ...bookmarks];
     const pendingCount = items.filter((item) => item.review_status === 'PENDING').length;
     if (badgeCount) badgeCount.textContent = `${pendingCount} Pending`;
 
-    const filtered = items.filter((item) => {
-        const statusMatch = activeFilter === 'ALL' || item.review_status === activeFilter;
-        const sourceMatch = activeSourceFilter === 'ALL' || item._source === activeSourceFilter;
-        return statusMatch && sourceMatch;
+    // Counts per decision for the current source filter
+    const inSource = items.filter((item) => activeSourceFilter === 'ALL' || item._source === activeSourceFilter);
+    document.querySelectorAll('[data-count-for]').forEach((el) => {
+        const status = el.dataset.countFor;
+        el.textContent = String(status === 'ALL' ? inSource.length : inSource.filter((item) => item.review_status === status).length);
     });
 
+    const filtered = inSource
+        .filter((item) => activeFilter === 'ALL' || item.review_status === activeFilter)
+        .sort((left, right) => (activeSort === 'priority'
+            ? queuePriority(right) - queuePriority(left) || queueItemTime(right) - queueItemTime(left)
+            : queueItemTime(right) - queueItemTime(left)));
+
     if (filtered.length === 0) {
-        grid.innerHTML = `
-            <div class="col-span-full py-10 flex flex-col items-center justify-center text-gray-500 font-mono text-xs gap-2">
-                <svg class="w-8 h-8 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                <span>No incidents matching filter [${escapeHtml(activeFilter)}].</span>
-            </div>
-        `;
+        list.innerHTML = `<div class="review-empty">${items.length
+            ? `No incidents match this filter.`
+            : 'No review incidents yet. Start the stream to begin monitoring.'}</div>`;
         return;
     }
 
-    grid.innerHTML = filtered
+    // Show the room on each row only when the queue spans several rooms
+    const rooms = new Set(items.map((item) => roomLabelFromSeat(item.seat_id || item.subject_ref)).filter(Boolean));
+    const showRoom = rooms.size > 1;
+
+    list.innerHTML = filtered
         .map((ev) => {
             const isManual = ev._source === 'MANUAL';
-            // Show only the score the core recorded; never invent a default priority.
-            const riskValue = ev.peak_risk_score ?? ev.risk_score;
-            const risk = Number.isFinite(Number(riskValue)) ? Math.round(Number(riskValue)) : '--';
-            const occ = ev.occurrence_count || 1;
-            const pattern = escapeHtml(isManual ? (ev.note || 'Proctor-marked observation') : formatBehaviorLabel(ev.primary_pattern || ev.behavior));
-            const seat = escapeHtml(ev.subject_ref || ev.seat_id || 'UNASSIGNED');
             const itemId = escapeHtml(String(isManual ? ev.bookmark_id : ev.event_id));
-            const severity = escapeHtml(isManual ? 'HUMAN MARK' : (ev.severity || 'MEDIUM'));
-            const sourceSeconds = isManual
-                ? Number(ev.source_timestamp_ms || 0) / 1000
-                : Number(ev.first_seen_ms || 0) / 1000;
-            const timeText = isManual ? `Time: ${sourceSeconds.toFixed(1)}s` : incidentTimeText(ev, true);
-
-            let statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">PENDING REVIEW</span>`;
-            if (ev.review_status === 'CONFIRMED') {
-                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">CONFIRMED</span>`;
-            } else if (ev.review_status === 'REJECTED') {
-                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-gray-800 text-gray-400 border border-gray-700">REJECTED</span>`;
-            } else if (ev.review_status === 'INCONCLUSIVE') {
-                statusBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/40">INCONCLUSIVE</span>`;
-            }
-
-            const sevBadge = isManual
-                ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                : ev.severity === 'HIGH'
-                    ? 'bg-red-500/20 text-red-300 border-red-500/40'
-                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
-
-            const sourceBadge = isManual ? 'PROCTOR' : 'AI SIGNAL';
-            const footerMetric = isManual
-                ? `Evidence: <strong class="${ev.evidence_status === 'READY' ? 'text-emerald-400' : 'text-amber-400'}">${escapeHtml(ev.evidence_status || 'PENDING')}</strong>`
-                : `Review Priority: <strong class="text-red-400">${risk}/100</strong>`;
-
+            // Show only the score the core recorded; never invent a default priority.
+            const priority = queuePriority(ev);
+            const score = isManual ? '' : (priority >= 0 ? String(Math.round(priority)) : '--');
+            const level = priority < 0 ? 'none' : (priority >= 85 ? 'high' : 'medium');
+            const seatRef = ev.subject_ref || ev.seat_id || '';
+            const seatShort = seatRef ? shortSeatLabel(seatRef) : '—';
+            const room = roomLabelFromSeat(seatRef);
+            const title = isManual ? (ev.note || 'Proctor-marked observation') : formatBehaviorLabel(ev.primary_pattern || ev.behavior);
+            const meta = [
+                showRoom && room ? room : null,
+                queueTimeText(ev),
+                isManual ? `frame ${ev.frame_id}` : `x${ev.occurrence_count || 1}`,
+                isManual ? 'proctor' : 'AI',
+            ].filter(Boolean).join(' · ');
+            const status = ev.review_status || 'PENDING';
+            const tooltip = isManual ? `${seatRef || 'No seat'} · ${title}` : `${seatRef} · ${title} · ${incidentTimeText(ev, false)}`;
+            const current = (isManual ? ev.bookmark_id : ev.event_id) === activeEventId;
             return `
-                <div class="incident-card bg-gray-950/80 border border-gray-800/90 rounded-xl p-4 flex flex-col justify-between space-y-3 cursor-pointer" data-item-id="${itemId}" data-item-source="${ev._source}">
-                    <div class="flex items-start justify-between gap-2">
-                        <div class="flex items-center gap-2">
-                            <span class="px-2 py-1 rounded-md bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 text-xs font-bold font-mono">[${seat}]</span>
-                            <span class="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${sevBadge} border">${severity}</span>
-                            <span class="text-[10px] font-mono text-gray-500">${sourceBadge}</span>
-                        </div>
-                        ${statusBadge}
-                    </div>
-
-                    <div>
-                        <div class="text-sm font-bold text-gray-100">${pattern}</div>
-                        <div class="text-xs text-gray-400 font-mono mt-1 flex items-center gap-2">
-                            <span>${escapeHtml(timeText)}</span>
-                            <span>&bull;</span>
-                            <span class="text-amber-300 font-semibold">${isManual ? `Frame ${escapeHtml(ev.frame_id)}` : `x${occ} Occurrences`}</span>
-                        </div>
-                    </div>
-
-                    <div class="pt-2 border-t border-gray-900 flex items-center justify-between text-xs font-mono">
-                        <span class="text-gray-400">${footerMetric}</span>
-                        <button class="vigil-btn vigil-btn--primary vigil-btn--sm px-2.5 py-1 rounded bg-gray-800 hover:bg-cyan-600 text-gray-200 hover:text-white transition text-xs font-semibold">
-                            Review &rarr;
-                        </button>
-                    </div>
-                </div>
-            `;
+                <button type="button" role="listitem" class="queue-row" data-item-id="${itemId}" data-item-source="${ev._source}"
+                    data-severity="${isManual ? 'MANUAL' : escapeHtml(ev.severity || 'MEDIUM')}" data-status="${escapeHtml(status)}"
+                    aria-current="${current}" title="${escapeHtml(tooltip)}">
+                    <span class="queue-seat">${room ? `<small>${escapeHtml(room)}</small>` : ''}<strong>${escapeHtml(seatShort)}</strong></span>
+                    <span class="queue-main">
+                        <span class="queue-title">${escapeHtml(title)}</span>
+                        <span class="queue-meta">${escapeHtml(meta)}</span>
+                    </span>
+                    <span class="queue-side">
+                        ${score ? `<span class="queue-score" data-level="${level}" title="Review priority">${score}</span>` : ''}
+                        <span class="queue-status" data-status="${escapeHtml(status)}">${escapeHtml(QUEUE_STATUS_LABEL[status] || status)}</span>
+                    </span>
+                </button>`;
         })
         .join('');
-    grid.querySelectorAll('.incident-card[data-item-id]').forEach((card) => {
-        card.addEventListener('click', () => openReviewItem(card.dataset.itemSource, card.dataset.itemId));
+    list.querySelectorAll('.queue-row[data-item-id]').forEach((row) => {
+        row.addEventListener('click', () => openReviewItem(row.dataset.itemSource, row.dataset.itemId));
     });
 }
 
@@ -668,6 +698,7 @@ function openReviewItem(source, itemId) {
     } else {
         openReviewModal(itemId);
     }
+    renderReviewQueue();
 }
 
 async function openBookmarkModal(bookmarkId) {
@@ -866,6 +897,7 @@ function closeReviewModal() {
     evidenceZoom = 1.0;
     activeEventId = null;
     activeItemType = 'AI';
+    renderReviewQueue();
 }
 
 function setEvidenceView(view) {

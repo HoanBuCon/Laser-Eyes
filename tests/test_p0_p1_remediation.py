@@ -538,9 +538,10 @@ def test_review_card_shows_trigger_score_not_post_reset_score():
 
 def test_neighbours_are_the_candidates_own_sides_when_camera_faces_them():
     seats = [
+        # Seats side by side in one row (adjacent ROIs)
         SeatDefinition(seat_id="IMG_LEFT", room_id="R", seat_code="IMG_LEFT", polygon=_square(0, 0)),
-        SeatDefinition(seat_id="MID", room_id="R", seat_code="MID", polygon=_square(150, 0)),
-        SeatDefinition(seat_id="IMG_RIGHT", room_id="R", seat_code="IMG_RIGHT", polygon=_square(300, 0)),
+        SeatDefinition(seat_id="MID", room_id="R", seat_code="MID", polygon=_square(100, 0)),
+        SeatDefinition(seat_id="IMG_RIGHT", room_id="R", seat_code="IMG_RIGHT", polygon=_square(200, 0)),
     ]
     facing = SeatGraph(room_id="R")  # default: camera facing the candidates
     facing.auto_infer_neighbors_from_polygons(seats)
@@ -551,6 +552,29 @@ def test_neighbours_are_the_candidates_own_sides_when_camera_faces_them():
     behind = SeatGraph(room_id="R", camera_view="behind_subjects")
     behind.auto_infer_neighbors_from_polygons(seats)
     assert behind.get_context("MID").neighbors.left_neighbor_id == "IMG_LEFT"
+
+
+def test_only_desk_mates_in_the_same_row_are_left_right_neighbours():
+    seats = [
+        # front row: a desk of two, then an aisle, then the next desk
+        SeatDefinition(seat_id="A", room_id="R", seat_code="A", polygon=_square(0, 200)),
+        SeatDefinition(seat_id="B", room_id="R", seat_code="B", polygon=_square(100, 200)),
+        SeatDefinition(seat_id="ACROSS_AISLE", room_id="R", seat_code="ACROSS_AISLE", polygon=_square(260, 200)),
+        # the row behind, drawn above and slightly offset (perspective)
+        SeatDefinition(seat_id="BEHIND", room_id="R", seat_code="BEHIND", polygon=_square(40, 100)),
+        SeatDefinition(seat_id="BEHIND2", room_id="R", seat_code="BEHIND2", polygon=_square(140, 100)),
+    ]
+    graph = SeatGraph(room_id="R", camera_view="behind_subjects")
+    graph.auto_infer_neighbors_from_polygons(seats)
+
+    def sides(code):
+        n = graph.get_context(code).neighbors
+        return n.left_neighbor_id, n.right_neighbor_id
+
+    assert sides("A") == (None, "B")
+    assert sides("B") == ("A", None)          # not the seat across the aisle
+    assert sides("ACROSS_AISLE") == (None, None)
+    assert sides("BEHIND") == (None, "BEHIND2")  # not linked to the row in front
 
 
 def test_pose_heuristic_uses_the_same_subject_centric_sign_as_6drepnet():
@@ -667,3 +691,62 @@ def test_incident_focus_carries_seat_and_person_location():
     fallback = incident_focus(seat_polygon=_square(0, 0), person_bbox=(0, 0, 0, 0),
                               current_bbox=(5, 5, 50, 90), frame_shape=(720, 1280, 3))
     assert fallback["person_bbox"] == [5.0, 5.0, 50.0, 90.0]
+
+
+# --- Desk mates' heads together -------------------------------------------
+
+def _student(nose_x: float, shoulder_x: float) -> Detection:
+    kps = np.zeros((17, 3), dtype=np.float32)
+    kps[0] = [nose_x, 40, 0.9]
+    kps[5] = [shoulder_x - 30, 80, 0.9]
+    kps[6] = [shoulder_x + 30, 80, 0.9]
+    return Detection(class_id=0, class_name="person", confidence=0.9,
+                     bbox=(int(shoulder_x - 50), 0, int(shoulder_x + 50), 200), keypoints=kps)
+
+
+def _desk_mates_graph() -> SeatGraph:
+    seats = [
+        SeatDefinition(seat_id="L", room_id="R", seat_code="L", polygon=_square(0, 0)),
+        SeatDefinition(seat_id="M", room_id="R", seat_code="M", polygon=_square(100, 0)),
+    ]
+    graph = SeatGraph(room_id="R")
+    graph.auto_infer_neighbors_from_polygons(seats)
+    return graph
+
+
+def _run_heads(monitor, frames):
+    """frames: list of (ts, left nose x, right nose x, people at right seat)."""
+    found = []
+    for ts, left_nose, right_nose, right_count in frames:
+        people = {"L": (_student(left_nose, 50), 1, 1), "M": (_student(right_nose, 150), right_count, 1)}
+        found += monitor.update(people, float(ts))
+    return found
+
+
+def test_desk_mates_bringing_heads_together_are_both_flagged():
+    from classroom_monitor.pair_proximity import HeadsTogetherMonitor
+
+    monitor = HeadsTogetherMonitor(_desk_mates_graph(), min_samples=10)
+    apart = [(ts, 50, 150, 1) for ts in range(0, 10000, 100)]       # 100 px = 1.7 shoulder widths
+    together = [(ts, 90, 115, 1) for ts in range(10000, 13000, 100)]  # heads over one paper
+    found = _run_heads(monitor, apart + together)
+    assert {p.seat_id for p in found} == {"L", "M"}
+    assert all(p.pattern_type == PatternType.HEADS_TOGETHER.value for p in found)
+
+
+def test_pair_that_always_looks_close_is_not_flagged():
+    from classroom_monitor.pair_proximity import HeadsTogetherMonitor
+
+    monitor = HeadsTogetherMonitor(_desk_mates_graph(), min_samples=10)
+    # The same short gap the whole time (e.g. perspective), never "apart"
+    assert _run_heads(monitor, [(ts, 90, 115, 1) for ts in range(0, 13000, 100)]) == []
+
+
+def test_heads_together_ignores_a_seat_with_someone_else_at_it():
+    from classroom_monitor.pair_proximity import HeadsTogetherMonitor
+
+    monitor = HeadsTogetherMonitor(_desk_mates_graph(), min_samples=10)
+    apart = [(ts, 50, 150, 1) for ts in range(0, 10000, 100)]
+    # A teacher leaning over the right seat
+    crowded = [(ts, 90, 115, 2) for ts in range(10000, 13000, 100)]
+    assert _run_heads(monitor, apart + crowded) == []

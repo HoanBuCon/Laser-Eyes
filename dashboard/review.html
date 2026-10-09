@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Review queue</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>tailwind.config = { darkMode: 'class' }</script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/demo.css">
+    <link rel="stylesheet" href="/static/css/review.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom vigil-review antialiased font-sans min-h-screen flex flex-col">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/demo" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy">
+                <strong>VIGIL AI</strong>
+                <small>CLASSROOM COPILOT</small>
+            </span>
+        </a>
+
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
+            <a href="/review" class="vigil-nav-item is-active" aria-current="page"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="classroom-topbar border-b sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
+            <div>
+                <div class="vigil-page-eyebrow">CLASSROOM / REVIEW QUEUE</div>
+                <h1 class="vigil-page-title">Review queue</h1>
+                <p class="vigil-page-subtitle">Every AI incident and proctor bookmark, across all sessions and rooms.</p>
+            </div>
+            <label class="reviewer-field" title="Recorded with every decision you make on this computer">
+                <span>Reviewer</span>
+                <input id="reviewerName" maxlength="60" placeholder="Your name" autocomplete="name">
+            </label>
+        </div>
+    </header>
+
+    <main class="classroom-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+        <div id="reviewError" role="alert" class="review-error hidden"></div>
+
+        <!-- Filters -->
+        <div class="session-toolbar review-toolbar">
+            <div class="toolbar-group">
+                <div class="segmented-control status-filters" role="group" aria-label="Review status">
+                    <button type="button" data-status="PENDING" aria-pressed="true" class="vigil-btn vigil-btn--sm filter-btn">Pending <span data-count-for="PENDING">0</span></button>
+                    <button type="button" data-status="CONFIRMED" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn">Confirmed <span data-count-for="CONFIRMED">0</span></button>
+                    <button type="button" data-status="REJECTED" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn">Rejected <span data-count-for="REJECTED">0</span></button>
+                    <button type="button" data-status="INCONCLUSIVE" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn">Unsure <span data-count-for="INCONCLUSIVE">0</span></button>
+                    <button type="button" data-status="ALL" aria-pressed="false" class="vigil-btn vigil-btn--sm filter-btn">All</button>
+                </div>
+                <select id="filterRoom" class="room-select" aria-label="Room"><option value="">All rooms</option></select>
+                <select id="filterPattern" class="room-select" aria-label="Behaviour"><option value="">All behaviours</option></select>
+                <select id="filterSeverity" class="room-select narrow" aria-label="Severity">
+                    <option value="">Any severity</option>
+                    <option value="HIGH">High</option>
+                    <option value="MEDIUM">Medium</option>
+                </select>
+                <select id="filterSource" class="room-select narrow" aria-label="Source">
+                    <option value="ALL">AI + proctor</option>
+                    <option value="AI">AI only</option>
+                    <option value="MANUAL">Proctor only</option>
+                </select>
+            </div>
+            <div class="toolbar-group">
+                <select id="sortOrder" class="room-select narrow" aria-label="Sort">
+                    <option value="newest">Newest</option>
+                    <option value="priority">Priority</option>
+                </select>
+                <span class="shortcut-hint" title="J/K: next/previous · C/R/I: decision · Enter: save and next">⌨ J K · C R I · Enter</span>
+            </div>
+        </div>
+
+        <!-- List + evidence -->
+        <div class="review-layout">
+            <section class="review-panel review-list-panel" aria-label="Incidents">
+                <div class="review-panel-inner">
+                    <div class="review-heading">
+                        <h2 id="listHeading">Pending</h2>
+                        <span id="listCount" class="list-count">0</span>
+                    </div>
+                    <div id="reviewList" class="review-list" role="list">
+                        <div class="review-empty">Loading…</div>
+                    </div>
+                    <div class="list-pager">
+                        <button type="button" id="btnMore" class="vigil-btn vigil-btn--sm hidden">Load more</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="viewer-card review-detail" aria-label="Evidence and decision">
+                <div id="detailEmpty" class="review-empty detail-empty">Select an incident on the left.</div>
+                <div id="detailBody" class="hidden">
+                    <div class="detail-head">
+                        <div class="flex items-center gap-2 min-w-0 flex-wrap">
+                            <span id="dSeat" class="detail-seat">S--</span>
+                            <h2 id="dTitle" class="detail-title">--</h2>
+                            <span id="dSeverity" class="detail-chip">--</span>
+                            <span id="dStatus" class="queue-status">--</span>
+                        </div>
+                        <div id="dScore" class="detail-score" title="Review priority">--</div>
+                    </div>
+                    <div id="dContext" class="detail-context">--</div>
+
+                    <div class="evidence-grid">
+                        <div>
+                            <div class="evidence-label">
+                                <span>Evidence clip</span>
+                                <label class="focus-toggle"><input type="checkbox" id="chkFocus" checked> Highlight suspect</label>
+                            </div>
+                            <div class="evidence-frame">
+                                <video id="dVideo" controls preload="metadata"></video>
+                                <svg id="dVideoFocus" class="focus-svg hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                                <div id="dVideoStatus" class="evidence-status hidden"></div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="evidence-label"><span>Evidence frame</span><a id="dSnapshotLink" href="#" target="_blank" rel="noopener">Open</a></div>
+                            <div class="evidence-frame">
+                                <img id="dSnapshot" alt="Evidence frame">
+                                <svg id="dSnapshotFocus" class="focus-svg hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="detail-columns">
+                        <dl class="detail-facts">
+                            <div><dt>Timing</dt><dd id="dTiming">--</dd></div>
+                            <div><dt>Session</dt><dd id="dSession">--</dd></div>
+                            <div><dt>Cues</dt><dd id="dCues">--</dd></div>
+                            <div><dt>Evidence</dt><dd id="dIntegrity">--</dd></div>
+                            <div><dt>Last decision</dt><dd id="dLastDecision">--</dd></div>
+                        </dl>
+
+                        <form id="decisionForm" class="decision-form">
+                            <div class="decision-buttons" role="group" aria-label="Decision">
+                                <button type="button" data-decision="CONFIRMED" class="vigil-btn decision-btn">Confirm <kbd>C</kbd></button>
+                                <button type="button" data-decision="REJECTED" class="vigil-btn decision-btn">Reject <kbd>R</kbd></button>
+                                <button type="button" data-decision="INCONCLUSIVE" class="vigil-btn decision-btn">Unsure <kbd>I</kbd></button>
+                            </div>
+                            <select id="dReason" aria-label="Reason">
+                                <option value="NONE">Reason (optional)</option>
+                                <optgroup label="Confirm">
+                                    <option value="OBSERVED_POLICY_VIOLATION">Observed policy violation</option>
+                                    <option value="UNAUTHORIZED_INTERACTION">Unauthorized interaction</option>
+                                    <option value="UNAUTHORIZED_MATERIAL">Unauthorized material</option>
+                                </optgroup>
+                                <optgroup label="Reject">
+                                    <option value="NORMAL_WRITING">Normal writing</option>
+                                    <option value="NORMAL_HEAD_MOVEMENT">Normal head movement</option>
+                                    <option value="PROCTOR_OCCLUSION">Teacher / proctor in view</option>
+                                    <option value="SEAT_MAPPING_ERROR">Wrong student / seat</option>
+                                    <option value="LOW_IMAGE_QUALITY">Low image quality</option>
+                                    <option value="FALSE_POSITIVE">Other false positive</option>
+                                </optgroup>
+                                <optgroup label="Unsure">
+                                    <option value="INSUFFICIENT_EVIDENCE">Insufficient evidence</option>
+                                    <option value="OCCLUDED">Occluded</option>
+                                </optgroup>
+                                <option value="OTHER">Other</option>
+                            </select>
+                            <textarea id="dNotes" rows="2" maxlength="4000" placeholder="Notes for the exam board (optional)"></textarea>
+                            <div class="decision-submit">
+                                <span id="decisionMessage" class="decision-message"></span>
+                                <button type="submit" id="btnSubmit" class="vigil-btn vigil-btn--primary">Save &amp; next <kbd>Enter</kbd></button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <footer class="classroom-footer border-t py-4 text-center text-xs font-mono">
+        VIGIL AI &bull; Human review &bull; AI flags, proctors decide
+    </footer>
+
+    <script src="/static/js/focus-overlay.js"></script>
+    <script src="/static/js/review.js"></script>
+</body>
+</html>

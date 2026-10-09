@@ -89,15 +89,10 @@ function initChart() {
     behaviorChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-            labels: ['PROLONGED_HEAD_TURN', 'BODY_LEAN_SIDE', 'LOOK_DOWN_LONG', 'LOW_HAND_POSTURE'],
+            labels: [],
             datasets: [{
-                data: [0, 0, 0, 0],
-                backgroundColor: [
-                    '#f59e0b', // Head turn - Amber
-                    '#3b82f6', // Body lean - Blue
-                    '#8b5cf6', // Look down - Purple
-                    '#ef4444'  // Low hand - Red
-                ],
+                data: [],
+                backgroundColor: BEHAVIOR_COLORS,
                 borderWidth: 0,
                 hoverOffset: 6
             }]
@@ -120,30 +115,40 @@ function initChart() {
     });
 }
 
+// Categorical palette for behaviour patterns (as many as the backend reports)
+const BEHAVIOR_COLORS = ['#f59e0b', '#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#06b6d4', '#ec4899', '#a3a3a3'];
+
+function prettyPattern(name) {
+    return String(name || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
+}
+
+// Counts come from the backend per pattern name, so new patterns appear without code changes
 function updateBehaviorChart(counts = {}) {
-    if (!behaviorChart) return;
-
-    const headTurn = counts['PROLONGED_HEAD_TURN'] || counts['side peeking'] || counts['back peeking'] || 0;
-    const bodyLean = counts['BODY_LEAN_SIDE'] || 0;
-    const lookDown = counts['LOOK_DOWN_LONG'] || counts['front peeking'] || 0;
-    const lowHand = counts['LOW_HAND_POSTURE'] || counts['phone using'] || 0;
-
-    const dataArr = [headTurn, bodyLean, lookDown, lowHand];
-    const total = dataArr.reduce((a, b) => a + b, 0);
-
-    if (total === 0) {
-        behaviorChart.data.datasets[0].data = [1, 1, 1, 1];
-    } else {
-        behaviorChart.data.datasets[0].data = dataArr;
+    const entries = Object.entries(counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    if (behaviorChart) {
+        behaviorChart.data.labels = entries.map(([name]) => prettyPattern(name));
+        behaviorChart.data.datasets[0].data = entries.map(([, n]) => n);
+        behaviorChart.update();
     }
-    behaviorChart.update();
-
-    // Update text labels
-    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    setEl('statHeadTurn', headTurn);
-    setEl('statBodyLean', bodyLean);
-    setEl('statLookDown', lookDown);
-    setEl('statLowHand', lowHand);
+    const legend = document.getElementById('behaviorLegend');
+    if (!legend) return;
+    if (!entries.length) {
+        legend.innerHTML = '<div class="text-gray-500">No incidents yet.</div>';
+        return;
+    }
+    legend.replaceChildren(...entries.map(([name, n], i) => {
+        const row = document.createElement('div');
+        row.className = 'flex justify-between gap-2';
+        const label = document.createElement('span');
+        label.textContent = prettyPattern(name);
+        label.style.borderLeft = `3px solid ${BEHAVIOR_COLORS[i % BEHAVIOR_COLORS.length]}`;
+        label.style.paddingLeft = '6px';
+        const value = document.createElement('span');
+        value.className = 'font-mono text-gray-200';
+        value.textContent = n;
+        row.append(label, value);
+        return row;
+    }));
 }
 
 // ==============================================================================
@@ -156,7 +161,7 @@ async function loadDashboardData() {
         if (statsRes.ok) {
             const stats = await statsRes.json();
             updateSummaryCounters(stats);
-            updateBehaviorChart(stats.events_by_behavior);
+            updateBehaviorChart(stats.events_by_pattern || stats.events_by_behavior);
         }
 
         // Fetch Room Rankings / Grid
@@ -180,16 +185,20 @@ async function loadDashboardData() {
 function updateSummaryCounters(stats) {
     const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
     setEl('statTotalEvents', stats.total_events || 0);
-    setEl('statActiveRooms', stats.active_rooms || 0);
+    // Rooms that can be analysed (they have Seat ROIs), out of all configured rooms
+    setEl('statActiveRooms', stats.monitored_rooms ?? stats.active_rooms ?? 0);
+    setEl('statActiveRoomsHint', `of ${stats.active_rooms || 0} rooms have seat ROIs`);
 
     const highCount = (stats.events_by_severity && stats.events_by_severity.HIGH) || 0;
     setEl('statHighSeverity', highCount);
+    setEl('statPendingHint', `${stats.unreviewed_events_count || 0} incidents pending review`);
 
-    // Human Review Rate calculation
+    // Share of incidents with a human decision; nothing to review is not "100 %"
     const totalEvents = stats.total_events || 0;
-    const reviewedCount = (stats.total_events || 0) - ((stats.events_by_review_status && stats.events_by_review_status.PENDING) || 0);
-    const reviewRate = totalEvents > 0 ? Math.round((reviewedCount / totalEvents) * 100) : 100;
-    setEl('statReviewRate', `${reviewRate}%`);
+    const pending = stats.unreviewed_events_count || 0;
+    const decided = totalEvents - pending;
+    setEl('statReviewRate', totalEvents > 0 ? `${Math.round((decided / totalEvents) * 100)}%` : '—');
+    setEl('statReviewRateHint', totalEvents > 0 ? `${decided} of ${totalEvents} decided by proctors` : 'no incidents yet');
 }
 
 function renderRoomGrid(rooms, rankings) {

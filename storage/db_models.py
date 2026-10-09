@@ -241,6 +241,9 @@ class DetectionEvent(Base):
     config_version = Column(String(50), default="school-prototype-v1")
     room_context = Column(Text, nullable=True)
     reviewer_note = Column(Text, default="")
+    # Timing and reviewer context of the incident (behaviour start, first/last
+    # flag, occurrence count, where the student is in the frame, cues)
+    incident_metadata_json = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships

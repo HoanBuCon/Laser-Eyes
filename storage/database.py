@@ -85,6 +85,8 @@ def init_db(custom_engine=None) -> None:
                     conn.execute(text("ALTER TABLE detection_events ADD COLUMN supporting_patterns_json TEXT"))
                 if "observation_quality" not in event_cols:
                     conn.execute(text("ALTER TABLE detection_events ADD COLUMN observation_quality FLOAT DEFAULT 1.0"))
+                if "incident_metadata_json" not in event_cols:
+                    conn.execute(text("ALTER TABLE detection_events ADD COLUMN incident_metadata_json TEXT"))
                 conn.commit()
 
                 duplicate_event_ids = conn.execute(

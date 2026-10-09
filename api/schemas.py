@@ -300,6 +300,10 @@ class StatisticsSummaryResponse(BaseModel):
     active_rooms: int
     completed_sessions: int
     unreviewed_events_count: int = 0
+    events_by_pattern: Dict[str, int] = {}
+    events_by_review_status: Dict[str, int] = {}
+    monitored_rooms: int = 0
+    running_sessions: int = 0
 
 
 class RoomRankingItem(BaseModel):

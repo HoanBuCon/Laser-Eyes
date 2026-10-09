@@ -9,6 +9,7 @@ from typing import Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
@@ -186,6 +187,11 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
         supporting_signals = []
     evidence = event.evidence
     review = event.review
+    try:
+        meta = json.loads(event.incident_metadata_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        meta = {}
+    session = event.session
     return {
         "queue_id": f"AI:{event.event_id}",
         "source_type": "AI_INCIDENT",
@@ -205,11 +211,21 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
         "reason_code": review.reason_code if review else None,
         "review_note": review.note if review else (event.reviewer_note or ""),
         "reviewed_at": review.reviewed_at.isoformat() if review and review.reviewed_at else None,
-        "source_timestamp_ms": None,
+        # Position in the source video; None for incidents saved before it was recorded
+        "source_timestamp_ms": meta.get("first_seen_ms"),
+        "behavior_start_ms": meta.get("behavior_start_ms"),
+        "first_seen_ms": meta.get("first_seen_ms"),
+        "last_seen_ms": meta.get("last_seen_ms"),
+        "supporting_cues": meta.get("supporting_cues") or [],
+        "focus": meta.get("focus"),
+        "room_code": event.room.room_code if event.room else None,
+        "room_name": event.room.name if event.room else None,
+        "session_name": session.exam_name if session else None,
+        "session_status": session.status if session else None,
         "first_seen": event.start_timestamp.isoformat() if event.start_timestamp else None,
         "last_seen": event.end_timestamp.isoformat() if event.end_timestamp else None,
         "duration_seconds": event.duration_seconds,
-        "occurrence_count": 1,
+        "occurrence_count": int(meta.get("occurrence_count") or 1),
         "evidence_status": evidence.status if evidence else "NOT_AVAILABLE",
         "snapshot_url": f"/api/v1/demo/events/{event.event_id}/evidence/snapshot"
         if evidence and evidence.snapshot_path
@@ -241,6 +257,92 @@ def get_combined_queue(
     ]
     combined = ai_items + manual_items
     return sorted(combined, key=lambda item: item.get("created_at") or item.get("captured_at") or "", reverse=True)
+
+
+REVIEW_STATUSES = ("PENDING", "CONFIRMED", "REJECTED", "INCONCLUSIVE")
+
+
+def _bookmark_status(item: dict[str, Any]) -> str:
+    return str(item.get("review_decision") or item.get("review_status") or "PENDING").upper()
+
+
+@router.get("/review-queue")
+def get_review_queue(
+    status: str = Query("PENDING", pattern="^(ALL|PENDING|CONFIRMED|REJECTED|INCONCLUSIVE)$"),
+    source: str = Query("ALL", pattern="^(ALL|AI|MANUAL)$"),
+    room: Optional[str] = Query(None, description="Room code"),
+    pattern_name: Optional[str] = Query(None, alias="pattern"),
+    severity: Optional[str] = Query(None),
+    session_id: Optional[str] = Query(None),
+    sort: str = Query("newest", pattern="^(newest|priority)$"),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Review work across every session: AI incidents and proctor bookmarks.
+
+    Unlike ``/queue`` (the session on the live page), this does not depend on
+    the analysis that is running, so incidents of finished sessions can be
+    decided.  ``counts`` are per decision for the other filters, and
+    ``facets`` list the rooms and patterns present, for the filter menus.
+    """
+    from storage.db_models import ExamRoom
+
+    ai_query = db.query(DetectionEvent).outerjoin(ExamRoom, DetectionEvent.room_id == ExamRoom.id)
+    if room:
+        ai_query = ai_query.filter(ExamRoom.room_code == room)
+    if pattern_name:
+        ai_query = ai_query.filter(
+            (DetectionEvent.primary_pattern == pattern_name)
+            | ((DetectionEvent.primary_pattern.is_(None)) & (DetectionEvent.behavior == pattern_name))
+        )
+    if severity:
+        ai_query = ai_query.filter(DetectionEvent.severity == severity.upper())
+    if session_id:
+        ai_query = ai_query.filter(DetectionEvent.session_id == session_id)
+
+    items: list[dict[str, Any]] = []
+    if source in ("ALL", "AI"):
+        items += [_serialize_ai_event(event) for event in ai_query.order_by(DetectionEvent.created_at.desc()).limit(2000)]
+    # Bookmarks have no room/pattern/severity of their own: only shown without those filters
+    if source in ("ALL", "MANUAL") and not (room or pattern_name or severity):
+        items += [{**serialize_bookmark(b), "review_status": None} for b in list_bookmarks(db, session_id=session_id, limit=1000)]
+        for item in items:
+            if item.get("source_type") == "MANUAL_BOOKMARK":
+                item["review_status"] = _bookmark_status(item)
+
+    for item in items:
+        item["review_status"] = str(item.get("review_status") or "PENDING").upper()
+    counts = {key: sum(1 for item in items if item["review_status"] == key) for key in REVIEW_STATUSES}
+    if status != "ALL":
+        items = [item for item in items if item["review_status"] == status]
+
+    if sort == "priority":
+        items.sort(key=lambda item: (item.get("review_priority_score") or -1, item.get("created_at") or item.get("captured_at") or ""), reverse=True)
+    else:
+        items.sort(key=lambda item: item.get("created_at") or item.get("captured_at") or "", reverse=True)
+
+    room_rows = (
+        db.query(ExamRoom.room_code, ExamRoom.name, func.count(DetectionEvent.id))
+        .join(DetectionEvent, DetectionEvent.room_id == ExamRoom.id)
+        .group_by(ExamRoom.room_code, ExamRoom.name)
+        .order_by(ExamRoom.room_code)
+        .all()
+    )
+    pattern_rows = (
+        db.query(func.coalesce(DetectionEvent.primary_pattern, DetectionEvent.behavior), func.count(DetectionEvent.id))
+        .group_by(func.coalesce(DetectionEvent.primary_pattern, DetectionEvent.behavior))
+        .all()
+    )
+    return {
+        "items": items[offset:offset + limit],
+        "total": len(items),
+        "counts": counts,
+        "facets": {
+            "rooms": [{"code": code, "name": name, "count": n} for code, name, n in room_rows if code],
+            "patterns": sorted(({"name": name, "count": n} for name, n in pattern_rows if name), key=lambda p: -p["count"]),
+        },
+    }
 
 
 @router.get("/sessions/{session_id}/export")

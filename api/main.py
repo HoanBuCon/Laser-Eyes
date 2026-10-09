@@ -37,7 +37,8 @@ from api.routes import (
     statistics,
     workers,
 )
-from storage.database import init_db
+from storage.database import SessionLocal, init_db
+from storage.session_lifecycle import close_interrupted_sessions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,6 +53,12 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown hooks."""
     logger.info("Initializing VIGIL AI database schema...")
     init_db()
+    # No analysis is running yet: sessions still RUNNING belong to a previous process
+    db = SessionLocal()
+    try:
+        close_interrupted_sessions(db)
+    finally:
+        db.close()
     loop = asyncio.get_running_loop()
     realtime_manager.set_event_loop(loop)
     runtime = DemoRuntime.get_instance()
@@ -190,6 +197,14 @@ if dashboard_dir.exists():
         if demo_file.exists():
             return FileResponse(str(demo_file))
         return {"message": "Competition demo page demo.html not found, please visit /docs"}
+
+    @app.get("/review", tags=["Dashboard"])
+    def serve_review_queue():
+        """Serve the cross-session human review queue."""
+        review_file = dashboard_dir / "review.html"
+        if review_file.exists():
+            return FileResponse(str(review_file))
+        return {"message": "Review queue review.html not found, please visit /docs"}
 
     @app.get("/calibration", tags=["Dashboard"])
     def serve_calibration_tool():

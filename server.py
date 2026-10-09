@@ -221,6 +221,33 @@ def _open_browser_when_ready(url: str, port: int) -> None:
     threading.Thread(target=wait_and_open, daemon=True).start()
 
 
+def cleanup_test_data(confirm: bool) -> None:
+    """Preview, or with confirm=True delete, rooms that have no Seat ROIs."""
+    from classroom_monitor.demo.config import DEMO_PRESETS
+    from storage.database import DATABASE_URL, SessionLocal
+    from storage.maintenance import apply_cleanup, backup_sqlite, plan_test_room_cleanup
+
+    init_db()
+    db = SessionLocal()
+    try:
+        plan = plan_test_room_cleanup(db, keep_room_codes=[p["room_code"] for p in DEMO_PRESETS.values()])
+        print(plan.summary())
+        if not plan.rooms:
+            print("Nothing to clean up.")
+            return
+        if not confirm:
+            print()
+            print("Preview only. Run again with --yes to delete these records (a backup is made first).")
+            return
+        backup = backup_sqlite(DATABASE_URL)
+        if backup is not None:
+            print(f"Backup: {backup}")
+        apply_cleanup(db, plan)
+        print("Deleted. Audit-log rows and evidence files on disk were kept.")
+    finally:
+        db.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="VIGIL AI Classroom server (single entry point)")
     parser.add_argument("--host", type=str, default="127.0.0.1", help="Binding host IP (localhost by default)")
@@ -232,7 +259,17 @@ def main() -> None:
         default=os.getenv("VIGIL_DEMO_TOKEN"),
         help="Required lightweight API token when binding beyond localhost",
     )
+    parser.add_argument(
+        "--cleanup-test-data",
+        action="store_true",
+        help="List rooms without Seat ROIs (left by tests) and their records, then exit; add --yes to delete them",
+    )
+    parser.add_argument("--yes", action="store_true", help="Confirm --cleanup-test-data (a database backup is made first)")
     args = parser.parse_args()
+
+    if args.cleanup_test_data:
+        cleanup_test_data(confirm=args.yes)
+        return
 
     loopback_hosts = {"127.0.0.1", "localhost", "::1"}
     if args.host not in loopback_hosts and not args.demo_token:

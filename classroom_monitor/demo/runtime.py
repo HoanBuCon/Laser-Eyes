@@ -66,6 +66,7 @@ from proctor_support.contracts import SourceProduct
 from proctor_support.frame_store import CapturedFrame, FrameCaptureStore
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, DetectionEvent, EvidenceFile, ExamRoom, ExamSession, ExamSite, SeatROI
+from storage.session_lifecycle import finish_session
 
 logger = logging.getLogger("VigilDemoRuntime")
 
@@ -391,19 +392,38 @@ class DemoRuntime:
 
             if mode_enum == DemoMode.REPLAY:
                 self._thread = threading.Thread(
-                    target=self._worker_replay,
-                    args=(preset, run_id, debug_overlay, show_window, max_frames),
+                    target=self._run_and_close_session,
+                    args=(session_id, self._worker_replay, preset, run_id, debug_overlay, show_window, max_frames),
                     daemon=False,
                 )
             else:
                 self._thread = threading.Thread(
-                    target=self._worker_live,
-                    args=(preset, run_id, debug_overlay, show_window, max_frames, stride, allow_mock),
+                    target=self._run_and_close_session,
+                    args=(session_id, self._worker_live, preset, run_id, debug_overlay, show_window, max_frames, stride, allow_mock),
                     daemon=False,
                 )
             self._thread.start()
 
             return self.status.to_dict()
+
+    def _run_and_close_session(self, session_id: Optional[str], worker: Callable[..., None], *args: Any) -> None:
+        """Run one analysis and record how it ended on its exam session."""
+        try:
+            worker(*args)
+        finally:
+            with self._lock:
+                state = self.status.state
+            outcome = {
+                DemoState.COMPLETED.value: "COMPLETED",
+                DemoState.ERROR.value: "FAILED",
+            }.get(state, "STOPPED")
+            db = SessionLocal()
+            try:
+                finish_session(db, session_id, outcome)
+            except Exception as exc:
+                logger.warning("Could not close exam session %s: %s", session_id, exc)
+            finally:
+                db.close()
 
     def pause(self) -> Dict[str, Any]:
         with self._lock:
@@ -561,11 +581,23 @@ class DemoRuntime:
         event_dict["peak_risk_score"] = float(event.metadata.get("peak_risk_score", event.metadata.get("risk_score", 0.0)) or 0.0)
         event_dict["primary_pattern"] = event.metadata.get("primary_pattern") or event.behavior
 
+        # What a reviewer needs later, when the run is no longer in memory
+        incident_metadata = json.dumps({
+            "behavior_start_ms": event_dict["behavior_start_ms"],
+            "first_seen_ms": event_dict["first_seen_ms"],
+            "last_seen_ms": event_dict["last_seen_ms"],
+            "occurrence_count": event_dict["occurrence_count"],
+            "peak_risk_score": event_dict["peak_risk_score"],
+            "supporting_cues": event.metadata.get("supporting_cues") or [],
+            "focus": event.metadata.get("focus"),
+        }, default=float)
+
         # Persist to SQLite
         try:
             db = SessionLocal()
             existing = db.query(DetectionEvent).filter(DetectionEvent.event_id == event.event_id).first()
             if existing:
+                existing.incident_metadata_json = incident_metadata
                 # Update in-place
                 existing.risk_score = int(event_dict["peak_risk_score"])
                 existing.severity = event.severity
@@ -613,6 +645,7 @@ class DemoRuntime:
                     status="FLAGGED_FOR_HUMAN_REVIEW",
                     review_status="PENDING",
                     room_context=event.room_context,
+                    incident_metadata_json=incident_metadata,
                 )
                 db.add(db_event)
                 db.flush()

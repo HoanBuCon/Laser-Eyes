@@ -684,38 +684,41 @@ class StatisticsRepository:
 
         total_events = q.count()
 
-        # Group by behavior
-        beh_counts = (
-            self.db.query(DetectionEvent.behavior, func.count(DetectionEvent.id))
-            .group_by(DetectionEvent.behavior)
-            .all()
-        )
-        events_by_behavior = {b: cnt for b, cnt in beh_counts if b}
+        def grouped(column) -> Dict[str, int]:
+            rows = q.with_entities(column, func.count(DetectionEvent.id)).group_by(column).all()
+            return {str(key): count for key, count in rows if key}
 
-        # Group by severity
-        sev_counts = (
-            self.db.query(DetectionEvent.severity, func.count(DetectionEvent.id))
-            .group_by(DetectionEvent.severity)
-            .all()
-        )
-        events_by_severity = {s: cnt for s, cnt in sev_counts if s}
+        events_by_behavior = grouped(DetectionEvent.behavior)
+        events_by_severity = grouped(DetectionEvent.severity)
+        # The behaviour pattern that named each incident (current pattern names)
+        events_by_pattern = grouped(func.coalesce(DetectionEvent.primary_pattern, DetectionEvent.behavior))
+        events_by_review_status = {
+            key.upper(): count for key, count in grouped(DetectionEvent.review_status).items()
+        }
 
         active_rooms = self.db.query(ExamRoom).filter(ExamRoom.is_active.is_(True)).count()
+        # Rooms that can actually be analysed: they have Seat ROIs
+        monitored_rooms = self.db.query(func.count(func.distinct(SeatROI.room_id))).scalar() or 0
         completed_sessions = (
             self.db.query(ExamSession).filter(ExamSession.status == "COMPLETED").count()
         )
-        unreviewed = (
-            self.db.query(DetectionEvent)
-            .filter(DetectionEvent.review_status.in_(["PENDING", "pending", "suspicious"]))
-            .count()
+        running_sessions = (
+            self.db.query(ExamSession).filter(ExamSession.status.in_(["RUNNING", "STOPPING"])).count()
+        )
+        unreviewed = sum(
+            count for status, count in events_by_review_status.items() if status in ("PENDING", "SUSPICIOUS")
         )
 
         return {
             "total_events": total_events,
             "events_by_behavior": events_by_behavior,
             "events_by_severity": events_by_severity,
+            "events_by_pattern": events_by_pattern,
+            "events_by_review_status": events_by_review_status,
             "active_rooms": active_rooms,
+            "monitored_rooms": int(monitored_rooms),
             "completed_sessions": completed_sessions,
+            "running_sessions": running_sessions,
             "unreviewed_events_count": unreviewed,
         }
 

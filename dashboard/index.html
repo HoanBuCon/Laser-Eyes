@@ -43,7 +43,7 @@
         <div class="vigil-nav-label">WORKSPACE</div>
         <nav class="vigil-nav">
             <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
-            <a href="/demo#reviewQueue" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
             <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
             <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
             <a href="/" class="vigil-nav-item is-active"><span>05</span><strong>Operations</strong></a>
@@ -111,7 +111,7 @@
                 </div>
                 <div class="mt-3 flex items-baseline gap-2">
                     <span id="statActiveRooms" class="text-3xl font-bold font-mono text-emerald-400">0</span>
-                    <span class="text-xs text-gray-500">active rooms</span>
+                    <span id="statActiveRoomsHint" class="text-xs text-gray-500">rooms with seat ROIs</span>
                 </div>
             </div>
 
@@ -137,7 +137,7 @@
                 </div>
                 <div class="mt-3 flex items-baseline gap-2">
                     <span id="statHighSeverity" class="text-3xl font-bold font-mono text-red-400">0</span>
-                    <span class="text-xs text-red-500/80">requires review</span>
+                    <span id="statPendingHint" class="text-xs text-red-500/80">pending review</span>
                 </div>
             </div>
 
@@ -150,7 +150,7 @@
                 </div>
                 <div class="mt-3 flex items-baseline gap-2">
                     <span id="statReviewRate" class="text-3xl font-bold font-mono text-white">0%</span>
-                    <span class="text-xs text-gray-500">audited by proctors</span>
+                    <span id="statReviewRateHint" class="text-xs text-gray-500">decided by proctors</span>
                 </div>
             </div>
         </div>
@@ -179,16 +179,13 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <!-- Left Chart: Behavior Distribution -->
             <div class="glass-panel p-6">
-                <h2 class="text-base font-semibold text-white mb-1">Behavior Signal Distribution</h2>
-                <p class="text-xs text-gray-400 mb-6">Normalized SRS Behavior Signals</p>
+                <h2 class="text-base font-semibold text-white mb-1">Behavior Pattern Distribution</h2>
+                <p class="text-xs text-gray-400 mb-6">Incidents by the behaviour pattern that raised them</p>
                 <div class="h-64 relative">
                     <canvas id="behaviorDonutChart"></canvas>
                 </div>
-                <div class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
-                    <div class="flex justify-between"><span>PROLONGED_HEAD_TURN:</span><span id="statHeadTurn" class="font-mono text-gray-200">0</span></div>
-                    <div class="flex justify-between"><span>BODY_LEAN_SIDE:</span><span id="statBodyLean" class="font-mono text-gray-200">0</span></div>
-                    <div class="flex justify-between"><span>LOOK_DOWN_LONG:</span><span id="statLookDown" class="font-mono text-gray-200">0</span></div>
-                    <div class="flex justify-between"><span>LOW_HAND_POSTURE:</span><span id="statLowHand" class="font-mono text-gray-200">0</span></div>
+                <div id="behaviorLegend" class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
+                    <div class="text-gray-500">No incidents yet.</div>
                 </div>
             </div>
 

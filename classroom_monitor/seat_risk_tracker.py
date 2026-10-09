@@ -63,6 +63,7 @@ PATTERN_PRIORITY_WEIGHTS: Dict[str, float] = {
     PatternType.SEAT_LEFT.value: 45.0,
     PatternType.MULTI_PERSON_DWELL_NEAR_SEAT.value: 40.0,
     PatternType.SUSTAINED_NEIGHBOR_ATTENTION.value: 45.0,
+    PatternType.HEADS_TOGETHER.value: 45.0,
     PatternType.BELOW_DESK_INTERACTION.value: 35.0,
 }
 

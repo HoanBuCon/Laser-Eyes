@@ -331,6 +331,13 @@ CAMERA_FACING_SUBJECTS = "facing_subjects"   # camera in front of the room, look
 CAMERA_BEHIND_SUBJECTS = "behind_subjects"   # camera behind the candidates
 CAMERA_VIEWS = (CAMERA_FACING_SUBJECTS, CAMERA_BEHIND_SUBJECTS)
 
+# Inferred left/right neighbours: ROIs at most this many seat widths apart, and no
+# more than this vertical offset per unit of horizontal offset (same row)
+NEIGHBOR_MAX_GAP_SEAT_WIDTHS = 0.15
+NEIGHBOR_MAX_ROW_SLOPE = 0.5
+# ...and its tilt within this of the room's typical row tilt
+NEIGHBOR_MAX_TILT_DEVIATION = 0.25
+
 
 class SeatGraph:
     """Manages the full topological graph and spatial context of all seats in a room.
@@ -369,6 +376,8 @@ class SeatGraph:
     ) -> None:
         """Heuristically infer left/right/front/back neighbors from seat polygon centroids."""
         centroids: List[Tuple[str, float, float]] = []
+        widths: Dict[str, float] = {}
+        polygons: Dict[str, np.ndarray] = {}
         for s in seats_definitions:
             s_id = getattr(s, "seat_code", None) or getattr(s, "seat_id", None) or str(s.get("seat_code", ""))
             poly = getattr(s, "polygon", None)
@@ -379,6 +388,59 @@ class SeatGraph:
                 cx = float(np.mean(poly_arr[:, 0]))
                 cy = float(np.mean(poly_arr[:, 1]))
                 centroids.append((s_id, cx, cy))
+                widths[s_id] = float(np.ptp(poly_arr[:, 0]))
+                polygons[s_id] = poly_arr
+
+        def side_by_side(s_id: str, other_id: str, dx: float, dy: float, room_tilt: Optional[float]) -> bool:
+            """Left/right neighbours sit next to each other in the same row.
+
+            Desk mates' ROIs touch; a seat across an aisle leaves a gap.  The
+            gap is measured in seat widths, so far rows (small ROIs) and near
+            rows (large ROIs) are judged alike.  Seats in front of or behind
+            each other also touch, but the line between them is steeper than
+            the rows or tilted the other way: rows of a room share one tilt in
+            the image (perspective), estimated from the clearest links.
+            """
+            width = max(1.0, (widths.get(s_id, 0.0) + widths.get(other_id, 0.0)) / 2.0)
+            if not (0.0 < dx <= x_dist_threshold and abs(dy) <= NEIGHBOR_MAX_ROW_SLOPE * dx):
+                return False
+            if polygon_gap(polygons[s_id], polygons[other_id]) > NEIGHBOR_MAX_GAP_SEAT_WIDTHS * width:
+                return False
+            return room_tilt is None or abs(dy / dx - room_tilt) <= NEIGHBOR_MAX_TILT_DEVIATION
+
+        def polygon_gap(a: np.ndarray, b: np.ndarray) -> float:
+            """Shortest distance between two polygons; 0 when they touch or overlap."""
+            if len(a) < 3 or len(b) < 3:
+                return float("inf")
+            gap_a = min(-cv2.pointPolygonTest(b, (float(x), float(y)), True) for x, y in a)
+            gap_b = min(-cv2.pointPolygonTest(a, (float(x), float(y)), True) for x, y in b)
+            return max(0.0, min(gap_a, gap_b))
+
+        def nearest(s_id: str, cx: float, cy: float, sign: float, room_tilt: Optional[float]) -> Optional[str]:
+            """Closest seat beside this one on one side of the image (sign -1 = left)."""
+            candidates = []
+            for other_id, other_cx, other_cy in centroids:
+                dx = sign * (other_cx - cx)
+                # tilt measured left -> right, whichever side the other seat is on
+                dy_lr = (other_cy - cy) if sign > 0 else (cy - other_cy)
+                if other_id != s_id and side_by_side(s_id, other_id, dx, dy_lr, room_tilt):
+                    candidates.append((float(np.hypot(other_cx - cx, other_cy - cy)), other_id))
+            return min(candidates)[1] if candidates else None
+
+        def mutual_links(room_tilt: Optional[float]) -> Tuple[Dict[str, Optional[str]], Dict[str, Optional[str]]]:
+            left = {s_id: nearest(s_id, cx, cy, -1.0, room_tilt) for s_id, cx, cy in centroids}
+            right = {s_id: nearest(s_id, cx, cy, 1.0, room_tilt) for s_id, cx, cy in centroids}
+            return left, right
+
+        # Pass 1: the room's row tilt from the clearest links; pass 2: links that follow it
+        image_left, image_right = mutual_links(None)
+        position = {s_id: (cx, cy) for s_id, cx, cy in centroids}
+        first = [(s_id, right) for s_id, right in image_right.items() if right and image_left.get(right) == s_id]
+        if len(first) >= 3:
+            room_tilt = float(np.median([
+                (position[r][1] - position[l][1]) / max(position[r][0] - position[l][0], 1.0) for l, r in first
+            ]))
+            image_left, image_right = mutual_links(room_tilt)
 
         for s_id, cx, cy in centroids:
             ctx = self.get_context(s_id)
@@ -386,27 +448,10 @@ class SeatGraph:
                 ctx = SeatContext(seat_id=s_id, room_id=self.room_id, seat_code=s_id)
                 self.add_seat_context(ctx)
 
-            # Closest seat on the image-left (cx_other < cx, same row |cy - cy_other| < y_thresh)
-            left_candidates = [
-                (other_id, cx - other_cx)
-                for other_id, other_cx, other_cy in centroids
-                if other_id != s_id and (cx - other_cx) > 0 and (cx - other_cx) < x_dist_threshold and abs(cy - other_cy) < 100.0
-            ]
-            image_left_id = None
-            if left_candidates:
-                left_candidates.sort(key=lambda item: item[1])
-                image_left_id = left_candidates[0][0]
-
-            # Closest seat on the image-right (cx_other > cx)
-            right_candidates = [
-                (other_id, other_cx - cx)
-                for other_id, other_cx, other_cy in centroids
-                if other_id != s_id and (other_cx - cx) > 0 and (other_cx - cx) < x_dist_threshold and abs(cy - other_cy) < 100.0
-            ]
-            image_right_id = None
-            if right_candidates:
-                right_candidates.sort(key=lambda item: item[1])
-                image_right_id = right_candidates[0][0]
+            # Neighbours must agree both ways: A has B on its right and B has A
+            # on its left.  A one-sided match is usually a seat in another row.
+            image_left_id = image_left[s_id] if image_left[s_id] and image_right.get(image_left[s_id]) == s_id else None
+            image_right_id = image_right[s_id] if image_right[s_id] and image_left.get(image_right[s_id]) == s_id else None
 
             # Image sides -> the candidate's own sides
             if self.mirrors_image:

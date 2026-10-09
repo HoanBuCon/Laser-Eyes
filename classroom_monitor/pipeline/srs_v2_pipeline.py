@@ -24,6 +24,7 @@ from classroom_monitor.head_pose_provider import (
     create_head_pose_provider,
 )
 from classroom_monitor.models import ClassroomEvent, Detection
+from classroom_monitor.pair_proximity import HeadsTogetherMonitor
 from classroom_monitor.observation_extractor import ObservationExtractor, ObservationType, RawObservation
 from classroom_monitor.scene_context import CapabilityStatus, SceneProfile, SeatContext, SeatGraph
 from classroom_monitor.seat_manager import SeatManager, SeatState
@@ -129,6 +130,8 @@ class SRSv2Pipeline:
             else None
         )
         self.head_offset_baseline = HeadOffsetBaseline()
+        # Desk mates bringing their heads together (pair-level, keypoints only)
+        self.heads_together = HeadsTogetherMonitor(seat_graph)
         self.seat_hpe_cache: Dict[str, Tuple[HeadOrientationEstimate, float]] = {}
         self.last_hpe_time: Dict[str, float] = {}
         self.scheduled_hpe_cycles = 0
@@ -248,6 +251,19 @@ class SRSv2Pipeline:
                     timestamp_ms=timestamp_ms,
                 )
             )
+        patterns.extend(
+            self.heads_together.update(
+                {
+                    seat_code: (
+                        occupancy.assigned_detection,
+                        len(occupancy.candidate_detections),
+                        int(getattr(occupancy, "expected_person_count", 1) or 1),
+                    )
+                    for seat_code, occupancy in self.seat_manager.occupancies.items()
+                },
+                timestamp_ms,
+            )
+        )
         timings["patterns"] = (time.perf_counter() - started) * 1000.0
 
         started = time.perf_counter()

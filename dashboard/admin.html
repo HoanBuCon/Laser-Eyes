@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — System</title>
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom admin-page">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <span class="vigil-brand-mark">V</span>
+            <span class="vigil-brand-copy">
+                <strong>VIGIL AI</strong>
+                <small>CLASSROOM COPILOT</small>
+            </span>
+        </a>
+
+        <div class="vigil-nav-label">WORKSPACE</div>
+        <nav class="vigil-nav">
+            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
+            <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
+            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
+            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>06</span><strong>Video wall</strong></a>
+            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>07</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">07 · System</span>
+            <h1 class="vg-title">System maintenance</h1>
+            <span class="vg-subtitle">Clean up demo and test data. Database actions take a backup first and are written to the audit log.</span>
+        </div>
+        <div class="vg-actions">
+            <span id="runtimeChip" class="vg-chip">RUNTIME —</span>
+            <label class="vg-label" for="actorInput">Operator</label>
+            <input id="actorInput" class="vg-input" type="text" placeholder="Your name" autocomplete="name">
+            <button type="button" id="refreshBtn" class="vigil-btn vigil-btn--sm">Refresh</button>
+        </div>
+    </header>
+
+    <main class="vg-page">
+        <section class="vg-kpis" aria-label="Storage">
+            <div class="vg-kpi"><span class="vg-label">Database</span><span id="kDb" class="vg-kpi-value">—</span><span id="kDbHint" class="vg-kpi-hint"></span></div>
+            <div class="vg-kpi"><span class="vg-label">Demo runs</span><span id="kRuns" class="vg-kpi-value">—</span><span id="kRunsHint" class="vg-kpi-hint"></span></div>
+            <div class="vg-kpi"><span class="vg-label">Replay packages</span><span id="kReplay" class="vg-kpi-value">—</span><span id="kReplayHint" class="vg-kpi-hint">kept; never cleaned here</span></div>
+            <div class="vg-kpi"><span class="vg-label">Playback cache</span><span id="kCache" class="vg-kpi-value">—</span><span id="kCacheHint" class="vg-kpi-hint"></span></div>
+        </section>
+
+        <div class="admin-grid">
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Database rows</h2><span class="vg-label">live counts</span></div>
+                <table class="vg-table"><tbody id="tableCounts"><tr><td class="vg-empty">Loading…</td></tr></tbody></table>
+            </section>
+
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Maintenance actions</h2><span class="vg-label">demo &amp; testing</span></div>
+                <div class="admin-actions">
+                    <article class="admin-action" data-action="test-rooms">
+                        <div class="admin-action-copy">
+                            <strong>Remove test rooms</strong>
+                            <p>Rooms without Seat ROIs (left by tests) and their sessions and incidents. Demo rooms are kept.</p>
+                            <small id="previewTestRooms" class="admin-preview"></small>
+                        </div>
+                        <button type="button" class="vigil-btn vigil-btn--sm vigil-btn--danger">Remove…</button>
+                    </article>
+                    <article class="admin-action" data-action="orphan-runs">
+                        <div class="admin-action-copy">
+                            <strong>Purge unused run folders</strong>
+                            <p>Run folders under data/demo_runs that no incident refers to. Evidence of stored incidents is kept.</p>
+                            <small id="previewOrphanRuns" class="admin-preview"></small>
+                        </div>
+                        <button type="button" class="vigil-btn vigil-btn--sm vigil-btn--danger">Purge…</button>
+                    </article>
+                    <article class="admin-action" data-action="playback-cache">
+                        <div class="admin-action-copy">
+                            <strong>Clear playback cache</strong>
+                            <p>Browser-playable copies of evidence clips. They are rebuilt the next time a clip is opened.</p>
+                            <small id="previewCache" class="admin-preview"></small>
+                        </div>
+                        <button type="button" class="vigil-btn vigil-btn--sm">Clear…</button>
+                    </article>
+                    <article class="admin-action admin-action--severe" data-action="reset-incidents">
+                        <div class="admin-action-copy">
+                            <strong>Reset all sessions and incidents</strong>
+                            <p>Deletes every session, incident, review decision and bookmark. Rooms, cameras and Seat ROIs stay; the audit log stays. Run "Purge unused run folders" afterwards to free disk space.</p>
+                            <small id="previewReset" class="admin-preview"></small>
+                        </div>
+                        <button type="button" class="vigil-btn vigil-btn--sm vigil-btn--danger">Reset…</button>
+                    </article>
+                </div>
+            </section>
+        </div>
+
+        <section class="vg-panel">
+            <div class="vg-panel-head"><h2>Activity</h2><span class="vg-label">this page</span></div>
+            <div id="activityLog" class="admin-log"><div class="vg-empty">No actions yet.</div></div>
+        </section>
+    </main>
+
+    <dialog id="confirmDialog" class="admin-dialog">
+        <form method="dialog" id="confirmForm">
+            <div class="vg-panel-head"><h2 id="confirmTitle">Confirm</h2></div>
+            <div class="vg-panel-body admin-dialog-body">
+                <p id="confirmText"></p>
+                <label class="vg-label" for="confirmInput">Type <code id="confirmPhrase"></code> to continue</label>
+                <input id="confirmInput" class="vg-input" type="text" autocomplete="off" spellcheck="false">
+                <p id="confirmError" class="admin-error" hidden></p>
+            </div>
+            <div class="admin-dialog-foot">
+                <button type="button" id="confirmCancel" class="vigil-btn vigil-btn--sm">Cancel</button>
+                <button type="submit" id="confirmRun" class="vigil-btn vigil-btn--sm vigil-btn--danger" disabled>Run</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>

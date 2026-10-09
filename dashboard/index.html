@@ -29,7 +29,7 @@
     <link rel="stylesheet" href="/static/css/dashboard.css">
     <script src="/static/js/vigil-theme.js"></script>
 </head>
-<body class="vigil-classroom bg-[#0b0f19] text-gray-100 antialiased selection:bg-cyan-500 selection:text-white font-sans">
+<body class="vigil-classroom operations-body antialiased font-sans">
 
     <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
         <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
@@ -47,6 +47,8 @@
             <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
             <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
             <a href="/" class="vigil-nav-item is-active"><span>05</span><strong>Operations</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>06</span><strong>Video wall</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>07</span><strong>System</strong></a>
             <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
 
@@ -56,171 +58,97 @@
         </div>
     </aside>
 
-    <!-- Top Navigation Header -->
-    <header class="operations-topbar border-b border-gray-800/80 bg-gray-950/80 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
-                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">MVP v1.0</span>
-                    </div>
-                    <p class="text-xs text-gray-400 font-mono">Multi-room observation and human review workspace</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-4">
-                <div id="wsStatusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span id="wsStatusText">LIVE STREAM CONNECTED</span>
-                </div>
-                <a href="/demo" class="px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white border border-cyan-400/40 text-xs font-bold transition flex items-center gap-1.5 shadow-lg shadow-cyan-500/20">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                    Live Demo
-                </a>
-                <a href="/calibration" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                    Seat Calibration
-                </a>
-                <a href="/data-workbench" class="px-3 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                    Data Workbench
-                </a>
-                <button onclick="triggerManualRefresh()" class="vigil-btn vigil-btn--ghost vigil-btn--icon p-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white transition" title="Refresh Dashboard">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                </button>
-                <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
-            </div>
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">05 · Operations</span>
+            <h1 class="vg-title">Operations</h1>
+            <span class="vg-subtitle">Rooms, incident volume and review progress across every session</span>
+        </div>
+        <div class="vg-actions">
+            <span id="wsStatusBadge" class="vg-chip" data-connected="false"><span id="wsStatusText">CONNECTING…</span></span>
+            <a href="/review" class="vigil-btn vigil-btn--sm vigil-btn--primary">Open review queue</a>
+            <button type="button" onclick="triggerManualRefresh()" class="vigil-btn vigil-btn--sm" title="Refresh">Refresh</button>
+            <a href="/docs" target="_blank" class="vigil-btn vigil-btn--sm vigil-btn--ghost">API docs</a>
         </div>
     </header>
 
-    <!-- Main Content Container -->
-    <main class="operations-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-
-        <!-- Stat Counter Cards -->
-        <div class="operations-stats grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="glass-panel p-5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Monitored Rooms</span>
-                    <span class="p-2 rounded-lg bg-emerald-500/10 text-emerald-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>
-                    </span>
-                </div>
-                <div class="mt-3 flex items-baseline gap-2">
-                    <span id="statActiveRooms" class="text-3xl font-bold font-mono text-emerald-400">0</span>
-                    <span id="statActiveRoomsHint" class="text-xs text-gray-500">rooms with seat ROIs</span>
-                </div>
+    <main class="vg-page operations-page">
+        <section class="vg-kpis" aria-label="Summary">
+            <div class="vg-kpi" data-tone="good">
+                <span class="vg-label">Monitored rooms</span>
+                <span id="statActiveRooms" class="vg-kpi-value">0</span>
+                <span id="statActiveRoomsHint" class="vg-kpi-hint">rooms with seat ROIs</span>
             </div>
-
-            <div class="glass-panel p-5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Review Incidents</span>
-                    <span class="p-2 rounded-lg bg-cyan-500/10 text-cyan-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                    </span>
-                </div>
-                <div class="mt-3 flex items-baseline gap-2">
-                    <span id="statTotalEvents" class="text-3xl font-bold font-mono text-white">0</span>
-                    <span class="text-xs text-gray-500">recorded episodes</span>
-                </div>
+            <div class="vg-kpi">
+                <span class="vg-label">Incidents</span>
+                <span id="statTotalEvents" class="vg-kpi-value">0</span>
+                <span class="vg-kpi-hint">recorded episodes</span>
             </div>
-
-            <div class="glass-panel p-5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">High Severity Alerts</span>
-                    <span class="p-2 rounded-lg bg-red-500/10 text-red-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414"/></svg>
-                    </span>
-                </div>
-                <div class="mt-3 flex items-baseline gap-2">
-                    <span id="statHighSeverity" class="text-3xl font-bold font-mono text-red-400">0</span>
-                    <span id="statPendingHint" class="text-xs text-red-500/80">pending review</span>
-                </div>
+            <div class="vg-kpi" data-tone="danger">
+                <span class="vg-label">High severity</span>
+                <span id="statHighSeverity" class="vg-kpi-value">0</span>
+                <span id="statPendingHint" class="vg-kpi-hint">pending review</span>
             </div>
-
-            <div class="glass-panel p-5">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs uppercase tracking-wider text-gray-400 font-medium">Human Review Rate</span>
-                    <span class="p-2 rounded-lg bg-blue-500/10 text-blue-400">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    </span>
-                </div>
-                <div class="mt-3 flex items-baseline gap-2">
-                    <span id="statReviewRate" class="text-3xl font-bold font-mono text-white">0%</span>
-                    <span id="statReviewRateHint" class="text-xs text-gray-500">decided by proctors</span>
-                </div>
+            <div class="vg-kpi">
+                <span class="vg-label">Human review rate</span>
+                <span id="statReviewRate" class="vg-kpi-value">0%</span>
+                <span id="statReviewRateHint" class="vg-kpi-hint">decided by proctors</span>
             </div>
-        </div>
+        </section>
 
-        <!-- 10-20 Exam Rooms Multi-Card Grid -->
-        <div class="glass-panel p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h2 class="text-base font-bold text-white flex items-center gap-2">
-                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span>
-                        Multi-Room Observation Grid
-                    </h2>
-                    <p class="text-xs text-gray-400">Real-time room risk scores, active cameras, and seat occupancy</p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button onclick="filterRooms('ALL')" class="vigil-btn vigil-btn--sm vigil-btn--primary px-3 py-1 rounded-lg text-xs font-semibold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 hover:bg-cyan-500/30 transition">All Rooms</button>
-                    <button onclick="filterRooms('HIGH_RISK')" class="vigil-btn vigil-btn--sm px-3 py-1 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-red-400 border border-gray-700 transition">High Risk Only</button>
-                </div>
-            </div>
-            <div id="roomCardsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                <div class="p-8 text-center text-gray-500 col-span-full">Loading room telemetry...</div>
-            </div>
-        </div>
-
-        <!-- Middle Grid: Behavior Distribution Chart & Live Event Feed -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Chart: Behavior Distribution -->
-            <div class="glass-panel p-6">
-                <h2 class="text-base font-semibold text-white mb-1">Behavior Pattern Distribution</h2>
-                <p class="text-xs text-gray-400 mb-6">Incidents by the behaviour pattern that raised them</p>
-                <div class="h-64 relative">
-                    <canvas id="behaviorDonutChart"></canvas>
-                </div>
-                <div id="behaviorLegend" class="mt-4 pt-4 border-t border-gray-800 text-xs text-gray-400 space-y-1">
-                    <div class="text-gray-500">No incidents yet.</div>
-                </div>
-            </div>
-
-            <!-- Right: Live Event Telemetry Feed with Human-in-the-Loop Review Buttons -->
-            <div class="glass-panel p-6 lg:col-span-2">
-                <div class="flex items-center justify-between mb-4">
-                    <div>
-                        <h2 class="text-base font-semibold text-white flex items-center gap-2">
-                            <span>Real-Time Review Incidents</span>
-                            <span id="selectedRoomFilterBadge" class="hidden text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono"></span>
-                        </h2>
-                        <p class="text-xs text-gray-400">Seat-anchored events requiring proctor verification</p>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <select id="severityFilter" onchange="applyEventFilters()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-2.5 py-1 text-gray-300 focus:outline-none focus:border-cyan-500">
-                            <option value="">All Severities</option>
-                            <option value="HIGH">HIGH Only</option>
-                            <option value="MEDIUM">MEDIUM</option>
-                            <option value="LOW">LOW</option>
-                        </select>
-                        <select id="reviewFilter" onchange="applyEventFilters()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-2.5 py-1 text-gray-300 focus:outline-none focus:border-cyan-500">
-                            <option value="">All Review States</option>
-                            <option value="PENDING">PENDING</option>
-                            <option value="CONFIRMED">CONFIRMED</option>
-                            <option value="REJECTED">REJECTED</option>
-                            <option value="INCONCLUSIVE">INCONCLUSIVE</option>
-                        </select>
+        <div class="ops-grid">
+            <section class="vg-panel ops-rooms">
+                <div class="vg-panel-head">
+                    <h2>Rooms <span id="roomCount" class="vg-chip"></span></h2>
+                    <div class="vg-seg" role="group" aria-label="Room filter">
+                        <button type="button" data-room-filter="ALL" aria-pressed="true" onclick="filterRooms('ALL')">All</button>
+                        <button type="button" data-room-filter="MONITORED" aria-pressed="false" onclick="filterRooms('MONITORED')">With incidents</button>
+                        <button type="button" data-room-filter="HIGH_RISK" aria-pressed="false" onclick="filterRooms('HIGH_RISK')">High risk</button>
                     </div>
                 </div>
-                <div id="eventsFeed" class="space-y-3 max-h-[480px] overflow-y-auto pr-1">
-                    <div class="p-8 text-center text-gray-500">No events found. Waiting for camera stream detections...</div>
+                <div class="vg-scroll ops-scroll">
+                    <table class="vg-table">
+                        <thead><tr><th>Room</th><th>Name</th><th class="num">Seats</th><th class="num">Incidents</th><th>Risk</th><th class="num">Score</th></tr></thead>
+                        <tbody id="roomCardsGrid"><tr><td colspan="6" class="vg-empty">Loading rooms…</td></tr></tbody>
+                    </table>
                 </div>
-            </div>
+            </section>
+
+            <section class="vg-panel ops-patterns">
+                <div class="vg-panel-head"><h2>Behaviour patterns</h2><span class="vg-label">all sessions</span></div>
+                <div class="vg-panel-body ops-pattern-body">
+                    <div class="ops-donut"><canvas id="behaviorDonutChart"></canvas></div>
+                    <div id="behaviorLegend" class="ops-legend"><div class="vg-empty">No incidents yet.</div></div>
+                </div>
+            </section>
         </div>
 
+        <section class="vg-panel">
+            <div class="vg-panel-head">
+                <h2>Latest incidents <span id="selectedRoomFilterBadge" class="vg-chip hidden"></span></h2>
+                <div class="vg-actions">
+                    <select id="severityFilter" onchange="applyEventFilters()" class="vg-select" aria-label="Severity">
+                        <option value="">All severities</option>
+                        <option value="HIGH">High</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="LOW">Low</option>
+                    </select>
+                    <select id="reviewFilter" onchange="applyEventFilters()" class="vg-select" aria-label="Review state">
+                        <option value="">All review states</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="CONFIRMED">Confirmed</option>
+                        <option value="REJECTED">Rejected</option>
+                        <option value="INCONCLUSIVE">Inconclusive</option>
+                    </select>
+                </div>
+            </div>
+            <div class="vg-scroll ops-scroll ops-scroll--tall">
+                <table class="vg-table">
+                    <thead><tr><th>Time</th><th>Room</th><th>Pattern</th><th>Severity</th><th>Review</th><th class="num">Score</th><th>Evidence hash</th><th></th></tr></thead>
+                    <tbody id="eventsFeed"><tr><td colspan="8" class="vg-empty">Waiting for incidents…</td></tr></tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
     <!-- Comprehensive Evidence & Human-in-the-Loop Review Modal -->

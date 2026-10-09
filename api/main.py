@@ -24,6 +24,7 @@ from fastapi.staticfiles import StaticFiles
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
 from api.routes import (
+    admin,
     cameras,
     data_workbench,
     demo,
@@ -141,6 +142,7 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(inference.router, prefix=prefix)
     app.include_router(proctor.router, prefix=prefix)
     app.include_router(data_workbench.router, prefix=prefix)
+    app.include_router(admin.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
@@ -205,6 +207,22 @@ if dashboard_dir.exists():
         if review_file.exists():
             return FileResponse(str(review_file))
         return {"message": "Review queue review.html not found, please visit /docs"}
+
+    @app.get("/wall", tags=["Dashboard"])
+    def serve_video_wall():
+        """Serve the multi-camera video wall."""
+        wall_file = dashboard_dir / "wall.html"
+        if wall_file.exists():
+            return FileResponse(str(wall_file))
+        return {"message": "Video wall wall.html not found, please visit /docs"}
+
+    @app.get("/admin", tags=["Dashboard"])
+    def serve_admin_page():
+        """Serve the system maintenance page (demo and testing)."""
+        admin_file = dashboard_dir / "admin.html"
+        if admin_file.exists():
+            return FileResponse(str(admin_file))
+        return {"message": "System page admin.html not found, please visit /docs"}
 
     @app.get("/calibration", tags=["Dashboard"])
     def serve_calibration_tool():

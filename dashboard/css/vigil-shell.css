@@ -4,6 +4,7 @@
 html { scroll-behavior: smooth; }
 
 body.vigil-classroom {
+  margin: 0;
   min-width: 320px;
   min-height: 100vh;
   padding-left: 204px;
@@ -37,6 +38,7 @@ select:focus-visible, textarea:focus-visible {
   font-weight: var(--vigil-font-medium);
   line-height: 1;
   cursor: pointer;
+  text-decoration: none;
   transition: background var(--vigil-duration-fast) var(--vigil-ease-standard), border-color var(--vigil-duration-fast) var(--vigil-ease-standard), color var(--vigil-duration-fast) var(--vigil-ease-standard), opacity var(--vigil-duration-fast) var(--vigil-ease-standard);
 }
 .vigil-btn:hover:not(:disabled) { border-color: var(--vigil-border-strong) !important; background: var(--vigil-surface-hover) !important; }
@@ -59,8 +61,30 @@ select:focus-visible, textarea:focus-visible {
 .vigil-btn--icon { width: 34px; padding: 0; }
 .vigil-btn--sm { min-height: 28px; padding: .3rem .6rem; }
 
-.vigil-theme-toggle { width: 100%; border: 0; text-align: left; cursor: pointer; }
+.vigil-theme-toggle { width: 100%; border: 0; background: transparent; font: inherit; text-align: left; cursor: pointer; }
 .vigil-theme-toggle [data-theme-icon] { color: var(--vigil-warning); font-size: var(--vigil-font-size-sm); }
+
+/* VIGIL Local look for markup that still carries Tailwind utilities:
+   flat surfaces, square corners, no shadows/gradients/blur, and accents
+   mapped to the observable-state tokens.  Pages may add layout, not style. */
+body.vigil-classroom main[class*="max-w-"], body.vigil-classroom header [class*="max-w-"], body.vigil-classroom [class*="workspace"][class*="max-w-"] { max-width: none !important; }
+body.vigil-classroom [class*="rounded"]:not(.rounded-full) { border-radius: 0 !important; }
+body.vigil-classroom [class*="shadow"] { box-shadow: none !important; }
+body.vigil-classroom [class*="bg-gradient"] { background-image: none !important; }
+body.vigil-classroom [class*="backdrop-blur"] { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+body.vigil-classroom :is([class*="text-cyan-"], [class*="text-blue-"], [class*="text-sky-"], [class*="text-indigo-"]):not(.vigil-btn) { color: var(--vigil-info) !important; }
+body.vigil-classroom :is([class*="text-emerald-"], [class*="text-green-"], [class*="text-teal-"]):not(.vigil-btn) { color: var(--vigil-good) !important; }
+body.vigil-classroom [class*="text-amber-"]:not(.vigil-btn), body.vigil-classroom [class*="text-yellow-"]:not(.vigil-btn) { color: var(--vigil-warning) !important; }
+body.vigil-classroom [class*="text-red-"]:not(.vigil-btn), body.vigil-classroom [class*="text-rose-"]:not(.vigil-btn) { color: var(--vigil-danger) !important; }
+body.vigil-classroom [class*="text-purple-"]:not(.vigil-btn) { color: var(--vigil-accent-purple) !important; }
+body.vigil-classroom :is([class*="bg-cyan-"], [class*="bg-blue-"], [class*="bg-sky-"], [class*="bg-purple-"]):not(.vigil-btn) { background-color: var(--vigil-info-dim) !important; }
+body.vigil-classroom :is([class*="bg-emerald-"], [class*="bg-green-"], [class*="bg-teal-"]):not(.vigil-btn) { background-color: var(--vigil-good-dim) !important; }
+body.vigil-classroom :is([class*="bg-amber-"], [class*="bg-yellow-"]):not(.vigil-btn) { background-color: var(--vigil-warning-dim) !important; }
+body.vigil-classroom :is([class*="bg-red-"], [class*="bg-rose-"]):not(.vigil-btn) { background-color: var(--vigil-danger-dim) !important; }
+body.vigil-classroom :is([class*="border-cyan-"], [class*="border-blue-"], [class*="border-emerald-"], [class*="border-amber-"], [class*="border-red-"], [class*="border-purple-"]):not(.vigil-btn) { border-color: var(--vigil-border) !important; }
+body.vigil-classroom [class*="bg-gray-9"], body.vigil-classroom [class*="bg-[#"] { background-color: var(--vigil-surface) !important; }
+body.vigil-classroom [class*="bg-gray-8"], body.vigil-classroom [class*="bg-gray-7"] { background-color: var(--vigil-surface-alt) !important; }
+body.vigil-classroom [class*="border-gray-"] { border-color: var(--vigil-border) !important; }
 
 /* Bridge legacy utility markup into the tokenized light palette. */
 [data-theme="light"] body.vigil-classroom [class*="bg-gray-950"],
@@ -211,3 +235,120 @@ select:focus-visible, textarea:focus-visible {
     transition-duration: .01ms !important;
   }
 }
+
+/* --- VIGIL Local building blocks -------------------------------------------
+   Same vocabulary as exam_monitor/app.py: page title on the background, flat
+   1px panels, tiny uppercase labels, compact stat cells, dense rows. */
+.vg-topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--vigil-z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vigil-space-4);
+  min-height: 64px;
+  padding: var(--vigil-space-3) var(--vigil-space-5);
+  border-bottom: 1px solid var(--vigil-border);
+  background: var(--vigil-bg);
+}
+.vg-topbar-title { display: grid; gap: 1px; min-width: 0; }
+.vg-eyebrow, .vg-label {
+  color: var(--vigil-text-dim);
+  font-family: var(--vigil-font-mono);
+  font-size: .625rem;
+  font-weight: var(--vigil-font-bold);
+  letter-spacing: .11em;
+  text-transform: uppercase;
+}
+.vg-title { margin: 0; color: var(--vigil-text); font-size: var(--vigil-font-size-lg); font-weight: var(--vigil-font-medium); line-height: 1.2; }
+.vg-subtitle { color: var(--vigil-text-muted); font-size: var(--vigil-font-size-xs); }
+.vg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--vigil-space-2); }
+.vg-page { display: grid; gap: var(--vigil-space-4); padding: var(--vigil-space-4) var(--vigil-space-5) var(--vigil-space-8); }
+
+.vg-panel { min-width: 0; border: 1px solid var(--vigil-border); background: var(--vigil-surface); }
+.vg-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vigil-space-2);
+  min-height: 40px;
+  padding: var(--vigil-space-2) var(--vigil-space-3);
+  border-bottom: 1px solid var(--vigil-border);
+}
+.vg-panel-head h2 { margin: 0; color: var(--vigil-text); font-size: var(--vigil-font-size-xs); font-weight: var(--vigil-font-medium); letter-spacing: .02em; }
+.vg-panel-body { padding: var(--vigil-space-3); }
+
+.vg-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); border: 1px solid var(--vigil-border); background: var(--vigil-surface); }
+.vg-kpi { display: grid; gap: 2px; padding: var(--vigil-space-2) var(--vigil-space-3); border-right: 1px solid var(--vigil-border); }
+.vg-kpi:last-child { border-right: 0; }
+.vg-kpi-value { color: var(--vigil-text); font-size: 1.375rem; font-weight: var(--vigil-font-medium); line-height: 1.15; font-variant-numeric: tabular-nums; }
+.vg-kpi-hint { color: var(--vigil-text-dim); font-size: var(--vigil-font-size-2xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vg-kpi[data-tone="good"] .vg-kpi-value { color: var(--vigil-good); }
+.vg-kpi[data-tone="danger"] .vg-kpi-value { color: var(--vigil-danger); }
+.vg-kpi[data-tone="warning"] .vg-kpi-value { color: var(--vigil-warning); }
+
+.vg-table { width: 100%; border-collapse: collapse; font-size: var(--vigil-font-size-xs); }
+.vg-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 6px var(--vigil-space-3);
+  border-bottom: 1px solid var(--vigil-border);
+  background: var(--vigil-surface);
+  color: var(--vigil-text-dim);
+  font-family: var(--vigil-font-mono);
+  font-size: .625rem;
+  font-weight: var(--vigil-font-bold);
+  letter-spacing: .08em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.vg-table td { padding: 5px var(--vigil-space-3); border-bottom: 1px solid var(--vigil-border-subtle); color: var(--vigil-text-muted); vertical-align: middle; }
+.vg-table tbody tr:hover td { background: var(--vigil-surface-alt); }
+.vg-table tr[aria-selected="true"] td { background: var(--vigil-surface-alt); color: var(--vigil-text); }
+.vg-table tr[aria-selected="true"] td:first-child { box-shadow: inset 2px 0 0 var(--vigil-good); }
+.vg-table .num { font-family: var(--vigil-font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+.vg-table .strong { color: var(--vigil-text); }
+.vg-scroll { overflow: auto; }
+.vg-empty { padding: var(--vigil-space-6); color: var(--vigil-text-dim); font-size: var(--vigil-font-size-xs); text-align: center; }
+
+.vg-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--vigil-border);
+  background: var(--vigil-surface-alt);
+  color: var(--vigil-text-muted);
+  font-family: var(--vigil-font-mono);
+  font-size: .625rem;
+  font-weight: var(--vigil-font-bold);
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.vg-chip[data-tone="good"] { border-color: color-mix(in srgb, var(--vigil-good) 35%, var(--vigil-border)); background: var(--vigil-good-dim); color: var(--vigil-good); }
+.vg-chip[data-tone="warning"] { border-color: color-mix(in srgb, var(--vigil-warning) 35%, var(--vigil-border)); background: var(--vigil-warning-dim); color: var(--vigil-warning); }
+.vg-chip[data-tone="danger"] { border-color: color-mix(in srgb, var(--vigil-danger) 35%, var(--vigil-border)); background: var(--vigil-danger-dim); color: var(--vigil-danger); }
+
+.vg-bar { position: relative; height: 4px; min-width: 60px; background: var(--vigil-surface-alt); }
+.vg-bar > i { position: absolute; inset: 0 auto 0 0; background: var(--vigil-text-dim); }
+.vg-bar[data-tone="good"] > i { background: var(--vigil-good); }
+.vg-bar[data-tone="warning"] > i { background: var(--vigil-warning); }
+.vg-bar[data-tone="danger"] > i { background: var(--vigil-danger); }
+
+.vg-select, .vg-input {
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--vigil-border);
+  border-radius: 0;
+  background: var(--vigil-surface-alt);
+  color: var(--vigil-text);
+  font-size: var(--vigil-font-size-xs);
+}
+.vg-seg { display: inline-flex; border: 1px solid var(--vigil-border); }
+.vg-seg > button { min-height: 26px; padding: 2px 10px; border: 0; border-right: 1px solid var(--vigil-border); background: transparent; color: var(--vigil-text-muted); font-size: var(--vigil-font-size-2xs); cursor: pointer; }
+.vg-seg > button:last-child { border-right: 0; }
+.vg-seg > button[aria-pressed="true"] { background: var(--vigil-primary); color: var(--vigil-primary-text); }

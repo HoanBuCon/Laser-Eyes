@@ -174,7 +174,14 @@ class DemoHUDOverlayRenderer:
         recent_events: List[ClassroomEvent],
         timestamp_ms: float = 0.0,
     ) -> None:
-        """Render seats in clean proctor mode: only highlight seats requiring human attention."""
+        """Clean proctor mode: only the students who need attention, no Seat ROIs.
+
+        Seat polygons are calibration geometry; drawn on every seat they
+        clutter the picture.  Here a flagged or suspicious seat is shown by a
+        box around its student (the seat's current person, or the person at
+        the incident), and quiet seats are not drawn at all.  The debug
+        overlay still shows every ROI.
+        """
         flagged_seats = []
         suspicious_seats = []
         normal_seats = []
@@ -226,30 +233,35 @@ class DemoHUDOverlayRenderer:
                 and (is_occupied or has_active_ep)
             )
 
-            if is_flagged:
-                flagged_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl, incident_evt, profile))
-            elif is_suspicious:
-                suspicious_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl))
+            if is_flagged or is_suspicious:
+                box = self._student_box(occ, incident_evt)
+                if box is not None:
+                    # Anchor labels to the student, not to the ROI
+                    cx = (box[0] + box[2]) // 2
+                    top_y = box[1]
             else:
-                normal_seats.append((seat_id, s_def, poly, cx, cy, top_y, score, short_lbl))
+                box = None
+            if is_flagged:
+                flagged_seats.append((seat_id, s_def, box, cx, cy, top_y, score, short_lbl, incident_evt, profile))
+            elif is_suspicious:
+                suspicious_seats.append((seat_id, s_def, box, cx, cy, top_y, score, short_lbl))
 
-        # PASS 1: Render NORMAL / OBSERVE / EMPTY / QUIET COOLDOWN seats (minimal unobtrusive pill badges)
-        for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl in normal_seats:
-            (tw, th), _ = cv2.getTextSize(short_lbl, cv2.FONT_HERSHEY_SIMPLEX, 0.32, 1)
-            cv2.rectangle(canvas, (cx - tw // 2 - 3, cy - th - 2), (cx + tw // 2 + 3, cy + 2), (15, 15, 15), -1)
-            cv2.putText(canvas, short_lbl, (cx - tw // 2, cy), cv2.FONT_HERSHEY_SIMPLEX, 0.32, (170, 170, 170), 1, cv2.LINE_AA)
+        thick = 2 if canvas.shape[1] < 800 else 3
 
-        # PASS 2: Render SUSPICIOUS seats (Amber border + score badge)
-        for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl in suspicious_seats:
-            cv2.polylines(canvas, [poly], isClosed=True, color=(0, 165, 255), thickness=2, lineType=cv2.LINE_AA)
+        # PASS 1: SUSPICIOUS students (amber box + score badge)
+        for seat_id, s_def, box, cx, cy, top_y, score, short_lbl in suspicious_seats:
+            if box is not None:
+                cv2.rectangle(canvas, (box[0], box[1]), (box[2], box[3]), (0, 165, 255), thick, cv2.LINE_AA)
             badge_txt = f"{short_lbl} ({score:.0f})"
-            (tw, th), _ = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.36, 1)
-            cv2.rectangle(canvas, (cx - tw // 2 - 3, cy - th - 3), (cx + tw // 2 + 3, cy + 3), (20, 20, 20), -1)
-            cv2.putText(canvas, badge_txt, (cx - tw // 2, cy - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.36, (0, 190, 255), 1, cv2.LINE_AA)
+            (tw, th), _ = cv2.getTextSize(badge_txt, cv2.FONT_HERSHEY_SIMPLEX, 0.4, 1)
+            by = max(th + 6, top_y - 4)
+            cv2.rectangle(canvas, (cx - tw // 2 - 4, by - th - 4), (cx + tw // 2 + 4, by + 3), (20, 20, 20), -1)
+            cv2.putText(canvas, badge_txt, (cx - tw // 2, by - 1), cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 190, 255), 1, cv2.LINE_AA)
 
-        # PASS 3: Render FLAGGED seats on top (High-contrast RED border and floating Incident Badge)
-        for seat_id, s_def, poly, cx, cy, top_y, score, short_lbl, incident_evt, profile in flagged_seats:
-            cv2.polylines(canvas, [poly], isClosed=True, color=(30, 30, 235), thickness=2 if canvas.shape[1] < 800 else 3, lineType=cv2.LINE_AA)
+        # PASS 2: FLAGGED students on top (red box + incident card)
+        for seat_id, s_def, box, cx, cy, top_y, score, short_lbl, incident_evt, profile in flagged_seats:
+            if box is not None:
+                cv2.rectangle(canvas, (box[0], box[1]), (box[2], box[3]), (30, 30, 235), thick, cv2.LINE_AA)
 
             # Causal incident reason derived strictly from ClassroomEvent / active_incident
             if incident_evt is not None:
@@ -286,6 +298,17 @@ class DemoHUDOverlayRenderer:
             # Card Header & Subtitle
             cv2.putText(canvas, card_title, (bx1 + 6, by1 + h1 + 3), cv2.FONT_HERSHEY_SIMPLEX, f_title, (60, 80, 255), 1, cv2.LINE_AA)
             cv2.putText(canvas, card_sub, (bx1 + 6, by2 - 3), cv2.FONT_HERSHEY_SIMPLEX, f_sub, (230, 230, 230), 1, cv2.LINE_AA)
+
+    @staticmethod
+    def _student_box(occ: Any, incident_evt: Any) -> Optional[Tuple[int, int, int, int]]:
+        """Box around the seat's student: the current person, else the person at the incident."""
+        det = getattr(occ, "assigned_detection", None) if occ is not None else None
+        bbox = getattr(det, "bbox", None) if det is not None else None
+        if bbox is None and incident_evt is not None:
+            bbox = getattr(incident_evt, "bbox", None)
+        if bbox is None or len(bbox) != 4 or (bbox[2] - bbox[0]) <= 1:
+            return None
+        return tuple(int(v) for v in bbox)
 
     def _render_proctor_roaming(self, canvas: np.ndarray, roaming_detections: List[Detection]) -> None:
         """Render roaming persons subtly in proctor mode."""

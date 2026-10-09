@@ -15,6 +15,7 @@ let currentEventId = null;
 let currentSha256 = '';
 let selectedRoomId = null;
 let currentRoomFilterType = 'ALL';
+let roomCodeById = {};
 let ws = null;
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -94,23 +95,15 @@ function initChart() {
                 data: [],
                 backgroundColor: BEHAVIOR_COLORS,
                 borderWidth: 0,
-                hoverOffset: 6
+                hoverOffset: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#9ca3af',
-                        font: { size: 11, family: 'Inter' },
-                        padding: 10
-                    }
-                }
-            },
-            cutout: '70%'
+            // The legend is drawn next to the chart as compact rows
+            plugins: { legend: { display: false } },
+            cutout: '68%'
         }
     });
 }
@@ -133,18 +126,17 @@ function updateBehaviorChart(counts = {}) {
     const legend = document.getElementById('behaviorLegend');
     if (!legend) return;
     if (!entries.length) {
-        legend.innerHTML = '<div class="text-gray-500">No incidents yet.</div>';
+        legend.innerHTML = '<div class="vg-empty">No incidents yet.</div>';
         return;
     }
     legend.replaceChildren(...entries.map(([name, n], i) => {
         const row = document.createElement('div');
-        row.className = 'flex justify-between gap-2';
+        row.className = 'ops-legend-row';
         const label = document.createElement('span');
         label.textContent = prettyPattern(name);
+        label.title = name;
         label.style.borderLeft = `3px solid ${BEHAVIOR_COLORS[i % BEHAVIOR_COLORS.length]}`;
-        label.style.paddingLeft = '6px';
         const value = document.createElement('span');
-        value.className = 'font-mono text-gray-200';
         value.textContent = n;
         row.append(label, value);
         return row;
@@ -173,6 +165,7 @@ async function loadDashboardData() {
         if (roomsRes.ok) rooms = await roomsRes.json();
         if (rankRes.ok) rankings = await rankRes.json();
 
+        roomCodeById = Object.fromEntries(rooms.map((r) => [r.id, r.room_code || r.name]));
         renderRoomGrid(rooms, rankings);
 
         // Fetch Events List with active filters
@@ -201,68 +194,53 @@ function updateSummaryCounters(stats) {
     setEl('statReviewRateHint', totalEvents > 0 ? `${decided} of ${totalEvents} decided by proctors` : 'no incidents yet');
 }
 
-function renderRoomGrid(rooms, rankings) {
-    const grid = document.getElementById('roomCardsGrid');
-    if (!grid) return;
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
-    if (!rooms || rooms.length === 0) {
-        grid.innerHTML = `<div class="p-6 text-center text-gray-500 col-span-full">No rooms configured in system.</div>`;
-        return;
-    }
+function riskTone(score) {
+    if (score >= 60) return 'danger';
+    if (score >= 25) return 'warning';
+    return 'good';
+}
+
+// One dense row per room, busiest first; clicking a row filters the incident list
+function renderRoomGrid(rooms, rankings) {
+    const body = document.getElementById('roomCardsGrid');
+    if (!body) return;
+    document.querySelectorAll('[data-room-filter]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.roomFilter === currentRoomFilterType));
+    });
 
     const rankMap = {};
     rankings.forEach(r => { rankMap[r.room_id] = r; });
+    let displayRooms = (rooms || []).map((room) => ({ room, rank: rankMap[room.id] || { risk_score: 0, total_events: 0 } }));
+    if (currentRoomFilterType === 'HIGH_RISK') displayRooms = displayRooms.filter(({ rank }) => rank.risk_score >= 30);
+    if (currentRoomFilterType === 'MONITORED') displayRooms = displayRooms.filter(({ rank }) => rank.total_events > 0);
+    displayRooms.sort((a, b) => b.rank.total_events - a.rank.total_events || b.rank.risk_score - a.rank.risk_score);
 
-    let displayRooms = rooms;
-    if (currentRoomFilterType === 'HIGH_RISK') {
-        displayRooms = rooms.filter(r => (rankMap[r.id]?.risk_score || 0) >= 30);
+    const count = document.getElementById('roomCount');
+    if (count) count.textContent = `${displayRooms.length}/${(rooms || []).length}`;
+    if (!displayRooms.length) {
+        body.innerHTML = '<tr><td colspan="6" class="vg-empty">No rooms match this filter.</td></tr>';
+        return;
     }
-
-    grid.innerHTML = displayRooms.map(room => {
-        const rank = rankMap[room.id] || { risk_score: 0, total_events: 0 };
-        const isSelected = selectedRoomId === room.id;
-
-        let riskColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-        let barColor = 'bg-emerald-500';
-        if (rank.risk_score >= 60) {
-            riskColor = 'text-red-400 bg-red-500/20 border-red-500/40 badge-pulse-red';
-            barColor = 'bg-red-500';
-        } else if (rank.risk_score >= 25) {
-            riskColor = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-            barColor = 'bg-amber-500';
-        }
-
-        const borderStyle = isSelected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-gray-800 hover:border-gray-700';
-
+    body.innerHTML = displayRooms.map(({ room, rank }) => {
+        const tone = riskTone(rank.risk_score);
+        const selected = selectedRoomId === room.id;
         return `
-        <div onclick="selectRoom('${room.id}', '${room.name}')" class="room-card p-4 rounded-xl bg-gray-900/80 border ${borderStyle} cursor-pointer transition flex flex-col justify-between" aria-current="${isSelected}">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-mono font-bold text-gray-400 uppercase">${room.room_code || 'ROOM'}</span>
-                    <span class="text-xs px-2 py-0.5 rounded-full border font-bold font-mono ${riskColor}">
-                        Score ${rank.risk_score}
-                    </span>
-                </div>
-                <h3 class="font-bold text-sm text-white mt-1">${room.name}</h3>
-                <p class="text-xs text-gray-400 font-mono mt-0.5">Capacity: ${room.capacity_seats || 24} seats</p>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-gray-800/80">
-                <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
-                    <span>Risk Level</span>
-                    <span class="font-mono text-gray-200">${rank.risk_score}/100</span>
-                </div>
-                <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                    <div class="${barColor} h-1.5 rounded-full transition-all duration-500" style="width: ${Math.min(100, rank.risk_score)}%"></div>
-                </div>
-                <div class="flex items-center justify-between text-[11px] text-gray-500 mt-2">
-                    <span>Events: <strong class="text-gray-300 font-mono">${rank.total_events}</strong></span>
-                    <span class="${isSelected ? 'text-cyan-400 font-semibold' : 'text-gray-400'}">${isSelected ? 'Filtering Feed' : 'Click to filter'}</span>
-                </div>
-            </div>
-        </div>
-        `;
+        <tr aria-selected="${selected}" data-room-id="${escapeHtml(room.id)}" data-room-name="${escapeHtml(room.name)}" title="${selected ? 'Click to clear the filter' : 'Click to filter incidents'}">
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(room.room_code || 'ROOM')}</td>
+            <td>${escapeHtml(room.name)}</td>
+            <td class="num">${room.capacity ?? '—'}</td>
+            <td class="num strong">${rank.total_events}</td>
+            <td><div class="vg-bar" data-tone="${tone}"><i style="width:${Math.min(100, rank.risk_score)}%"></i></div></td>
+            <td class="num"><span class="vg-chip" data-tone="${rank.total_events ? tone : ''}">${rank.risk_score}</span></td>
+        </tr>`;
     }).join('');
+    body.querySelectorAll('tr[data-room-id]').forEach((row) => {
+        row.addEventListener('click', () => selectRoom(row.dataset.roomId, row.dataset.roomName));
+    });
 }
 
 function filterRooms(type) {
@@ -312,64 +290,39 @@ function applyEventFilters() {
     loadEvents();
 }
 
+const SEVERITY_TONE = { HIGH: 'danger', MEDIUM: 'warning', LOW: '' };
+const REVIEW_TONE = { CONFIRMED: 'danger', REJECTED: 'good', INCONCLUSIVE: 'warning', PENDING: '' };
+
 function renderEventFeed(events) {
     const feed = document.getElementById('eventsFeed');
     if (!feed) return;
 
     if (!events || events.length === 0) {
-        feed.innerHTML = `<div class="p-8 text-center text-gray-500">No detection events match the current filter.</div>`;
+        feed.innerHTML = '<tr><td colspan="8" class="vg-empty">No incidents match the current filter.</td></tr>';
         return;
     }
 
     feed.innerHTML = events.map(ev => {
-        let badgeCls = 'text-gray-400 bg-gray-500/10 border-gray-500/30';
-        if (ev.severity === 'HIGH') {
-            badgeCls = 'text-red-400 bg-red-500/20 border-red-500/40';
-        } else if (ev.severity === 'MEDIUM') {
-            badgeCls = 'text-amber-400 bg-amber-500/20 border-amber-500/40';
-        }
-
-        let reviewBadgeCls = 'text-gray-400 bg-gray-800';
-        if (ev.review_status === 'CONFIRMED') {
-            reviewBadgeCls = 'text-red-400 bg-red-500/10 border border-red-500/30';
-        } else if (ev.review_status === 'REJECTED') {
-            reviewBadgeCls = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
-        } else if (ev.review_status === 'INCONCLUSIVE') {
-            reviewBadgeCls = 'text-amber-400 bg-amber-500/10 border border-amber-500/30';
-        }
-
         const seatLabel = ev.seat_id || `TRACK-#${ev.track_id}`;
-        const shaShort = ev.evidence_hash ? `${ev.evidence_hash.substring(0, 10)}...` : 'N/A';
-
+        const shaShort = ev.evidence_hash ? `${ev.evidence_hash.substring(0, 10)}…` : '—';
+        const when = ev.created_at ? new Date(`${ev.created_at}${/Z|[+-]\d\d:?\d\d$/.test(ev.created_at) ? '' : 'Z'}`) : null;
+        const whenText = when && !Number.isNaN(when.getTime())
+            ? when.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+            : '—';
+        const pattern = ev.primary_pattern || ev.behavior;
+        const args = [ev.id, seatLabel, ev.behavior, ev.confidence_peak, ev.duration_seconds, ev.evidence_hash || '', ev.review_status]
+            .map((v) => `'${escapeHtml(String(v ?? ''))}'`).join(', ');
         return `
-        <div class="review-incident-row p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center font-mono text-xs text-cyan-300 font-bold border border-gray-700">
-                    <span class="text-[9px] text-gray-400">SEAT</span>
-                    <span>${seatLabel.replace('SEAT-', '')}</span>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-sm text-white font-mono">${ev.behavior}</span>
-                        <span class="text-[11px] px-2 py-0.5 rounded border font-bold ${badgeCls}">${ev.severity}</span>
-                        <span class="text-[10px] px-2 py-0.5 rounded font-mono ${reviewBadgeCls}">${ev.review_status}</span>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-3">
-                        <span>Confidence: <strong class="text-gray-200 font-mono">${(ev.confidence_peak * 100).toFixed(0)}%</strong></span>
-                        <span>Duration: <strong class="text-gray-200 font-mono">${ev.duration_seconds}s</strong></span>
-                        <span class="font-mono text-[11px] text-gray-500">SHA: ${shaShort}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2 self-end sm:self-center">
-                <button onclick="openEvidenceModal('${ev.id}', '${seatLabel}', '${ev.behavior}', '${ev.confidence_peak}', '${ev.duration_seconds}', '${ev.evidence_hash || ''}', '${ev.review_status}')" class="vigil-btn vigil-btn--primary vigil-btn--sm px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    Review Evidence
-                </button>
-            </div>
-        </div>
-        `;
+        <tr>
+            <td style="font-family:var(--vigil-font-mono)">${escapeHtml(whenText)}</td>
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(roomCodeById[ev.room_id] || '—')}</td>
+            <td class="strong" title="${escapeHtml(pattern)}">${escapeHtml(prettyPattern(pattern))}</td>
+            <td><span class="vg-chip" data-tone="${SEVERITY_TONE[ev.severity] || ''}">${escapeHtml(ev.severity)}</span></td>
+            <td><span class="vg-chip" data-tone="${REVIEW_TONE[ev.review_status] || ''}">${escapeHtml(ev.review_status)}</span></td>
+            <td class="num">${ev.risk_score ?? Math.round((ev.confidence_peak || 0) * 100)}</td>
+            <td style="font-family:var(--vigil-font-mono);color:var(--vigil-text-dim)">${escapeHtml(shaShort)}</td>
+            <td class="num"><button type="button" class="vigil-btn vigil-btn--sm" onclick="openEvidenceModal(${args})">Evidence</button></td>
+        </tr>`;
     }).join('');
 }
 

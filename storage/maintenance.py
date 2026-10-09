@@ -14,14 +14,18 @@ reviews, bookmarks, episodes and patterns go with it.  Audit-log rows are kept
 from __future__ import annotations
 
 import datetime
+import os
+import re
 import shutil
+import sqlite3
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Dict, Iterable, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
 from storage.db_models import (
+    AuditLog,
     BehaviorEpisodeDB,
     BehaviorPatternDB,
     Camera,
@@ -124,5 +128,134 @@ def backup_sqlite(database_url: str) -> Optional[Path]:
         return None
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     target = source.with_name(f"{source.stem}.backup-{stamp}{source.suffix}")
-    shutil.copy2(source, target)
+    # SQLite's online backup includes pages still in the WAL file (a plain file
+    # copy of a WAL database can miss recent commits).
+    src = sqlite3.connect(str(source))
+    dst = sqlite3.connect(str(target))
+    try:
+        src.backup(dst)
+    finally:
+        dst.close()
+        src.close()
     return target
+
+
+# --- Demo / test maintenance (System page) -----------------------------------
+
+# Matches both separators, also as JSON-escaped "\\" in replay packages
+_RUN_DIR_IN_PATH = re.compile(r"demo_runs[/\\]+([^/\\\"']+)")
+
+
+def directory_size(path: Path) -> Tuple[int, int]:
+    """(bytes, files) under ``path``; a missing directory is empty."""
+    total = files = 0
+    if not Path(path).exists():
+        return 0, 0
+    for root, _dirs, names in os.walk(path):
+        for name in names:
+            try:
+                total += (Path(root) / name).stat().st_size
+                files += 1
+            except OSError:
+                pass
+    return total, files
+
+
+def table_counts(db: Session) -> Dict[str, int]:
+    models = {
+        "rooms": ExamRoom, "seat_rois": SeatROI, "cameras": Camera, "sessions": ExamSession,
+        "incidents": DetectionEvent, "evidence_files": EvidenceFile, "reviews": EventReview,
+        "bookmarks": ProctorBookmark, "episodes": BehaviorEpisodeDB, "patterns": BehaviorPatternDB,
+        "audit_log": AuditLog,
+    }
+    return {name: db.query(model).count() for name, model in models.items()}
+
+
+def referenced_run_ids(db: Session) -> Set[str]:
+    """Run directories that still hold evidence for incidents in the database."""
+    ids: Set[str] = set()
+    for (file_path,) in db.query(EvidenceFile.file_path):
+        match = _RUN_DIR_IN_PATH.search(file_path or "")
+        if match:
+            ids.add(match.group(1))
+    return ids
+
+
+def run_ids_in_files(root: Path, pattern: str = "*.json") -> Set[str]:
+    """Run directories named in files under ``root`` (replay packages point at run evidence)."""
+    ids: Set[str] = set()
+    root = Path(root)
+    if not root.is_dir():
+        return ids
+    for path in root.rglob(pattern):
+        try:
+            ids.update(_RUN_DIR_IN_PATH.findall(path.read_text(encoding="utf-8", errors="ignore")))
+        except OSError:
+            continue
+    return ids
+
+
+def orphan_run_dirs(
+    db: Session, runs_root: Path, active_run_id: str = "", also_keep: Iterable[str] = ()
+) -> List[Path]:
+    """Run directories nothing points to (safe to delete), oldest first."""
+    runs_root = Path(runs_root)
+    if not runs_root.is_dir():
+        return []
+    keep = referenced_run_ids(db) | set(also_keep) | ({active_run_id} if active_run_id else set())
+    dirs = [d for d in runs_root.iterdir() if d.is_dir() and d.name not in keep]
+    return sorted(dirs, key=lambda d: d.stat().st_mtime)
+
+
+def remove_directories(paths: Iterable[Path]) -> int:
+    removed = 0
+    for path in paths:
+        shutil.rmtree(path, ignore_errors=True)
+        if not Path(path).exists():
+            removed += 1
+    return removed
+
+
+def clear_directory(path: Path) -> int:
+    """Delete everything inside ``path`` (the directory itself is kept)."""
+    path = Path(path)
+    if not path.is_dir():
+        return 0
+    removed = 0
+    for child in path.iterdir():
+        if child.is_dir():
+            shutil.rmtree(child, ignore_errors=True)
+        else:
+            try:
+                child.unlink()
+            except OSError:
+                continue
+        removed += 1
+    return removed
+
+
+def reset_incident_data(db: Session) -> Dict[str, int]:
+    """Delete every session and what it produced; rooms, cameras and Seat ROIs stay.
+
+    The audit log is kept.  Run directories on disk become orphans and can be
+    purged afterwards with :func:`orphan_run_dirs`.
+    """
+    counts = {
+        "incidents": db.query(DetectionEvent).count(),
+        "sessions": db.query(ExamSession).count(),
+        "bookmarks": db.query(ProctorBookmark).count(),
+    }
+    try:
+        db.query(EventReview).delete(synchronize_session=False)
+        db.query(EvidenceFile).delete(synchronize_session=False)
+        db.query(DetectionEvent).delete(synchronize_session=False)
+        db.query(ProctorBookmarkReview).delete(synchronize_session=False)
+        db.query(ProctorBookmark).delete(synchronize_session=False)
+        db.query(BehaviorEpisodeDB).delete(synchronize_session=False)
+        db.query(BehaviorPatternDB).delete(synchronize_session=False)
+        db.query(ExamSession).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return counts

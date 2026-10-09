@@ -19,7 +19,7 @@ import numpy as np
 import pytest
 
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer, get_short_seat_label
-from classroom_monitor.models import ClassroomEvent, SeverityLevel
+from classroom_monitor.models import ClassroomEvent, Detection, SeverityLevel
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatOccupancy, SeatState
 from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskProfile, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeType, TemporalEpisode
@@ -39,6 +39,8 @@ def test_setup():
     seat_mgr.occupancies["SEAT-01"] = SeatOccupancy(
         seat=seat_def,
         state=SeatState.OCCUPIED,
+        # the seated student; clean mode boxes the student, not the ROI
+        assigned_detection=Detection(class_id=0, class_name="person", confidence=0.9, bbox=(70, 60, 130, 140)),
     )
     risk_tracker = SeatRiskTracker(
         room_id="ROOM-01",
@@ -358,3 +360,23 @@ def test_ui10_clean_mode_hides_raw_telemetry(test_setup):
         recent_events=[],
     )
     assert rendered is not None
+
+
+def test_clean_mode_boxes_the_student_and_never_draws_seat_rois(test_setup):
+    """Seat ROIs are calibration geometry: only the debug overlay draws them."""
+    rt = test_setup["risk_tracker"]
+    prof = rt.get_or_create_profile("SEAT-01")
+    prof.risk_score = 60.0
+    prof.current_state = RiskState.SUSPICIOUS.value
+
+    def render(debug):
+        return test_setup["renderer"].render_frame(
+            frame=test_setup["frame"], frame_idx=10, timestamp_ms=1000.0, fps=30.0,
+            room_code="ROOM-01", camera_id="CAM-01", seat_mgr=test_setup["seat_mgr"], seat_graph=None,
+            risk_tracker=rt, active_episodes=[], recent_events=[], debug_overlay=debug,
+        )
+
+    clean = render(False)
+    # The ROI's left edge (x=50) stays untouched; the student's box edge (x=70) is drawn
+    assert not np.any(clean[60:140, 50] != 0)
+    assert np.any(np.all(clean[80:120, 70] == [0, 165, 255], axis=-1))

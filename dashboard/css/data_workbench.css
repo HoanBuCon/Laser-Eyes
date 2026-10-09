@@ -184,7 +184,7 @@ body {
 .workbench-content {
   flex: 1;
   padding: 1.5rem;
-  max-width: 1600px;
+  max-width: none;
   width: 100%;
   margin: 0 auto;
 }
@@ -1035,7 +1035,7 @@ body {
   color: var(--vigil-text);
 }
 .workbench-page .workbench-content {
-  max-width: var(--vigil-content-wide);
+  max-width: none;
   padding: var(--vigil-space-5);
 }
 .workbench-page .stat-card, .workbench-page .panel-card, .workbench-page .toolbar {

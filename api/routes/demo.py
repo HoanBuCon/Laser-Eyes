@@ -13,6 +13,7 @@ Endpoints for:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import secrets
 from pathlib import Path
@@ -95,6 +96,67 @@ def list_presets() -> List[Dict[str, Any]]:
             "has_replay_artifacts": has_replay,
         })
     return presets
+
+
+def _known_preset(preset: str) -> str:
+    name = preset.lower().strip()
+    if name not in DEMO_PRESETS:
+        raise HTTPException(status_code=404, detail=f"Unknown preset '{preset}'")
+    return name
+
+
+@router.get("/presets/{preset}/source")
+def preset_source_video(preset: str):
+    """The preset's original camera video (browser-playable H.264), for the video wall."""
+    name = _known_preset(preset)
+    path = Path(DEMO_PRESETS[name].get("video_path", ""))
+    if not path.is_file() or path.suffix.lower() != ".mp4":
+        raise HTTPException(status_code=404, detail="Source video not found")
+    return FileResponse(str(path), media_type="video/mp4")
+
+
+@router.get("/presets/{preset}/incidents")
+def preset_replay_incidents(preset: str) -> Dict[str, Any]:
+    """Incidents of the preset's replay package with the student's box, for overlays.
+
+    ``behavior_start_ms`` is when the behaviour began (shown as suspicious),
+    ``flagged_ms`` when the incident was raised, ``last_seen_ms`` its last
+    occurrence.  Boxes are in source-frame pixels (``frame_size``).
+    """
+    name = _known_preset(preset)
+    events_path = replay_package_dir(name) / "events.json"
+    if not events_path.is_file():
+        return {"preset": name, "available": False, "frame_size": None, "incidents": []}
+    try:
+        raw = json.loads(events_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=f"Replay package unreadable: {exc}") from exc
+    incidents = []
+    frame_size = None
+    for event in raw if isinstance(raw, list) else []:
+        meta = event.get("metadata") if isinstance(event.get("metadata"), dict) else {}
+        focus = meta.get("focus") or {}
+        box = focus.get("person_bbox")
+        if not box and focus.get("seat_polygon"):
+            xs = [p[0] for p in focus["seat_polygon"]]
+            ys = [p[1] for p in focus["seat_polygon"]]
+            box = [min(xs), min(ys), max(xs), max(ys)]
+        if not box:
+            continue
+        frame_size = frame_size or focus.get("frame_size")
+        flagged = float(event.get("first_seen_ms") or event.get("timestamp_ms") or 0.0)
+        incidents.append({
+            "event_id": event.get("event_id"),
+            "seat_code": event.get("seat_code"),
+            "pattern": meta.get("primary_pattern") or event.get("title"),
+            "severity": event.get("severity"),
+            "risk": event.get("peak_risk_score") or meta.get("risk_score"),
+            "behavior_start_ms": float(event.get("behavior_start_ms") or flagged),
+            "flagged_ms": flagged,
+            "last_seen_ms": float(event.get("last_seen_ms") or flagged),
+            "bbox": [float(v) for v in box],
+        })
+    return {"preset": name, "available": True, "frame_size": frame_size, "incidents": incidents}
 
 
 class OverlayRequest(BaseModel):

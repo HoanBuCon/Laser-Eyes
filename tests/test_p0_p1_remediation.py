@@ -499,7 +499,10 @@ def render_setup():
     seat = SeatDefinition(seat_id="SEAT-01", room_id="R", seat_code="SEAT-01", polygon=_square(50, 50))
     mgr = SeatManager(room_id="R")
     mgr.load_seats([seat])
-    mgr.occupancies["SEAT-01"] = SeatOccupancy(seat=seat, state=SeatState.OCCUPIED)
+    mgr.occupancies["SEAT-01"] = SeatOccupancy(
+        seat=seat, state=SeatState.OCCUPIED,
+        assigned_detection=Detection(class_id=0, class_name="person", confidence=0.9, bbox=(70, 60, 130, 140)),
+    )
     tracker = SeatRiskTracker(room_id="R", cooldown_duration_ms=5000.0)
     return mgr, tracker, DemoHUDOverlayRenderer(debug_overlay=False), np.zeros((300, 300, 3), dtype=np.uint8)
 

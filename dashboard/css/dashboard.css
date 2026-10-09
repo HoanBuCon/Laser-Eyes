@@ -82,7 +82,7 @@ body {
 
 /* Local Gaze visual language ------------------------------------------------ */
 .operations-topbar {
-  min-height: 90px;
+  min-height: 64px;
   border-color: var(--vigil-border) !important;
   background: color-mix(in srgb, var(--vigil-bg) 94%, transparent) !important;
 }
@@ -92,7 +92,7 @@ body {
   max-width: var(--vigil-content-max) !important;
 }
 
-.operations-topbar > div { min-height: 90px; height: auto !important; }
+.operations-topbar > div { min-height: 64px; height: auto !important; }
 .operations-topbar > div > div:first-child > div:first-child {
   width: 34px !important;
   height: 34px !important;
@@ -223,12 +223,12 @@ body {
 
 /* Seat calibration workspace ------------------------------------------------ */
 .calibration-topbar {
-  min-height: 90px;
+  min-height: 64px;
   border-color: var(--vigil-border) !important;
   background: color-mix(in srgb, var(--vigil-bg) 94%, transparent) !important;
 }
 .calibration-topbar > div, .calibration-workspace { max-width: var(--vigil-content-max) !important; }
-.calibration-topbar > div { min-height: 90px; height: auto !important; }
+.calibration-topbar > div { min-height: 64px; height: auto !important; }
 .calibration-topbar > div > div:first-child > a {
   width: 34px !important;
   height: 34px !important;
@@ -288,4 +288,24 @@ body {
   .calibration-topbar > div { min-height: 78px; align-items: flex-start !important; gap: var(--vigil-space-3); padding-block: var(--vigil-space-3); }
   .calibration-topbar > div > div:last-child { display: none; }
   .calibration-toolbar, .calibration-toolbar > div { align-items: stretch !important; width: 100%; }
+}
+
+/* Operations (05): dense Local-style layout ---------------------------------- */
+.ops-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: var(--vigil-space-4); align-items: stretch; }
+.ops-scroll { max-height: 320px; }
+.ops-scroll--tall { max-height: calc(100vh - 470px); min-height: 220px; }
+.ops-rooms tbody tr { cursor: pointer; }
+.ops-rooms .vg-bar { width: 100%; max-width: 160px; }
+.ops-pattern-body { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--vigil-space-3); align-items: center; }
+.ops-donut { position: relative; height: 120px; }
+.ops-legend { display: grid; gap: 3px; font-size: var(--vigil-font-size-2xs); }
+.ops-legend-row { display: flex; justify-content: space-between; gap: var(--vigil-space-2); color: var(--vigil-text-muted); }
+.ops-legend-row span:first-child { overflow: hidden; padding-left: 6px; text-overflow: ellipsis; white-space: nowrap; }
+.ops-legend-row span:last-child { color: var(--vigil-text); font-family: var(--vigil-font-mono); }
+.glass-panel { border-radius: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.glass-panel:hover { box-shadow: none; }
+.modal-overlay { backdrop-filter: none; }
+@media (max-width: 1100px) {
+  .ops-grid { grid-template-columns: minmax(0, 1fr); }
+  .ops-scroll--tall { max-height: 520px; }
 }

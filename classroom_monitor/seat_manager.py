@@ -32,6 +32,9 @@ SHOULDER_KEYPOINT_CONF = 0.3
 # Two boxes whose shoulder midpoints are closer than this fraction of the
 # shoulder width are the same person
 DUPLICATE_SHOULDER_RATIO = 0.35
+# A person is matched to a seat by the head only when their box is at most
+# this many times the ROI's height (a seated student, not a standing adult)
+HEAD_FALLBACK_MAX_HEIGHT_RATIO = 2.5
 
 
 class SeatState:
@@ -345,7 +348,23 @@ class SeatManager:
                 self._anchor(det), frame_w=frame_w, frame_h=frame_h
             )
 
-            # Fallback to centroid if the torso anchor did not match
+            # Far rows are often calibrated around the head and shoulders, so
+            # the torso point can fall just below a small ROI: try the head.
+            # A standing adult (teacher) whose head passes a far ROI is not its
+            # student: their box is many times taller than that seat.
+            if not matched_seat_code:
+                head = self._head_point(det)
+                if head is not None:
+                    head_seat = self._best_seat_for_point(
+                        head, frame_w=frame_w, frame_h=frame_h
+                    )
+                    if head_seat is not None:
+                        roi = self.seats[head_seat].polygon_for_frame(frame_w=frame_w, frame_h=frame_h)
+                        roi_height = float(np.ptp(roi[:, 1])) if len(roi) else 0.0
+                        if roi_height > 0 and (y2 - y1) <= HEAD_FALLBACK_MAX_HEIGHT_RATIO * roi_height:
+                            matched_seat_code = head_seat
+
+            # Fallback to centroid if neither anchor matched
             if not matched_seat_code:
                 matched_seat_code = self._best_seat_for_point(
                     centroid, frame_w=frame_w, frame_h=frame_h
@@ -451,6 +470,22 @@ class SeatManager:
             return ((x1 + x2) / 2.0, float(y2) - (y2 - y1) * 0.15)
         x, y, width = shoulders
         return (x, y + 0.5 * max(width, 1.0))
+
+    @staticmethod
+    def _head_point(det: Detection) -> Optional[Tuple[float, float]]:
+        """Centre of the visible face keypoints (nose, eyes, ears) inside the box."""
+        kps = det.keypoints
+        if kps is None or len(kps) < 5 or kps.shape[-1] < 3:
+            return None
+        visible = [kp for kp in kps[:5] if kp[2] >= SHOULDER_KEYPOINT_CONF]
+        if not visible:
+            return None
+        x = float(np.mean([kp[0] for kp in visible]))
+        y = float(np.mean([kp[1] for kp in visible]))
+        x1, y1, x2, y2 = det.bbox
+        if not (x1 <= x <= x2 and y1 <= y <= y2):
+            return None
+        return (x, y)
 
     @classmethod
     def _track_point(cls, det: Detection) -> Tuple[float, float, float]:

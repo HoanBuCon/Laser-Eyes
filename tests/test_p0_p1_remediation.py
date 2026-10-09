@@ -190,6 +190,31 @@ def test_two_boxes_for_one_student_count_as_one_person():
     assert occ.assigned_detection is upper_body
 
 
+def test_far_seat_drawn_around_the_head_still_finds_its_student():
+    mgr = SeatManager(room_id="R")
+    # A back-row ROI covering only the head and shoulders
+    mgr.load_seats([SeatDefinition(seat_id="FAR", room_id="R", seat_code="FAR", polygon=_square(100, 0, 60))])
+    student = _posed((110, 10, 150, 140), ((115, 55), (145, 55)))
+    student.keypoints[0] = [130, 30, 0.9]   # nose
+    student.keypoints[1] = [126, 26, 0.9]   # eyes
+    student.keypoints[2] = [134, 26, 0.9]
+    # The torso point (below the shoulders) lies under the ROI
+    assert SeatManager._anchor(student)[1] > 60
+    mapped, unmapped = mgr.map_detections_to_seats([student], 0.0)
+    assert mapped["FAR"] is student
+    assert unmapped == []
+
+    # A standing teacher whose head passes through the same ROI is not its student
+    mgr2 = SeatManager(room_id="R")
+    mgr2.load_seats([SeatDefinition(seat_id="FAR", room_id="R", seat_code="FAR", polygon=_square(100, 0, 60))])
+    teacher = _posed((100, 10, 160, 400), ((112, 70), (148, 70)))
+    teacher.keypoints[0] = [130, 30, 0.9]
+    teacher.keypoints[1] = [126, 26, 0.9]
+    mapped, unmapped = mgr2.map_detections_to_seats([teacher], 0.0)
+    assert mapped["FAR"] is None
+    assert unmapped == [teacher]
+
+
 def test_box_stretching_over_the_next_row_stays_in_its_own_seat():
     mgr = SeatManager(room_id="R")
     mgr.load_seats([

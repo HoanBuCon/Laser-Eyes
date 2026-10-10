@@ -255,7 +255,16 @@ body {
   border-radius: var(--vigil-radius-sm) !important;
   box-shadow: none !important;
 }
-.calibration-toolbar button, .calibration-toolbar label { min-height: 34px; }
+/* Only controls get the 34px height; the small captions above the selects keep
+   their natural height so every control in the row shares one baseline. */
+.calibration-toolbar button, .calibration-toolbar label.vigil-btn { min-height: 34px; }
+.calibration-toolbar label.block { min-height: 0; line-height: 1.2; }
+.calibration-toolbar,
+.calibration-toolbar > div,
+.calibration-toolbar > div > div { align-items: flex-end !important; }
+.calibration-toolbar > div > div > label.block + select,
+.calibration-toolbar select { display: block; }
+.calibration-toolbar .pt-4 { padding-top: 0 !important; }
 #btnModeSelect[aria-pressed="true"], #btnModeDraw[aria-pressed="true"] {
   border-color: var(--vigil-primary) !important;
   background: var(--vigil-primary) !important;
@@ -309,3 +318,8 @@ body {
   .ops-grid { grid-template-columns: minmax(0, 1fr); }
   .ops-scroll--tall { max-height: 520px; }
 }
+.ops-kpi-link { color: inherit; text-decoration: none; }
+.ops-kpi-link:hover { background: var(--vigil-surface-alt); }
+.ops-priority { display: flex; align-items: center; gap: var(--vigil-space-2); }
+.ops-priority span { min-width: 2ch; color: var(--vigil-text-muted); font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-2xs); }
+#eventsFeed tr, #roomCardsGrid tr { cursor: pointer; }

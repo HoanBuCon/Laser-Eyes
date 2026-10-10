@@ -12,7 +12,7 @@ const PAGE_SIZE = 50;
 const REVIEWER_KEY = 'vigil.reviewer';
 
 const state = {
-    filters: { status: 'PENDING', room: '', pattern: '', severity: '', source: 'ALL', sort: 'newest' },
+    filters: { status: 'PENDING', room: '', pattern: '', severity: '', source: 'ALL', sort: 'newest', session_id: '' },
     items: [],
     total: 0,
     offset: 0,
@@ -45,7 +45,7 @@ function prettyName(raw) {
     return String(raw).replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (l) => l.toUpperCase());
 }
 
-// "SEAT-ROOM-CHINA-03-15" -> "S15"
+// "SEAT-CLASSROOM-03-15" -> "S15"
 function seatShort(ref) {
     const digits = String(ref || '').match(/(\d+)(?!.*\d)/);
     return digits ? `S${digits[1].padStart(2, '0')}` : (ref ? String(ref).slice(0, 6) : '—');
@@ -151,7 +151,7 @@ async function loadQueue(reset) {
         limit: String(PAGE_SIZE),
         offset: String(state.offset),
     });
-    for (const key of ['room', 'pattern', 'severity']) {
+    for (const key of ['room', 'pattern', 'severity', 'session_id']) {
         if (state.filters[key]) params.set(key, state.filters[key]);
     }
     try {
@@ -168,6 +168,7 @@ async function loadQueue(reset) {
         fillSelect($('filterPattern'), (data.facets?.patterns || []).map((p) => ({ value: p.name, label: `${prettyName(p.name)} · ${p.count}` })), state.filters.pattern, 'All behaviours');
         showError(null);
         renderList();
+        if (state.openId && await openLinkedItem()) return;
         // Keep the open incident if it is still listed, otherwise open the first
         if (!state.items.some((item) => itemId(item) === state.selectedId)) {
             selectItem(state.items.length ? itemId(state.items[0]) : null);
@@ -177,6 +178,31 @@ async function loadQueue(reset) {
     } finally {
         state.loading = false;
     }
+}
+
+// Other pages (Operations, Playback) link here with ?open=AI:<event_id>.  The
+// incident is opened even when it is not on the first page or outside the
+// current filter; the link parameter is then dropped from the URL.
+async function openLinkedItem() {
+    const wanted = state.openId;
+    state.openId = null;
+    const params = new URLSearchParams(window.location.search);
+    params.delete('open');
+    const query = params.toString();
+    history.replaceState(null, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    if (!state.items.some((item) => itemId(item) === wanted) && wanted.startsWith('AI:')) {
+        try {
+            const res = await apiFetch(`/api/v1/proctor/review-queue?status=ALL&event_id=${encodeURIComponent(wanted.slice(3))}&limit=1`);
+            const data = res.ok ? await res.json() : { items: [] };
+            if (!data.items.length) return false;
+            state.items.unshift(data.items[0]);
+            renderList();
+        } catch (err) {
+            return false;
+        }
+    }
+    selectItem(wanted);
+    return true;
 }
 
 function renderList() {
@@ -230,6 +256,12 @@ function renderList() {
         status.className = 'queue-status';
         status.dataset.status = row.dataset.status;
         status.textContent = { PENDING: 'Pending', CONFIRMED: 'Confirmed', REJECTED: 'Rejected', INCONCLUSIVE: 'Unsure' }[row.dataset.status] || row.dataset.status;
+        if (item.session_closed) {
+            // Left undecided when the session's report was approved
+            row.dataset.closed = 'true';
+            if (row.dataset.status === 'PENDING') status.textContent = 'Closed';
+            row.title = 'Session closed: read-only';
+        }
         side.append(status);
 
         row.append(seat, main, side);
@@ -307,6 +339,13 @@ function renderDetail(item) {
     $('dNotes').value = item.review_note && !/^Occurrence x\d+$/.test(item.review_note) ? item.review_note : '';
     updateDecisionButtons();
     $('decisionMessage').textContent = '';
+
+    // A closed session's decisions are frozen with its approved report
+    const locked = Boolean(item.session_closed);
+    $('closedNotice').classList.toggle('hidden', !locked);
+    $('closedReportLink').href = `/reports?session=${encodeURIComponent(item.session_id || '')}`;
+    $('decisionForm').classList.toggle('is-locked', locked);
+    $('decisionForm').querySelectorAll('button, select, textarea, input').forEach((el) => { el.disabled = locked || (el.id === 'btnSubmit' && !state.decision); });
 }
 
 function renderFocus(item) {
@@ -343,14 +382,20 @@ function updateDecisionButtons() {
     $('btnSubmit').disabled = !state.decision;
 }
 
+function isLocked() {
+    const item = currentItem();
+    return Boolean(item && item.session_closed);
+}
+
 function chooseDecision(decision) {
+    if (isLocked()) return;
     state.decision = decision;
     updateDecisionButtons();
 }
 
 async function submitDecision() {
     const item = currentItem();
-    if (!item || !state.decision) return;
+    if (!item || !state.decision || item.session_closed) return;
     const reviewer = ($('reviewerName').value || '').trim();
     if (!reviewer) {
         $('decisionMessage').textContent = 'Enter your name (top right) first.';
@@ -407,6 +452,7 @@ function showError(message) {
 
 document.addEventListener('DOMContentLoaded', () => {
     readFiltersFromUrl();
+    state.openId = new URLSearchParams(window.location.search).get('open');
     syncFilterControls();
 
     try { $('reviewerName').value = localStorage.getItem(REVIEWER_KEY) || ''; } catch (e) { /* storage blocked */ }

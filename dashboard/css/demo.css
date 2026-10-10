@@ -66,9 +66,10 @@
     display: flex;
     flex-direction: column;
     gap: var(--vigil-space-3);
-    padding-top: var(--vigil-space-4) !important;
-    padding-bottom: var(--vigil-space-6) !important;
+    padding: var(--vigil-space-4) var(--vigil-space-5) var(--vigil-space-6) !important;
 }
+/* Same header as every other page (vg-topbar); the status chips keep their ids */
+#wsBadge .ws-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--vigil-good); }
 .session-toolbar, .viewer-card, .review-panel, .review-dialog, .kpi-strip {
     border: 1px solid var(--vigil-border) !important;
     border-radius: var(--vigil-radius-md) !important;

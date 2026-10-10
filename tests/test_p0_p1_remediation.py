@@ -38,7 +38,7 @@ def _person(x1: int, y1: int, x2: int, y2: int, conf: float = 0.9) -> Detection:
 
 # --- P0-1 -------------------------------------------------------------------
 
-@pytest.mark.parametrize("preset", ["china1", "china2", "china3"])
+@pytest.mark.parametrize("preset", ["classroom-01", "classroom-02", "classroom-03"])
 def test_runs_use_the_seats_saved_from_the_web_calibration(preset, calibrated_demo_rooms):
     seating = build_scene_seating(get_demo_config(preset))
     assert seating.source == "database"

@@ -103,6 +103,24 @@ def init_db(custom_engine=None) -> None:
                         duplicate_event_ids[0],
                     )
 
+            # 3. Exam sessions: exam workflow columns (phase 2)
+            if "exam_sessions" in tables:
+                session_cols = {row[1] for row in conn.execute(text("PRAGMA table_info(exam_sessions)")).fetchall()}
+                for name, ddl in (
+                    ("exam_id", "VARCHAR(36)"),
+                    ("proctor_user_id", "VARCHAR(36)"),
+                    ("scheduled_start", "DATETIME"),
+                    ("scheduled_end", "DATETIME"),
+                    ("run_id", "VARCHAR(100)"),
+                    ("source_preset", "VARCHAR(50)"),
+                    ("closed_at", "DATETIME"),
+                    ("closed_by", "VARCHAR(100)"),
+                    ("close_note", "TEXT"),
+                ):
+                    if name not in session_cols:
+                        conn.execute(text(f"ALTER TABLE exam_sessions ADD COLUMN {name} {ddl}"))
+                conn.commit()
+
             if "evidence_files" in tables:
                 duplicate_evidence = conn.execute(
                     text("SELECT event_id FROM evidence_files GROUP BY event_id HAVING COUNT(*) > 1 LIMIT 1")

@@ -235,10 +235,25 @@ def test_review_service_requires_durable_event_and_writes_audit():
 
 
 @pytest.mark.integration
-def test_favicon_endpoint_is_quiet():
+def test_favicon_endpoint_serves_the_official_logo():
     with TestClient(app) as client:
         response = client.get("/favicon.ico")
-    assert response.status_code == 204
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/x-icon"
+    assert response.content[:4] == bytes([0, 0, 1, 0])  # ICO header
+
+
+def test_every_page_uses_the_official_logo_and_wordmark_font():
+    from pathlib import Path
+
+    for page in Path("dashboard").glob("*.html"):
+        html = page.read_text(encoding="utf-8")
+        assert "/static/assets/brand/favicon.ico" in html, page.name
+        if "vigil-brand" in html:
+            assert ("/static/assets/brand/logo-mark.png" in html or "/static/assets/brand/logo-login.png" in html), page.name
+            assert 'class="vigil-brand-mark"' not in html, page.name
+    css = Path("dashboard/css/vigil-shell.css").read_text(encoding="utf-8")
+    assert '/static/assets/fonts/dmc5.ttf' in css and Path("dashboard/assets/fonts/dmc5.ttf").is_file()
 
 
 def test_cli_and_web_adapters_share_canonical_srs_v2_pipeline():
@@ -580,7 +595,7 @@ def test_reference_upload_rejects_unsafe_or_unsupported_file(monkeypatch, tmp_pa
 
 def test_demo_video_calibration_presets_return_real_video_frames():
     with TestClient(app) as client:
-        for preset in ("china1", "china2", "china3"):
+        for preset in ("classroom-01", "classroom-02", "classroom-03"):
             response = client.get(f"/api/v1/cameras/calibration-presets/{preset}/reference-frame")
             assert response.status_code == 200
             assert response.headers["content-type"] == "image/jpeg"

@@ -9,11 +9,26 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from storage.db_models import AuditLog, DetectionEvent, EventReview
+from storage.db_models import AuditLog, DetectionEvent, EventReview, ExamSession
+
+CLOSED_SESSION_MESSAGE = (
+    "This session is closed: its report was approved. "
+    "Reopen the session on the Reports page to change decisions."
+)
 
 
 class ReviewTargetMissing(LookupError):
     pass
+
+
+class SessionClosed(RuntimeError):
+    """Decisions of a closed session are frozen with its approved report."""
+
+
+def ensure_session_open(db: Session, session_id: Optional[str]) -> None:
+    session = db.get(ExamSession, session_id) if session_id else None
+    if session is not None and session.status == "CLOSED":
+        raise SessionClosed(CLOSED_SESSION_MESSAGE)
 
 
 @dataclass(frozen=True)
@@ -41,6 +56,7 @@ def submit_event_review(db: Session, command: ReviewCommand) -> EventReview:
     )
     if event is None:
         raise ReviewTargetMissing(command.event_id)
+    ensure_session_open(db, event.session_id)
 
     review = db.query(EventReview).filter(EventReview.event_id == event.id).first()
     if review is None:

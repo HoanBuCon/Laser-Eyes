@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Reports</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom reports-page">
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item is-active" aria-current="page"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">06 · Reports</span>
+            <h1 class="vg-title">Reports</h1>
+            <span class="vg-subtitle">Only incidents a proctor confirmed are recorded as violations. The AI flag is supporting evidence, not a verdict.</span>
+        </div>
+        <div class="vg-actions">
+            <div class="vg-seg" role="group" aria-label="Report">
+                <button type="button" data-tab="session" aria-pressed="true">Session report</button>
+                <button type="button" data-tab="exam" aria-pressed="false">Exam summary</button>
+                <button type="button" data-tab="quality" aria-pressed="false">AI quality</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="vg-page">
+        <!-- Session report -->
+        <section data-pane="session" class="rp-pane">
+            <div class="rp-toolbar">
+                <select id="rpSession" class="vg-select pb-session" aria-label="Session"></select>
+                <select id="rpVersion" class="vg-select" aria-label="Version"><option value="">Live (not approved)</option></select>
+                <span class="p2-grow"></span>
+                <a id="rpPrint" class="vigil-btn vigil-btn--sm" target="_blank">Print / PDF</a>
+                <a id="rpCsv" class="vigil-btn vigil-btn--sm">Incidents CSV</a>
+                <a id="rpPlayback" class="vigil-btn vigil-btn--sm vigil-btn--ghost">Playback</a>
+                <button type="button" id="rpApprove" class="vigil-btn vigil-btn--sm vigil-btn--primary">Approve &amp; close…</button>
+                <button type="button" id="rpReopen" class="vigil-btn vigil-btn--sm vigil-btn--warning" hidden>Reopen session…</button>
+            </div>
+            <div id="rpFrozen" class="vg-notice" hidden></div>
+            <section class="vg-kpis" id="rpKpis"></section>
+            <div class="p2-split rp-split">
+                <section class="vg-panel">
+                    <div class="vg-panel-head"><h2>Session</h2></div>
+                    <table class="vg-table"><tbody id="rpFacts"></tbody></table>
+                </section>
+                <section class="vg-panel">
+                    <div class="vg-panel-head"><h2>By behaviour pattern</h2><span class="vg-label">review decisions</span></div>
+                    <table class="vg-table">
+                        <thead><tr><th>Pattern</th><th class="num">Pending</th><th class="num">Confirmed</th><th class="num">Rejected</th><th class="num">Inconclusive</th></tr></thead>
+                        <tbody id="rpPatterns"></tbody>
+                    </table>
+                </section>
+            </div>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Recorded violations (confirmed by a proctor)</h2><span id="rpConfirmedCount" class="vg-label"></span></div>
+                <div id="rpConfirmed" class="rp-confirmed"></div>
+            </section>
+        </section>
+
+        <!-- Exam summary -->
+        <section data-pane="exam" class="rp-pane" hidden>
+            <div class="rp-toolbar"><select id="rpExam" class="vg-select pb-session" aria-label="Exam"></select></div>
+            <section class="vg-kpis" id="exKpis"></section>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Sessions</h2></div>
+                <table class="vg-table">
+                    <thead><tr><th>Session</th><th>Room</th><th>Status</th><th class="num">Incidents</th><th class="num">Pending</th><th class="num">Confirmed</th><th class="num">Rejected</th><th>Report</th></tr></thead>
+                    <tbody id="exRows"></tbody>
+                </table>
+            </section>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Decisions by pattern in this exam</h2></div>
+                <table class="vg-table"><thead id="exQualityHead"></thead><tbody id="exQuality"></tbody></table>
+            </section>
+        </section>
+
+        <!-- AI quality -->
+        <section data-pane="quality" class="rp-pane" hidden>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>How proctors decided, per pattern</h2><span class="vg-label">precision = confirmed ÷ (confirmed + rejected), all sessions</span></div>
+                <table class="vg-table"><thead id="qHead"></thead><tbody id="qRows"></tbody></table>
+            </section>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Recently rejected (candidates for relabelling)</h2></div>
+                <table class="vg-table">
+                    <thead><tr><th>When</th><th>Pattern</th><th class="num">Risk</th><th>Reason</th><th></th></tr></thead>
+                    <tbody id="qRejected"></tbody>
+                </table>
+            </section>
+        </section>
+    </main>
+
+    <dialog id="approveDialog" class="p2-dialog">
+        <form id="approveForm" method="dialog">
+            <div class="vg-panel-head"><h2>Approve report and close the session</h2></div>
+            <div class="vg-panel-body vg-form">
+                <p id="approveText" class="vg-subtitle"></p>
+                <label class="vg-field"><span class="vg-label">Note (required while incidents are pending)</span><textarea id="approveNote" class="vg-input" rows="3"></textarea></label>
+                <p class="vg-error" hidden></p>
+            </div>
+            <div class="p2-dialog-foot"><button type="button" class="vigil-btn vigil-btn--sm" data-close>Cancel</button><button type="submit" class="vigil-btn vigil-btn--sm vigil-btn--primary">Approve</button></div>
+        </form>
+    </dialog>
+
+    <dialog id="reopenDialog" class="p2-dialog">
+        <form id="reopenForm" method="dialog">
+            <div class="vg-panel-head"><h2>Reopen the session</h2></div>
+            <div class="vg-panel-body vg-form">
+                <p class="vg-subtitle">Proctors can then change decisions again. Approved versions stay as they are; approving again creates the next version. Recorded in the audit log.</p>
+                <label class="vg-field"><span class="vg-label">Reason (required)</span><textarea id="reopenReason" class="vg-input" rows="3" placeholder="e.g. Appeal from candidate no. … about seat S07"></textarea></label>
+                <p class="vg-error" hidden></p>
+            </div>
+            <div class="p2-dialog-foot"><button type="button" class="vigil-btn vigil-btn--sm" data-close>Cancel</button><button type="submit" class="vigil-btn vigil-btn--sm vigil-btn--warning">Reopen</button></div>
+        </form>
+    </dialog>
+
+    <script src="/static/js/p2-common.js"></script>
+    <script src="/static/js/reports.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

@@ -179,3 +179,9 @@ kbd {
     .evidence-grid { grid-template-columns: minmax(0, 1fr); }
     .classroom-topbar > div { flex-direction: column; align-items: flex-start; }
 }
+
+/* Closed session: decisions are frozen with the approved report */
+.closed-notice { margin: 0 0 var(--vigil-space-2); padding: var(--vigil-space-2) var(--vigil-space-3); border: 1px solid var(--vigil-border); border-left: 2px solid var(--vigil-info); background: var(--vigil-surface-alt); color: var(--vigil-text-muted); font-size: var(--vigil-font-size-xs); }
+.closed-notice a { color: var(--vigil-text); }
+.decision-form.is-locked { opacity: .5; }
+.queue-row[data-closed="true"] { opacity: .6; }

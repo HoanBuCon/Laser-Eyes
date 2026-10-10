@@ -17,7 +17,8 @@ import sys
 
 import uvicorn
 
-from storage.database import SessionLocal, init_db
+from storage.database import DATABASE_URL, SessionLocal, init_db
+from storage.demo_rename import migrate_demo_names
 from storage.db_models import Camera, ExamRoom, ExamSession, ExamSite
 
 logging.basicConfig(
@@ -96,6 +97,8 @@ def seed_initial_demo_data() -> None:
     """Pre-populate sample campus and classroom records if database is fresh."""
     db = SessionLocal()
     try:
+        # Must precede ensure_calibration_sources (see storage.demo_rename)
+        migrate_demo_names(db, DATABASE_URL)
         site_count = db.query(ExamSite).count()
         if site_count == 0:
             logger.info("Database is empty. Populating default demonstration sites & rooms...")

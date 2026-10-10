@@ -330,10 +330,10 @@ def test_competition_calibration_sources_are_seeded_idempotently(db_session):
 
     # One calibration room + camera per demo video, created once
     for n in (1, 2, 3):
-        room = db_session.query(ExamRoom).filter_by(room_code=f"ROOM-CHINA-0{n}").one()
+        room = db_session.query(ExamRoom).filter_by(room_code=f"CLASSROOM-0{n}").one()
         camera = db_session.query(Camera).filter_by(
-            room_id=room.id, name=f"VIGIL China Classroom {n} Video"
+            room_id=room.id, name=f"VIGIL Classroom 0{n} Video"
         ).one()
-        assert camera.source_uri == f"demo_video/china{n}_classroom.mp4"
+        assert camera.source_uri == f"demo_video/classroom-0{n}.mp4"
 
 

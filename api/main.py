@@ -18,13 +18,17 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
 from api.routes import (
     admin,
+    auth as auth_routes,
+    exams,
+    reports,
     cameras,
     data_workbench,
     demo,
@@ -38,7 +42,9 @@ from api.routes import (
     statistics,
     workers,
 )
-from storage.database import SessionLocal, init_db
+from api.auth import COOKIE_NAME, auth_mode
+from storage.auth_service import user_for_token
+from storage.database import SessionLocal, get_db, init_db
 from storage.session_lifecycle import close_interrupted_sessions
 
 logging.basicConfig(
@@ -94,7 +100,10 @@ app = FastAPI(
 
 @app.get("/favicon.ico", include_in_schema=False)
 def favicon():
-    """Silence browser default favicon requests."""
+    """The VIGIL AI logo for browsers that ask for /favicon.ico directly."""
+    icon = Path("dashboard/assets/brand/favicon.ico")
+    if icon.is_file():
+        return FileResponse(str(icon), media_type="image/x-icon")
     return Response(status_code=204)
 
 
@@ -114,6 +123,40 @@ async def protect_network_demo(request: Request, call_next):
         if not supplied or not secrets.compare_digest(supplied, token):
             return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
     return await call_next(request)
+
+
+@app.middleware("http")
+async def revalidate_dashboard_files(request: Request, call_next):
+    """Pages, CSS and JS change with every release: the browser must check its
+    copy (ETag, a cheap 304) instead of reusing a stale one for hours."""
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if request.url.path.startswith("/static/") or content_type.startswith("text/html"):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
+
+
+_OPEN_PATHS = ("/login", "/static/", "/api/v1/auth/", "/health", "/ready", "/api/v1/health", "/api/v1/ready", "/favicon.ico")
+
+
+@app.middleware("http")
+async def require_sign_in(request: Request, call_next):
+    """With VIGIL_AUTH_MODE=required, every page and API needs a signed-in user."""
+    path = request.url.path
+    if auth_mode() != "required" or path.startswith(_OPEN_PATHS):
+        return await call_next(request)
+    provider = request.app.dependency_overrides.get(get_db, get_db)
+    db_gen = provider()
+    db = next(db_gen)
+    try:
+        user = user_for_token(db, request.cookies.get(COOKIE_NAME))
+    finally:
+        db_gen.close()
+    if user is not None:
+        return await call_next(request)
+    if path.startswith("/api/") or path.startswith("/ws"):
+        return JSONResponse(status_code=401, content={"detail": "Sign in to continue."})
+    return RedirectResponse(url=f"/login?next={quote(path)}", status_code=303)
 
 
 # Dashboard origins are explicit. Credentials are not needed by this prototype.
@@ -143,6 +186,9 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(proctor.router, prefix=prefix)
     app.include_router(data_workbench.router, prefix=prefix)
     app.include_router(admin.router, prefix=prefix)
+    app.include_router(auth_routes.router, prefix=prefix)
+    app.include_router(exams.router, prefix=prefix)
+    app.include_router(reports.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
@@ -223,6 +269,24 @@ if dashboard_dir.exists():
         if admin_file.exists():
             return FileResponse(str(admin_file))
         return {"message": "System page admin.html not found, please visit /docs"}
+
+    def _page(name: str):
+        def serve():
+            page = dashboard_dir / name
+            if page.exists():
+                return FileResponse(str(page))
+            return {"message": f"{name} not found, please visit /docs"}
+        return serve
+
+    for route, page in (
+        ("/login", "login.html"),
+        ("/sessions", "sessions.html"),
+        ("/playback", "playback.html"),
+        ("/reports", "reports.html"),
+        ("/reports/print", "report-print.html"),
+        ("/users", "users.html"),
+    ):
+        app.add_api_route(route, _page(page), methods=["GET"], tags=["Dashboard"], include_in_schema=False)
 
     @app.get("/calibration", tags=["Dashboard"])
     def serve_calibration_tool():

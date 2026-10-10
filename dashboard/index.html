@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIGIL AI — Classroom Observation & Human Review</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -33,25 +36,29 @@
 
     <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
         <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
-            <span class="vigil-brand-mark">V</span>
-            <span class="vigil-brand-copy">
-                <strong>VIGIL AI</strong>
-                <small>CLASSROOM COPILOT</small>
-            </span>
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
         </a>
-
-        <div class="vigil-nav-label">WORKSPACE</div>
+        <div class="vigil-nav-label">MONITOR</div>
         <nav class="vigil-nav">
-            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
-            <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
-            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
-            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
-            <a href="/" class="vigil-nav-item is-active"><span>05</span><strong>Operations</strong></a>
-            <a href="/wall" class="vigil-nav-item"><span>06</span><strong>Video wall</strong></a>
-            <a href="/admin" class="vigil-nav-item"><span>07</span><strong>System</strong></a>
+            <a href="/" class="vigil-nav-item is-active" aria-current="page"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
             <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
-
+        <div class="vigil-user" data-user-slot></div>
         <div class="vigil-sidebar-note">
             <span class="vigil-sidebar-note-dot"></span>
             <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
@@ -60,7 +67,7 @@
 
     <header class="vg-topbar">
         <div class="vg-topbar-title">
-            <span class="vg-eyebrow">05 · Operations</span>
+            <span class="vg-eyebrow">01 · Operations</span>
             <h1 class="vg-title">Operations</h1>
             <span class="vg-subtitle">Rooms, incident volume and review progress across every session</span>
         </div>
@@ -84,11 +91,11 @@
                 <span id="statTotalEvents" class="vg-kpi-value">0</span>
                 <span class="vg-kpi-hint">recorded episodes</span>
             </div>
-            <div class="vg-kpi" data-tone="danger">
-                <span class="vg-label">High severity</span>
-                <span id="statHighSeverity" class="vg-kpi-value">0</span>
-                <span id="statPendingHint" class="vg-kpi-hint">pending review</span>
-            </div>
+            <a class="vg-kpi ops-kpi-link" data-tone="warning" href="/review" title="Open the review queue">
+                <span class="vg-label">Pending review</span>
+                <span id="statPending" class="vg-kpi-value">0</span>
+                <span id="statPendingHint" class="vg-kpi-hint">waiting for a proctor decision</span>
+            </a>
             <div class="vg-kpi">
                 <span class="vg-label">Human review rate</span>
                 <span id="statReviewRate" class="vg-kpi-value">0%</span>
@@ -103,13 +110,13 @@
                     <div class="vg-seg" role="group" aria-label="Room filter">
                         <button type="button" data-room-filter="ALL" aria-pressed="true" onclick="filterRooms('ALL')">All</button>
                         <button type="button" data-room-filter="MONITORED" aria-pressed="false" onclick="filterRooms('MONITORED')">With incidents</button>
-                        <button type="button" data-room-filter="HIGH_RISK" aria-pressed="false" onclick="filterRooms('HIGH_RISK')">High risk</button>
+                        <button type="button" data-room-filter="NEEDS_REVIEW" aria-pressed="false" onclick="filterRooms('NEEDS_REVIEW')">Needs review</button>
                     </div>
                 </div>
                 <div class="vg-scroll ops-scroll">
                     <table class="vg-table">
-                        <thead><tr><th>Room</th><th>Name</th><th class="num">Seats</th><th class="num">Incidents</th><th>Risk</th><th class="num">Score</th></tr></thead>
-                        <tbody id="roomCardsGrid"><tr><td colspan="6" class="vg-empty">Loading rooms…</td></tr></tbody>
+                        <thead><tr><th>Room</th><th>Name</th><th class="num">Incidents</th><th class="num">Pending</th><th class="num">Confirmed</th><th class="num">Rejected</th><th title="Highest priority among the room's pending incidents">Open priority</th><th></th></tr></thead>
+                        <tbody id="roomCardsGrid"><tr><td colspan="8" class="vg-empty">Loading rooms…</td></tr></tbody>
                     </table>
                 </div>
             </section>
@@ -125,7 +132,7 @@
 
         <section class="vg-panel">
             <div class="vg-panel-head">
-                <h2>Latest incidents <span id="selectedRoomFilterBadge" class="vg-chip hidden"></span></h2>
+                <h2>Latest incidents <span class="vg-label">decisions are made in the review queue</span></h2>
                 <div class="vg-actions">
                     <select id="severityFilter" onchange="applyEventFilters()" class="vg-select" aria-label="Severity">
                         <option value="">All severities</option>
@@ -144,103 +151,14 @@
             </div>
             <div class="vg-scroll ops-scroll ops-scroll--tall">
                 <table class="vg-table">
-                    <thead><tr><th>Time</th><th>Room</th><th>Pattern</th><th>Severity</th><th>Review</th><th class="num">Score</th><th>Evidence hash</th><th></th></tr></thead>
+                    <thead><tr><th>Time</th><th>Room</th><th>Pattern</th><th>Severity</th><th>Review</th><th>Decided by</th><th class="num">Score</th><th></th></tr></thead>
                     <tbody id="eventsFeed"><tr><td colspan="8" class="vg-empty">Waiting for incidents…</td></tr></tbody>
                 </table>
             </div>
         </section>
     </main>
 
-    <!-- Comprehensive Evidence & Human-in-the-Loop Review Modal -->
-    <div id="evidenceModal" class="operations-modal fixed inset-0 modal-overlay z-50 hidden items-center justify-center p-4">
-        <div class="operations-dialog bg-gray-900 border border-gray-700 rounded-2xl max-w-4xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between border-b border-gray-800 pb-3">
-                <div>
-                    <h3 id="modalEventTitle" class="font-bold text-lg text-white font-mono flex items-center gap-2">
-                        <span>Evidence Package</span>
-                        <span id="modalSeatBadge" class="text-xs px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"></span>
-                    </h3>
-                    <p id="modalEventSubtitle" class="text-xs text-gray-400 mt-0.5"></p>
-                </div>
-                <button onclick="closeEvidenceModal()" class="vigil-btn vigil-btn--ghost vigil-btn--icon text-gray-400 hover:text-white p-1.5 rounded-lg hover:bg-gray-800 transition">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-
-            <!-- Media Preview Tabs (Snapshot / Video) -->
-            <div class="space-y-3">
-                <div class="flex items-center justify-between">
-                    <div class="flex gap-2">
-                        <button id="btnTabSnapshot" onclick="switchEvidenceTab('snapshot')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold bg-cyan-500 text-white shadow">Peak Snapshot (JPEG)</button>
-                        <button id="btnTabVideo" onclick="switchEvidenceTab('video')" class="vigil-btn vigil-btn--sm px-3 py-1.5 rounded-lg text-xs font-semibold bg-gray-800 text-gray-400 hover:text-white">10s Video Clip (MP4)</button>
-                    </div>
-                    <!-- Integrity Hash Badge -->
-                    <div class="flex items-center gap-2">
-                        <span class="text-[11px] text-gray-400 font-mono">SHA-256:</span>
-                        <code id="modalSha256" class="text-[11px] text-cyan-300 bg-gray-950 px-2 py-1 rounded border border-gray-800 font-mono truncate max-w-[200px]" title="Cryptographic Evidence Hash">N/A</code>
-                        <button onclick="copySha256()" class="vigil-btn vigil-btn--ghost vigil-btn--icon text-xs text-gray-400 hover:text-cyan-400" title="Copy full SHA-256 hash">📋</button>
-                    </div>
-                </div>
-
-                <!-- Snapshot Image Display -->
-                <div id="snapshotViewer" class="rounded-xl overflow-hidden bg-black flex items-center justify-center min-h-[300px] max-h-[460px] border border-gray-800">
-                    <img id="modalEvidenceImg" src="" alt="Evidence Frame" class="object-contain max-h-[440px] w-full">
-                </div>
-
-                <!-- MP4 Video Player Display -->
-                <div id="videoViewer" class="hidden rounded-xl overflow-hidden bg-black flex items-center justify-center min-h-[300px] max-h-[460px] border border-gray-800">
-                    <video id="modalEvidenceVideo" controls class="max-h-[440px] w-full">
-                        <source id="modalVideoSource" src="" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                </div>
-            </div>
-
-            <!-- Human-in-the-Loop Proctor Review Panel -->
-            <div class="pt-3 border-t border-gray-800 bg-gray-950/60 p-4 rounded-xl space-y-3">
-                <div class="flex items-center justify-between">
-                    <h4 class="text-sm font-semibold text-white">Proctor Decision & Verification (Human-in-the-Loop)</h4>
-                    <span id="modalCurrentReviewStatus" class="text-xs px-2.5 py-0.5 rounded font-bold font-mono">PENDING</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-1">Reason Code (Mã lý do)</label>
-                        <select id="reviewReasonCode" class="w-full bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-cyan-500">
-                            <option value="CLEAR_CHEATING">CLEAR_CHEATING — Gian lận rõ ràng (dùng tài liệu/nhìn bài)</option>
-                            <option value="LEGITIMATE_BEHAVIOR">LEGITIMATE_BEHAVIOR — Hành vi hợp lệ (mỏi cổ / nhìn bảng / làm bài)</option>
-                            <option value="OCCLUSION_ERROR">OCCLUSION_ERROR — Che khuất / Giám thị đi ngang qua</option>
-                            <option value="TEACHER_INTERACTION">TEACHER_INTERACTION — Tương tác với giám thị</option>
-                            <option value="CAMERA_GLITCH">CAMERA_GLITCH — Nhiễu khung hình camera</option>
-                            <option value="OTHER">OTHER — Khác</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs text-gray-400 mb-1">Reviewer Note (Ghi chú giám thị)</label>
-                        <input id="reviewNoteInput" type="text" placeholder="Optional audit explanation..." class="w-full bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-2 text-gray-200 focus:outline-none focus:border-cyan-500">
-                    </div>
-                </div>
-                <div class="flex items-center justify-between pt-2">
-                    <div class="text-[11px] text-gray-500">
-                        * In accordance with SRS Section 7: AI never makes final disciplinary decisions.
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <button onclick="submitReviewDecision('REJECTED')" class="vigil-btn px-4 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 transition">
-                            REJECT (Bác bỏ)
-                        </button>
-                        <button onclick="submitReviewDecision('INCONCLUSIVE')" class="vigil-btn vigil-btn--warning px-4 py-2 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-500/40 text-xs font-bold transition">
-                            INCONCLUSIVE (Chưa rõ)
-                        </button>
-                        <button onclick="submitReviewDecision('CONFIRMED')" class="vigil-btn vigil-btn--danger px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition">
-                            CONFIRM (Xác nhận vi phạm)
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- App JavaScript -->
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
 </body>
 </html>

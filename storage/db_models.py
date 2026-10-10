@@ -194,7 +194,18 @@ class ExamSession(Base):
     avg_fps = Column(Float, default=0.0)
     total_events = Column(Integer, default=0)
     risk_score = Column(Integer, default=0)  # 0 to 100
-    status = Column(String(20), default="RUNNING")  # "DRAFT", "READY", "RUNNING", "STOPPING", "COMPLETED", "FAILED"
+    status = Column(String(20), default="RUNNING")  # "DRAFT", "READY", "RUNNING", "STOPPING", "COMPLETED", "FAILED", "CLOSED"
+    # Exam workflow (phase 2): the exam it belongs to, its schedule and proctor,
+    # the analysis run that produced its incidents, and who closed it
+    exam_id = Column(String(36), ForeignKey("exams.id"), nullable=True, index=True)
+    proctor_user_id = Column(String(36), ForeignKey("users.id"), nullable=True)
+    scheduled_start = Column(DateTime, nullable=True)
+    scheduled_end = Column(DateTime, nullable=True)
+    run_id = Column(String(100), nullable=True)
+    source_preset = Column(String(50), nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    closed_by = Column(String(100), nullable=True)
+    close_note = Column(Text, nullable=True)
 
     # Relationships
     room = relationship("ExamRoom", back_populates="sessions")
@@ -569,3 +580,61 @@ class StagedScenarioChecklist(Base):
 
     # Relationships
     session = relationship("StagedRecordingSession", back_populates="scenarios")
+
+
+# ---- Phase 2: people, exams and approved reports ----------------------------
+
+class User(Base):
+    """A person who signs in: proctor, chief proctor or administrator."""
+
+    __tablename__ = "users"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    username = Column(String(64), nullable=False, unique=True, index=True)
+    display_name = Column(String(120), nullable=False)
+    role = Column(String(20), nullable=False, default="PROCTOR")  # "PROCTOR", "CHIEF", "ADMIN"
+    password_hash = Column(String(255), nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_login_at = Column(DateTime, nullable=True)
+
+
+class AuthSession(Base):
+    """A signed-in browser; only the SHA-256 of the cookie token is stored."""
+
+    __tablename__ = "auth_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+
+
+class Exam(Base):
+    """An exam (e.g. "Term 1 2026 – Maths 10") grouping several room sessions."""
+
+    __tablename__ = "exams"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    name = Column(String(255), nullable=False)
+    subject_code = Column(String(50), nullable=True)
+    exam_date = Column(String(10), nullable=True)  # YYYY-MM-DD
+    description = Column(Text, nullable=True)
+    status = Column(String(20), default="ACTIVE")  # "ACTIVE", "ARCHIVED"
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+class SessionReportVersion(Base):
+    """An approved, frozen session report; later edits create a new version."""
+
+    __tablename__ = "session_report_versions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    content_json = Column(Text, nullable=False)
+    content_sha256 = Column(String(64), nullable=False)
+    approved_by = Column(String(100), nullable=False)
+    approved_at = Column(DateTime, default=datetime.datetime.utcnow)

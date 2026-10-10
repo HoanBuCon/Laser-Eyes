@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIGIL AI — System</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
     <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/admin.css">
@@ -13,25 +16,29 @@
 
     <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
         <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
-            <span class="vigil-brand-mark">V</span>
-            <span class="vigil-brand-copy">
-                <strong>VIGIL AI</strong>
-                <small>CLASSROOM COPILOT</small>
-            </span>
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
         </a>
-
-        <div class="vigil-nav-label">WORKSPACE</div>
+        <div class="vigil-nav-label">MONITOR</div>
         <nav class="vigil-nav">
-            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
-            <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
-            <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
-            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
-            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
-            <a href="/wall" class="vigil-nav-item"><span>06</span><strong>Video wall</strong></a>
-            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>07</span><strong>System</strong></a>
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>09</span><strong>System</strong></a>
             <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
-
+        <div class="vigil-user" data-user-slot></div>
         <div class="vigil-sidebar-note">
             <span class="vigil-sidebar-note-dot"></span>
             <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
@@ -40,7 +47,7 @@
 
     <header class="vg-topbar">
         <div class="vg-topbar-title">
-            <span class="vg-eyebrow">07 · System</span>
+            <span class="vg-eyebrow">09 · System</span>
             <h1 class="vg-title">System maintenance</h1>
             <span class="vg-subtitle">Clean up demo and test data. Database actions take a backup first and are written to the audit log.</span>
         </div>
@@ -128,5 +135,6 @@
     </dialog>
 
     <script src="/static/js/admin.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
 </body>
 </html>

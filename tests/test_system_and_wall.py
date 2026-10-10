@@ -49,7 +49,7 @@ def client(db):
 
 
 def _seed(db, run_dir: str):
-    room = ExamRoom(room_code="ROOM-CHINA-01", name="China 1")
+    room = ExamRoom(room_code="CLASSROOM-01", name="Classroom 01")
     db.add(room)
     db.flush()
     db.add(SeatROI(room_id=room.id, seat_code="SEAT-1", polygon_json="[[0,0],[1,0],[1,1]]"))
@@ -68,7 +68,7 @@ def _seed(db, run_dir: str):
 # --- System maintenance ----------------------------------------------------------
 
 def test_destructive_actions_need_the_typed_phrase(client, db):
-    _seed(db, "DEMO-1-china1")
+    _seed(db, "DEMO-1-classroom-01")
     for url in ("/api/v1/admin/reset/incidents", "/api/v1/admin/cleanup/test-rooms",
                 "/api/v1/admin/cleanup/orphan-runs", "/api/v1/admin/cleanup/playback-cache"):
         assert client.post(url, json={"confirm": "yes"}).status_code == 400, url
@@ -76,7 +76,7 @@ def test_destructive_actions_need_the_typed_phrase(client, db):
 
 
 def test_maintenance_is_refused_while_an_analysis_runs(client, db, monkeypatch):
-    _seed(db, "DEMO-1-china1")
+    _seed(db, "DEMO-1-classroom-01")
     monkeypatch.setattr(admin_routes, "_active_run", lambda: {"busy": True, "run_id": "DEMO-9", "state": "RUNNING"})
     res = client.post("/api/v1/admin/reset/incidents", json={"confirm": "RESET ALL"})
     assert res.status_code == 409
@@ -84,7 +84,7 @@ def test_maintenance_is_refused_while_an_analysis_runs(client, db, monkeypatch):
 
 
 def test_reset_keeps_rooms_seats_and_audit_and_records_who_did_it(client, db):
-    _seed(db, "DEMO-1-china1")
+    _seed(db, "DEMO-1-classroom-01")
     res = client.post("/api/v1/admin/reset/incidents", json={"confirm": "reset all", "actor": "Demo Operator"})
     assert res.status_code == 200, res.text
     assert res.json()["incidents"] == 1
@@ -101,28 +101,28 @@ def test_reset_keeps_rooms_seats_and_audit_and_records_who_did_it(client, db):
 def test_orphan_run_purge_keeps_runs_with_incidents_or_replay_clips(client, db):
     runs = Path(os.environ["VIGIL_DEMO_RUNS_ROOT"])
     final = Path(os.environ["VIGIL_DEMO_FINAL_ROOT"])
-    for name in ("DEMO-1-china1", "DEMO-2-china3", "DEMO-3-old"):
+    for name in ("DEMO-1-classroom-01", "DEMO-2-classroom-03", "DEMO-3-old"):
         (runs / name / "evidence").mkdir(parents=True)
         (runs / name / "evidence" / "clip.mp4").write_bytes(b"x" * 10)
-    (final / "china3").mkdir(parents=True)
-    (final / "china3" / "events.json").write_text(
-        json.dumps([{"evidence_clip_path": "data\\demo_runs\\DEMO-2-china3\\evidence\\clip.mp4"}]), encoding="utf-8")
-    _seed(db, "DEMO-1-china1")
+    (final / "classroom-03").mkdir(parents=True)
+    (final / "classroom-03" / "events.json").write_text(
+        json.dumps([{"evidence_clip_path": "data\\demo_runs\\DEMO-2-classroom-03\\evidence\\clip.mp4"}]), encoding="utf-8")
+    _seed(db, "DEMO-1-classroom-01")
 
     overview = client.get("/api/v1/admin/overview").json()
     assert overview["cleanup"]["orphan_runs"]["examples"] == ["DEMO-3-old"]
     res = client.post("/api/v1/admin/cleanup/orphan-runs", json={"confirm": "DELETE"})
     assert res.json()["runs"] == 1
-    assert sorted(p.name for p in runs.iterdir()) == ["DEMO-1-china1", "DEMO-2-china3"]
+    assert sorted(p.name for p in runs.iterdir()) == ["DEMO-1-classroom-01", "DEMO-2-classroom-03"]
 
 
 # --- Video wall --------------------------------------------------------------------
 
 def test_wall_incidents_carry_the_student_box_and_timing(client):
-    final = Path(os.environ["VIGIL_DEMO_FINAL_ROOT"]) / "china3"
+    final = Path(os.environ["VIGIL_DEMO_FINAL_ROOT"]) / "classroom-03"
     final.mkdir(parents=True)
     (final / "events.json").write_text(json.dumps([
-        {"event_id": "a", "seat_code": "SEAT-ROOM-CHINA-03-15", "title": "HEADS_TOGETHER", "severity": "HIGH",
+        {"event_id": "a", "seat_code": "SEAT-CLASSROOM-03-15", "title": "HEADS_TOGETHER", "severity": "HIGH",
          "peak_risk_score": 88, "behavior_start_ms": 1800.0, "first_seen_ms": 5000.0, "last_seen_ms": 9000.0,
          "metadata": {"primary_pattern": "HEADS_TOGETHER",
                       "focus": {"frame_size": [1920, 1080], "person_bbox": [808, 189, 918, 304]}}},
@@ -131,7 +131,7 @@ def test_wall_incidents_carry_the_student_box_and_timing(client):
          "timestamp_ms": 7000.0},
         {"event_id": "c", "metadata": {}},
     ]), encoding="utf-8")
-    data = client.get("/api/v1/demo/presets/china3/incidents").json()
+    data = client.get("/api/v1/demo/presets/classroom-03/incidents").json()
     assert data["available"] is True and data["frame_size"] == [1920, 1080]
     first, second = data["incidents"]
     assert first["bbox"] == [808, 189, 918, 304]

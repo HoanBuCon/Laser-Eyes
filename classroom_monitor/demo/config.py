@@ -2,7 +2,7 @@
 
 Defines:
 - DemoVideoConfig: Dataclass encapsulating single-video run parameters.
-- DEMO_PRESETS: video/room bindings for the demo videos (china1..china3, ROOM-CHINA-01..03).
+- DEMO_PRESETS: video/room bindings for the demo videos (classroom-01..03, rooms CLASSROOM-01..03).
   Seat ROIs are NOT part of a preset: they are drawn on the web calibration page
   and read from the database at run time (see classroom_monitor.demo.seating).
 - Utility functions for path resolution and command-line argument parsing.
@@ -60,19 +60,19 @@ class DemoVideoConfig:
 # This is the only list: add or remove a video here and every interface follows.
 # Seat ROIs are drawn per room on the calibration page; no layout is bundled.
 DEMO_PRESETS: Dict[str, Dict[str, Any]] = {
-    f"china{n}": {
-        "name": f"china{n}",
-        "title": f"China Classroom {n}",
-        "video_path": f"demo_video/china{n}_classroom.mp4",
-        "room_code": f"ROOM-CHINA-0{n}",
-        "camera_id": f"CAM-CHINA-0{n}",
-        "output_dir": f"data/demo_final/china{n}",
+    f"classroom-0{n}": {
+        "name": f"classroom-0{n}",
+        "title": f"Classroom 0{n}",
+        "video_path": f"demo_video/classroom-0{n}.mp4",
+        "room_code": f"CLASSROOM-0{n}",
+        "camera_id": f"CAM-CLASSROOM-0{n}",
+        "output_dir": f"data/demo_final/classroom-0{n}",
         "resolution": "1920x1080",
         "pose_imgsz": 1280,
     }
     for n in (1, 2, 3)
 }
-DEFAULT_PRESET = "china1"
+DEFAULT_PRESET = "classroom-01"
 
 
 def resolve_video_path(video_arg: Union[str, Path], video_dir: str = "demo_video") -> Path:

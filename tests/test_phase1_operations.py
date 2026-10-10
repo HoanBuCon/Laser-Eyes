@@ -122,7 +122,7 @@ def test_sessions_left_running_by_a_previous_server_are_interrupted(db):
 # --- Test-data cleanup --------------------------------------------------------
 
 def test_cleanup_removes_rooms_without_seats_and_keeps_audit_and_demo_rooms(db):
-    real = _room(db, "ROOM-CHINA-01", with_seat=True)
+    real = _room(db, "CLASSROOM-01", with_seat=True)
     junk = _room(db, "ROOM-ab12cd34", with_seat=False)
     demo_without_seats = _room(db, "ROOM-DEMO", with_seat=False)
     db.add(Camera(room_id=junk.id, name="cam"))
@@ -142,7 +142,7 @@ def test_cleanup_removes_rooms_without_seats_and_keeps_audit_and_demo_rooms(db):
     apply_cleanup(db, plan)
 
     codes = {code for (code,) in db.query(ExamRoom.room_code)}
-    assert codes == {"ROOM-CHINA-01", "ROOM-DEMO"}
+    assert codes == {"CLASSROOM-01", "ROOM-DEMO"}
     assert db.query(DetectionEvent).count() == 1
     assert db.query(EvidenceFile).count() == 0
     assert db.query(EventReview).count() == 0
@@ -181,16 +181,16 @@ def test_operations_page_reads_review_progress_and_patterns_from_the_api():
 # --- Review queue ----------------------------------------------------------------
 
 def test_review_queue_covers_every_session_with_filters_and_counts(client, db):
-    china = _room(db, "ROOM-CHINA-03", with_seat=True)
+    room3 = _room(db, "CLASSROOM-03", with_seat=True)
     other = _room(db, "ROOM-OTHER", with_seat=True)
-    old = ExamSession(room_id=china.id, exam_name="yesterday", status="COMPLETED")
+    old = ExamSession(room_id=room3.id, exam_name="yesterday", status="COMPLETED")
     now = ExamSession(room_id=other.id, exam_name="today", status="RUNNING")
     db.add_all([old, now])
     db.flush()
-    _event(db, old, china, 1, pattern="HEADS_TOGETHER", risk=90,
+    _event(db, old, room3, 1, pattern="HEADS_TOGETHER", risk=90,
            meta={"behavior_start_ms": 14200.0, "first_seen_ms": 21400.0, "last_seen_ms": 21400.0,
                  "occurrence_count": 2, "focus": {"frame_size": [1920, 1080], "person_bbox": [1, 2, 3, 4]}})
-    _event(db, old, china, 2, pattern="REPEATED_NEIGHBOR_GLANCE", status="CONFIRMED", risk=70)
+    _event(db, old, room3, 2, pattern="REPEATED_NEIGHBOR_GLANCE", status="CONFIRMED", risk=70)
     _event(db, now, other, 1, pattern="REPEATED_NEIGHBOR_GLANCE", risk=60)
     db.commit()
 
@@ -198,11 +198,11 @@ def test_review_queue_covers_every_session_with_filters_and_counts(client, db):
     # Not tied to the running analysis: the finished session's incident is there
     assert queue["counts"] == {"PENDING": 2, "CONFIRMED": 1, "REJECTED": 0, "INCONCLUSIVE": 0}
     assert queue["total"] == 2
-    assert {item["room_code"] for item in queue["items"]} == {"ROOM-CHINA-03", "ROOM-OTHER"}
+    assert {item["room_code"] for item in queue["items"]} == {"CLASSROOM-03", "ROOM-OTHER"}
 
-    china_only = client.get("/api/v1/proctor/review-queue", params={"room": "ROOM-CHINA-03", "status": "ALL", "sort": "priority"}).json()
-    assert [item["review_priority_score"] for item in china_only["items"]] == [90, 70]
-    first = china_only["items"][0]
+    room3_only = client.get("/api/v1/proctor/review-queue", params={"room": "CLASSROOM-03", "status": "ALL", "sort": "priority"}).json()
+    assert [item["review_priority_score"] for item in room3_only["items"]] == [90, 70]
+    first = room3_only["items"][0]
     assert first["behavior_start_ms"] == 14200.0
     assert first["source_timestamp_ms"] == 21400.0   # no longer 0 in exports
     assert first["occurrence_count"] == 2
@@ -212,7 +212,7 @@ def test_review_queue_covers_every_session_with_filters_and_counts(client, db):
     glances = client.get("/api/v1/proctor/review-queue", params={"pattern": "REPEATED_NEIGHBOR_GLANCE"}).json()
     assert [item["room_code"] for item in glances["items"]] == ["ROOM-OTHER"]
     facets = queue["facets"]
-    assert {r["code"] for r in facets["rooms"]} == {"ROOM-CHINA-03", "ROOM-OTHER"}
+    assert {r["code"] for r in facets["rooms"]} == {"CLASSROOM-03", "ROOM-OTHER"}
     assert facets["patterns"][0]["name"] in ("HEADS_TOGETHER", "REPEATED_NEIGHBOR_GLANCE")
 
 

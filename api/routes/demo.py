@@ -25,6 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
+from api.auth import actor_name, current_user
 from api.realtime import realtime_manager
 from classroom_monitor.demo.paths import demo_final_root, demo_runs_root, replay_package_dir
 from classroom_monitor.demo.config import DEFAULT_PRESET, DEMO_PRESETS, get_demo_config
@@ -34,7 +35,7 @@ from classroom_monitor.async_evidence_writer import compute_file_sha256
 from classroom_monitor.contracts import HashStatus
 from classroom_monitor.evidence_playback import PlaybackUnavailable, ensure_browser_playback
 from storage.db_models import DetectionEvent
-from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
+from storage.review_service import ReviewCommand, ReviewTargetMissing, SessionClosed, submit_event_review
 
 logger = logging.getLogger("DemoRouter")
 router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"])
@@ -315,18 +316,20 @@ def review_demo_event(
     event_id: str,
     payload: HumanReviewRequest,
     db: Session = Depends(get_db),
+    user=Depends(current_user),
 ) -> Dict[str, Any]:
     """Record human proctor decision (CONFIRMED / REJECTED / INCONCLUSIVE) on an incident."""
     decision_clean = payload.decision.upper().strip()
     if decision_clean not in ("CONFIRMED", "REJECTED", "INCONCLUSIVE"):
         raise HTTPException(status_code=400, detail="Decision must be 'CONFIRMED', 'REJECTED', or 'INCONCLUSIVE'")
 
+    reviewer = actor_name(user, payload.reviewer_id)
     try:
         submit_event_review(
             db,
             ReviewCommand(
                 event_id=event_id,
-                reviewer_id=payload.reviewer_id or "Proctor",
+                reviewer_id=reviewer,
                 decision=decision_clean,
                 reason_code=payload.reason_code,
                 note=payload.notes or "",
@@ -337,6 +340,8 @@ def review_demo_event(
             status_code=409,
             detail="Review incident is not durable; decision was not accepted",
         ) from exc
+    except SessionClosed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     runtime = DemoRuntime.get_instance()
     ev_dict = runtime.get_event(event_id)
@@ -345,7 +350,7 @@ def review_demo_event(
         ev_dict["review_decision"] = decision_clean
         ev_dict["decision_reason"] = payload.reason_code
         ev_dict["reviewer_notes"] = payload.notes
-        ev_dict["reviewer_id"] = payload.reviewer_id
+        ev_dict["reviewer_id"] = reviewer
 
     # Broadcast decision to all connected clients
     realtime_manager.broadcast_threadsafe({

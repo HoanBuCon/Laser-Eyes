@@ -551,7 +551,7 @@ function queuePriority(item) {
     return Number.isFinite(value) ? value : -1;
 }
 
-// "SEAT-ROOM-CHINA-03-15" -> "CHINA-03"
+// "SEAT-CLASSROOM-03-15" -> "CLASSROOM-03"
 function roomLabelFromSeat(seatId) {
     const match = String(seatId || '').match(/^SEAT-(?:ROOM-)?(.+)-\d+$/);
     return match ? match[1] : '';

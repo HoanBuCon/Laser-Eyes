@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Sign in</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom login-page">
+    <main class="login-wrap">
+        <div class="login-brand">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-login.png" alt="" width="96" height="56">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </div>
+        <section class="vg-panel login-panel">
+            <div class="vg-panel-head"><h2 id="loginTitle">Sign in</h2><span id="modeChip" class="vg-label"></span></div>
+            <form id="loginForm" class="vg-panel-body vg-form" autocomplete="on">
+                <p id="setupNote" class="vg-subtitle" hidden>No accounts exist yet. Create the first administrator; more people can be added afterwards under System → Accounts.</p>
+                <label class="vg-field"><span class="vg-label">Username</span>
+                    <input id="username" class="vg-input" name="username" autocomplete="username" required></label>
+                <label class="vg-field" id="displayField" hidden><span class="vg-label">Full name</span>
+                    <input id="displayName" class="vg-input" name="display_name" autocomplete="name"></label>
+                <label class="vg-field"><span class="vg-label">Password</span>
+                    <input id="password" class="vg-input" type="password" name="password" autocomplete="current-password" required minlength="8"></label>
+                <p id="loginError" class="vg-error" hidden></p>
+                <button id="loginBtn" type="submit" class="vigil-btn vigil-btn--primary">Sign in</button>
+                <a id="skipLink" href="/" class="vg-subtitle" hidden>Continue without signing in</a>
+            </form>
+        </section>
+    </main>
+    <script src="/static/js/login.js"></script>
+</body>
+</html>

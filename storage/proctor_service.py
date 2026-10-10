@@ -306,6 +306,9 @@ def review_bookmark(
     if normalized not in REVIEW_DECISIONS or normalized == ReviewDecision.PENDING.value:
         raise BookmarkConflict("Decision must be CONFIRMED, REJECTED, or INCONCLUSIVE")
     bookmark = get_bookmark(db, bookmark_id)
+    from storage.review_service import ensure_session_open  # local: avoids a cycle at import time
+
+    ensure_session_open(db, bookmark.session_id)
     previous = bookmark.review_decision
     review = ProctorBookmarkReview(
         bookmark_id=bookmark.id,

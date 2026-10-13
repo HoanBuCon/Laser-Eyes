@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Accounts</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom users-page">
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>09</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">09 · System · Accounts</span>
+            <h1 class="vg-title">Accounts</h1>
+            <span class="vg-subtitle">Proctors review incidents; chief proctors also run sessions and approve reports; administrators manage accounts.</span>
+        </div>
+        <div class="vg-actions"><a href="/admin" class="vigil-btn vigil-btn--sm vigil-btn--ghost">Back to System</a></div>
+    </header>
+
+    <main class="vg-page">
+        <p id="denied" class="vg-notice" hidden>Only an administrator can manage accounts. <a href="/login?next=/users">Sign in</a> as one.</p>
+        <div class="p2-split" id="usersBody" hidden>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>People</h2><span id="userCount" class="vg-label"></span></div>
+                <div class="vg-scroll">
+                    <table class="vg-table">
+                        <thead><tr><th>Name</th><th>Username</th><th>Role</th><th>Status</th><th>Last sign-in</th><th></th></tr></thead>
+                        <tbody id="userRows"></tbody>
+                    </table>
+                </div>
+            </section>
+            <section class="vg-panel">
+                <div class="vg-panel-head"><h2>Add a person</h2></div>
+                <form id="userForm" class="vg-panel-body vg-form" autocomplete="off">
+                    <label class="vg-field"><span class="vg-label">Full name</span><input id="uName" class="vg-input" required></label>
+                    <label class="vg-field"><span class="vg-label">Username</span><input id="uUser" class="vg-input" required pattern="[A-Za-z0-9._\-]+"></label>
+                    <label class="vg-field"><span class="vg-label">Role</span>
+                        <select id="uRole" class="vg-select"><option value="PROCTOR">Proctor</option><option value="CHIEF">Chief proctor</option><option value="ADMIN">Administrator</option></select></label>
+                    <label class="vg-field"><span class="vg-label">Initial password (min 8)</span><input id="uPass" class="vg-input" type="password" minlength="8" required autocomplete="new-password"></label>
+                    <p id="userError" class="vg-error" hidden></p>
+                    <button type="submit" class="vigil-btn vigil-btn--primary vigil-btn--sm">Add</button>
+                </form>
+            </section>
+        </div>
+    </main>
+
+    <script src="/static/js/users.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

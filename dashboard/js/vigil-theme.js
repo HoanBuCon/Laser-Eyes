@@ -4,6 +4,19 @@
   const STORAGE_KEY = 'vigil-classroom-theme';
   const root = document.documentElement;
 
+  // The DMC5 wordmark font has lowercase letters only: lowercase the
+  // "VIGIL AI" wordmark only once the font is really there, so a failed load
+  // still shows "VIGIL AI" in the normal font instead of empty boxes.
+  function loadWordmarkFont() {
+    if (!document.fonts || !document.fonts.load) return;
+    document.fonts.load('20px "DMC5"', 'vigil ai').then((faces) => {
+      if (faces.length) root.classList.add('font-dmc5');
+    }).catch(() => {});
+  }
+  // The @font-face rule lives in vigil-shell.css: wait until it is parsed
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadWordmarkFont);
+  else loadWordmarkFont();
+
   function storedTheme() {
     try {
       const value = window.localStorage.getItem(STORAGE_KEY);

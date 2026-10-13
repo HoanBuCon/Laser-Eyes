@@ -705,9 +705,20 @@ class StatisticsRepository:
         running_sessions = (
             self.db.query(ExamSession).filter(ExamSession.status.in_(["RUNNING", "STOPPING"])).count()
         )
-        unreviewed = sum(
-            count for status, count in events_by_review_status.items() if status in ("PENDING", "SUSPICIOUS")
+        # Waiting for a decision = PENDING in a session that is not closed.
+        # Incidents left undecided when a session's report was approved are
+        # counted apart: nobody is expected to decide them any more.
+        pending_q = q.filter(func.upper(func.coalesce(DetectionEvent.review_status, "PENDING")).in_(("PENDING", "SUSPICIOUS")))
+        closed_ids = self.db.query(ExamSession.id).filter(ExamSession.status == "CLOSED")
+        closed_unresolved = pending_q.filter(DetectionEvent.session_id.in_(closed_ids)).count()
+        open_pending_q = pending_q.filter(~DetectionEvent.session_id.in_(closed_ids))
+        unreviewed = open_pending_q.count()
+        pending_rows = (
+            open_pending_q.with_entities(DetectionEvent.severity, func.count(DetectionEvent.id))
+            .group_by(DetectionEvent.severity)
+            .all()
         )
+        pending_by_severity = {str(sev): n for sev, n in pending_rows if sev}
 
         return {
             "total_events": total_events,
@@ -720,26 +731,58 @@ class StatisticsRepository:
             "completed_sessions": completed_sessions,
             "running_sessions": running_sessions,
             "unreviewed_events_count": unreviewed,
+            "pending_by_severity": pending_by_severity,
+            "closed_unresolved_count": closed_unresolved,
         }
 
     def get_room_rankings(self, site_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Rank classrooms by highest risk scores."""
-        rooms = self.db.query(ExamRoom).all()
-        rankings = []
-        for r in rooms:
-            evt_count = (
-                self.db.query(DetectionEvent).filter(DetectionEvent.room_id == r.id).count()
+        """Rooms by the review work they still need.
+
+        ``risk_score`` is the highest priority among the room's PENDING
+        incidents: once proctors have decided every incident the room drops
+        to 0, whatever the AI flagged.  Decided incidents are counted
+        separately; they are history, not open risk.
+        """
+        closed = (ExamSession.status == "CLOSED").label("closed")
+        rows = (
+            self.db.query(
+                DetectionEvent.room_id,
+                DetectionEvent.review_status,
+                closed,
+                func.count(DetectionEvent.id),
+                func.max(DetectionEvent.risk_score),
             )
-            site_name = r.site.name if r.site else "Main Campus"
+            .outerjoin(ExamSession, ExamSession.id == DetectionEvent.session_id)
+            .group_by(DetectionEvent.room_id, DetectionEvent.review_status, closed)
+            .all()
+        )
+        stats: Dict[str, Dict[str, int]] = {}
+        for room_id, status, is_closed, count, peak in rows:
+            entry = stats.setdefault(room_id, {"PENDING": 0, "CONFIRMED": 0, "REJECTED": 0, "INCONCLUSIVE": 0, "UNRESOLVED": 0, "open_priority": 0})
+            key = (status or "PENDING").upper()
+            if key == "PENDING" and is_closed:
+                # Left undecided in an approved, closed session: not open work
+                key = "UNRESOLVED"
+            entry[key] = entry.get(key, 0) + int(count)
+            if key == "PENDING":
+                entry["open_priority"] = max(entry["open_priority"], int(peak or 0))
+        rankings = []
+        for r in self.db.query(ExamRoom).all():
+            s = stats.get(r.id, {"PENDING": 0, "CONFIRMED": 0, "REJECTED": 0, "INCONCLUSIVE": 0, "UNRESOLVED": 0, "open_priority": 0})
             rankings.append({
                 "room_id": r.id,
                 "room_name": r.name,
-                "site_name": site_name,
-                "risk_score": min(100, evt_count * 15),
-                "total_events": evt_count,
+                "room_code": r.room_code,
+                "site_name": r.site.name if r.site else "Main Campus",
+                "risk_score": s["open_priority"],
+                "total_events": s["PENDING"] + s["CONFIRMED"] + s["REJECTED"] + s["INCONCLUSIVE"] + s["UNRESOLVED"],
+                "pending": s["PENDING"],
+                "confirmed": s["CONFIRMED"],
+                "rejected": s["REJECTED"],
+                "inconclusive": s["INCONCLUSIVE"],
                 "status": r.status or "active",
             })
-        rankings.sort(key=lambda x: x["risk_score"], reverse=True)
+        rankings.sort(key=lambda x: (x["pending"], x["risk_score"], x["total_events"]), reverse=True)
         return rankings
 
 

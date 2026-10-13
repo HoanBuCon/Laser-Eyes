@@ -60,12 +60,8 @@ function drawFocusOverlay(svg, focus, label) {
     defs.append(mask);
 
     const children = [defs, el('rect', { x: 0, y: 0, width: w, height: h, fill: 'black', 'fill-opacity': 0.5, mask: `url(#${maskId})` })];
-    if (polygon.length >= 3) {
-        children.push(el('polygon', {
-            points: polygon.map((p) => p.join(',')).join(' '),
-            fill: 'none', stroke: '#fbbf24', 'stroke-width': stroke, 'stroke-dasharray': `${stroke * 4} ${stroke * 3}`,
-        }));
-    }
+    // The seat ROI is not drawn (calibration geometry clutters the evidence);
+    // it only stands in for the student's box when no person was recorded.
     children.push(el('rect', {
         x: x1, y: y1, width: x2 - x1, height: y2 - y1, rx: stroke * 2,
         fill: 'none', stroke: '#ef4444', 'stroke-width': stroke * 1.6,

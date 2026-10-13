@@ -1,0 +1,63 @@
+/* 06 Video wall: N cameras, each kept at its own aspect ratio (never stretched). */
+.wall-page { overflow: hidden; }
+.wall-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--vigil-text-muted); font-size: var(--vigil-font-size-xs); cursor: pointer; }
+
+.wall {
+  --wall-cols: 2;
+  --wall-rows: 2;
+  display: grid;
+  grid-template-columns: repeat(var(--wall-cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--wall-rows), minmax(0, 1fr));
+  gap: 1px;
+  height: calc(100vh - 64px);
+  background: var(--vigil-border);
+}
+.wall:fullscreen { height: 100vh; width: 100vw; }
+/* Window-filling fallback when the Fullscreen API is refused */
+.wall.is-maximized, .wall-tile.is-maximized { position: fixed; inset: 0; z-index: calc(var(--vigil-z-modal) + 10); width: 100vw; height: 100vh; }
+
+.wall-tile { position: relative; display: flex; min-width: 0; min-height: 0; flex-direction: column; background: var(--vigil-video-bg); }
+.wall-tile:fullscreen { width: 100vw; height: 100vh; }
+.wall-tile-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--vigil-space-2);
+  height: 30px;
+  flex: 0 0 auto;
+  padding: 0 var(--vigil-space-2);
+  border-bottom: 1px solid var(--vigil-border);
+  background: var(--vigil-surface);
+}
+.wall-source { min-height: 22px; max-width: 46%; padding: 0 4px; font-size: var(--vigil-font-size-2xs); }
+.wall-time { margin-left: auto; color: var(--vigil-text-dim); font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-2xs); }
+.wall-tile-fs { width: 24px; min-height: 22px; padding: 0; }
+
+/* The stage is the largest box of the source's aspect ratio that fits the
+   tile, so the video, the stream and the overlay share one coordinate frame. */
+.wall-tile-body { position: relative; display: grid; flex: 1 1 auto; min-height: 0; place-items: center; container-type: size; }
+.wall-stage {
+  --ar: 1.7778;
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--ar)));
+  height: min(100cqh, calc(100cqw / var(--ar)));
+}
+.wall-video, .wall-live { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
+.wall-boxes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.wall-boxes[hidden] { display: none; }
+.wall-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--vigil-text-dim); font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-xs); }
+.wall-empty[hidden] { display: none; }
+
+.wall-box { fill: none; vector-effect: non-scaling-stroke; stroke-width: 2.5; }
+.wall-box--suspect { stroke: #ffb020; }
+.wall-box--flagged { stroke: #ff3b3b; }
+.wall-label-bg { fill: rgb(0 0 0 / 78%); }
+.wall-label { fill: #fff; font-family: var(--vigil-font-mono); font-weight: 700; }
+
+.wall-tile:is(:fullscreen, .is-maximized) .wall-tile-bar { position: absolute; z-index: 2; inset: 0 0 auto; opacity: 0; transition: opacity var(--vigil-duration-normal); }
+.wall-tile:is(:fullscreen, .is-maximized):hover .wall-tile-bar { opacity: 1; }
+.wall-tile:is(:fullscreen, .is-maximized) .wall-tile-body { height: 100vh; }
+
+@media (max-width: 840px) {
+  .wall-page { overflow: auto; }
+  .wall { height: auto; grid-template-columns: minmax(0, 1fr); grid-template-rows: none; grid-auto-rows: 60vw; }
+}

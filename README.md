@@ -35,7 +35,7 @@ The UI includes guided calibration, an explicit Recalibrate action and an allowe
 
 ### Demo videos
 
-The demo videos are `demo_video/china1_classroom.mp4`, `china2_classroom.mp4` and `china3_classroom.mp4` (1920×1080, 30 FPS), one calibration room each (`ROOM-CHINA-01..03`). The list lives only in `DEMO_PRESETS` (`classroom_monitor/demo/config.py`); the calibration page, the live monitor, the server and the CLI all read it. The earlier India/Student videos are no longer offered as demos.
+The demo videos are `demo_video/classroom-01.mp4`, `classroom-02.mp4` and `classroom-03.mp4` (1920×1080, 30 FPS), one calibration room each (`CLASSROOM-01..03`). The list lives only in `DEMO_PRESETS` (`classroom_monitor/demo/config.py`); the calibration page, the live monitor, the server and the CLI all read it. The earlier India/Student videos are no longer offered as demos.
 
 ### Operate — the website is the only interface
 
@@ -51,7 +51,7 @@ For best speed keep a laptop on AC power: a GPU in power-saving state (for examp
 
 ### Developer tools (not for operators)
 
-`scripts/run_demo_video.py --video china1|china2|china3` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
+`scripts/run_demo_video.py --video classroom-01|classroom-02|classroom-03` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
 
 ## Real, degraded and mock modes
 

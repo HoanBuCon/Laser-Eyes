@@ -1,0 +1,41 @@
+/* 07 System: maintenance actions for demo and testing. */
+.admin-grid { display: grid; grid-template-columns: minmax(240px, 340px) minmax(0, 1fr); gap: var(--vigil-space-4); align-items: start; }
+.admin-actions { display: grid; }
+.admin-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vigil-space-4);
+  padding: var(--vigil-space-3);
+  border-bottom: 1px solid var(--vigil-border-subtle);
+}
+.admin-action:last-child { border-bottom: 0; }
+.admin-action-copy { display: grid; gap: 2px; min-width: 0; }
+.admin-action-copy strong { color: var(--vigil-text); font-size: var(--vigil-font-size-sm); font-weight: var(--vigil-font-medium); }
+.admin-action-copy p { margin: 0; color: var(--vigil-text-muted); font-size: var(--vigil-font-size-xs); }
+.admin-action--severe { box-shadow: inset 2px 0 0 var(--vigil-danger); }
+.admin-preview { color: var(--vigil-text-dim); font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-2xs); }
+.admin-log { max-height: 220px; overflow: auto; font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-2xs); }
+.admin-log-row { display: grid; grid-template-columns: 80px 1fr; gap: var(--vigil-space-3); padding: 4px var(--vigil-space-3); border-bottom: 1px solid var(--vigil-border-subtle); color: var(--vigil-text-muted); }
+.admin-log-row[data-tone="danger"] { color: var(--vigil-danger); }
+.admin-log-row[data-tone="good"] span:last-child { color: var(--vigil-text); }
+#actorInput { width: 150px; }
+
+.admin-dialog {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--vigil-border-strong);
+  background: var(--vigil-surface);
+  color: var(--vigil-text);
+}
+.admin-dialog::backdrop { background: var(--vigil-overlay); }
+.admin-dialog-body { display: grid; gap: var(--vigil-space-2); font-size: var(--vigil-font-size-xs); }
+.admin-dialog-body p { margin: 0; color: var(--vigil-text-muted); }
+.admin-dialog-body code { color: var(--vigil-danger); }
+.admin-dialog-foot { display: flex; justify-content: flex-end; gap: var(--vigil-space-2); padding: var(--vigil-space-3); border-top: 1px solid var(--vigil-border); }
+.admin-error { color: var(--vigil-danger) !important; }
+
+@media (max-width: 1000px) {
+  .admin-grid { grid-template-columns: minmax(0, 1fr); }
+  .admin-action { flex-direction: column; align-items: flex-start; }
+}

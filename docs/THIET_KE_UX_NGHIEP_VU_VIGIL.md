@@ -278,8 +278,8 @@ Giữ bố cục vừa làm (video + cột review). Thay đổi:
 
 ### 6.8 Phòng, camera & ghế (`/calibration`, mở rộng)
 
-* Hiện **độ phủ**: số ghế có ROI so với sức chứa. Trên China2 hiện chỉ khoảng 22/45 học sinh có ROI.
-* Hiện **sơ đồ hàng xóm** đã suy ra (đường nối như ảnh kiểm tra) để người vẽ ROI phát hiện lỗi ngay, ví dụ S05 China3 vẽ ROI hình chữ nhật làm mất liên kết với S06.
+* Hiện **độ phủ**: số ghế có ROI so với sức chứa. Trên Classroom 02 hiện chỉ khoảng 22/45 học sinh có ROI.
+* Hiện **sơ đồ hàng xóm** đã suy ra (đường nối như ảnh kiểm tra) để người vẽ ROI phát hiện lỗi ngay, ví dụ S05 Classroom 03 vẽ ROI hình chữ nhật làm mất liên kết với S06.
 * Cảnh báo ROI chồng lên nhau hoặc với sang hàng sau (nguyên nhân báo nhầm "Multi person").
 
 ### 6.9 Lưu trữ (`/admin/storage`, MỚI)
@@ -345,6 +345,32 @@ Thứ tự này ưu tiên **giá trị cho dữ liệu đã có** (179 incident 
 4. **Mẫu biên bản:** có mẫu biên bản xử lý vi phạm chuẩn của đơn vị để dựng PDF theo không?
 5. **Phần cứng mục tiêu** cho giám sát đa phòng: bao nhiêu phòng trên một máy, có thêm GPU/máy không? Quyết định này ảnh hưởng ngân sách FPS và `imgsz`.
 6. **Ngôn ngữ giao diện:** chuyển sang tiếng Việt (người dùng là giám thị) hay giữ tiếng Anh?
+
+---
+
+## 10. Trạng thái triển khai (cập nhật 2026-10-09)
+
+| Giai đoạn | Trạng thái |
+|---|---|
+| GĐ1 | Xong: `/review` liên phiên, vòng đời phiên, KPI, lệnh dọn dữ liệu test |
+| Đợt chỉnh giao diện | Xong: phong cách VIGIL Local, full width, Video wall `/wall`, trang System `/admin`, bỏ ROI ngoài chế độ debug |
+| GĐ2 | Xong: tài khoản & vai trò (`/login`, `/users`), Kỳ thi & ca thi (`/sessions`), Xem lại có timeline (`/playback`), Báo cáo (`/reports`, bản in `/reports/print`), độ phủ ROI + sơ đồ hàng xóm + cảnh báo ROI chồng nhau trên `/calibration` |
+| GĐ3 | Chưa làm |
+
+**Mặc định đã chọn cho các quyết định còn mở ở mục 9** (có thể đổi):
+
+1. Giữ preset video demo song song với ca thi. Ca thi theo lịch chạy **phân tích live** video của phòng. Replay của gói demo phát lại incident đã thuộc lần chạy gốc (khóa `event_id`), nên không dùng để tạo incident cho ca thi.
+2. Đăng nhập cục bộ (PBKDF2, cookie phiên 12 giờ). `VIGIL_AUTH_MODE=optional` (mặc định) giữ demo mở; `required` bắt buộc đăng nhập. Duyệt báo cáo và quản lý tài khoản **luôn** cần đăng nhập đúng vai trò.
+4. Biên bản theo mẫu chung tự dựng (in ra PDF qua trình duyệt); thay bằng mẫu của đơn vị khi có.
+6. Giao diện giữ tiếng Anh như hiện tại; báo cáo in và biên bản bằng tiếng Việt.
+
+Vai trò: PROCTOR (review), CHIEF (thêm: tạo kỳ thi/ca thi, chạy phân tích, duyệt báo cáo), ADMIN (thêm: tài khoản). Báo cáo ca thi khi duyệt được đóng băng (lưu nội dung + SHA-256, có phiên bản), ca thi chuyển `CLOSED`; còn incident PENDING thì phải ghi lý do.
+
+**Một nơi quyết định, ca đã đóng thì khóa:**
+
+* Operations chỉ là trang tổng quan; mọi quyết định review làm tại `/review` (Operations dẫn link `?open=AI:<event_id>` tới đúng incident). Số "Pending review" trên Operations bằng tab Pending của hàng đợi; ưu tiên của phòng là điểm cao nhất trong các incident **còn chờ**.
+* Ca `CLOSED` không nhận quyết định mới ở bất kỳ API review nào (409). Incident còn PENDING lúc đóng ca không tính vào hàng chờ/KPI nữa (hiện ở tab All, chỉ xem, ghi "Closed").
+* Muốn sửa: CHIEF bấm **Reopen** trên trang Reports, bắt buộc ghi lý do (ghi audit log); ca trở lại trạng thái trước khi đóng, review tiếp rồi duyệt lại thành phiên bản mới. Phiên bản cũ giữ nguyên.
 
 ---
 

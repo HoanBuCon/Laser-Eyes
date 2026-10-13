@@ -1,7 +1,7 @@
 """Unit & Regression Tests for VIGIL AI SRS v2.0 Demo Runner Infrastructure.
 
 Validates Requirements D1 through D12:
-- D1: Demo video config resolves the demo presets (china1..china3) and custom paths.
+- D1: Demo video config resolves the demo presets (classroom-01..classroom-03) and custom paths.
 - D2: Scene profile loads correctly from YAML configuration.
 - D3: Canonical episodes.json export deduplicates by episode_id and includes required fields.
 - D4: Events export contains canonical review states (FLAGGED_FOR_REVIEW, no auto CHEATING).
@@ -53,10 +53,10 @@ from classroom_monitor.video_buffer import EvidenceVideoBuffer
 # D1: Demo video config resolves the demo presets and custom paths
 def test_d1_demo_config_resolution():
     for n in (1, 2, 3):
-        cfg = get_demo_config(f"china{n}")
-        assert cfg.name == f"china{n}"
-        assert cfg.room_code == f"ROOM-CHINA-0{n}"
-        assert cfg.camera_id == f"CAM-CHINA-0{n}"
+        cfg = get_demo_config(f"classroom-0{n}")
+        assert cfg.name == f"classroom-0{n}"
+        assert cfg.room_code == f"CLASSROOM-0{n}"
+        assert cfg.camera_id == f"CAM-CLASSROOM-0{n}"
         assert cfg.video_path.exists()
         assert cfg.seats_preset is None  # seats come from the web calibration
 
@@ -436,11 +436,11 @@ def test_d11_evidence_clip_and_hash():
 # D12: Batch orchestrator smoke test for presets and arguments
 def test_d12_demo_arg_parser_and_presets():
     parser = build_arg_parser()
-    args = parser.parse_args(["--video", "china2", "--hz", "6.0", "--show", "--debug-overlay"])
-    assert args.video == "china2"
+    args = parser.parse_args(["--video", "classroom-02", "--hz", "6.0", "--show", "--debug-overlay"])
+    assert args.video == "classroom-02"
     assert args.hz == 6.0
     assert args.show is True
     assert args.debug_overlay is True
 
     # Check preset mapping
-    assert list(DEMO_PRESETS) == ["china1", "china2", "china3"]
+    assert list(DEMO_PRESETS) == ["classroom-01", "classroom-02", "classroom-03"]

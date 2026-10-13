@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Report</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <style>
+        :root { --ink: #111; --muted: #555; --line: #bbb; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #e9e9e9; color: var(--ink); font: 13px/1.45 "Segoe UI", "Times New Roman", serif; }
+        .toolbar { position: sticky; top: 0; display: flex; gap: 8px; justify-content: flex-end; padding: 8px 16px; background: #222; }
+        .toolbar button, .toolbar a { padding: 6px 12px; border: 1px solid #555; background: #333; color: #fff; font: 12px "Segoe UI", sans-serif; text-decoration: none; cursor: pointer; }
+        .sheet { width: 210mm; min-height: 297mm; margin: 16px auto; padding: 18mm 18mm 20mm; background: #fff; }
+        h1 { margin: 0 0 4px; font-size: 18px; text-align: center; text-transform: uppercase; letter-spacing: .02em; }
+        h2 { margin: 18px 0 6px; padding-bottom: 3px; border-bottom: 1px solid var(--line); font-size: 13px; text-transform: uppercase; }
+        .sub { margin: 0 0 14px; color: var(--muted); text-align: center; }
+        .header { display: flex; justify-content: space-between; margin-bottom: 14px; font-size: 12px; }
+        .header div { text-align: center; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 4px 6px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+        th { background: #f2f2f2; font-weight: 600; }
+        td.num, th.num { text-align: right; }
+        .facts td:first-child { width: 32%; color: var(--muted); }
+        .violation { display: grid; grid-template-columns: 60mm 1fr; gap: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+        .violation img { width: 100%; border: 1px solid var(--line); }
+        .hash { font: 10px Consolas, monospace; word-break: break-all; color: var(--muted); }
+        .note { margin-top: 14px; padding: 8px; border: 1px solid var(--line); background: #fafafa; font-size: 12px; }
+        .signatures { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; text-align: center; }
+        .signatures div { min-height: 90px; }
+        .signatures small { display: block; color: var(--muted); }
+        .lines p { margin: 0 0 6px; }
+        .dots { border-bottom: 1px dotted #777; display: inline-block; min-width: 60mm; }
+        .empty { color: var(--muted); font-style: italic; }
+        @media print {
+            body { background: #fff; }
+            .toolbar { display: none; }
+            .sheet { width: auto; min-height: 0; margin: 0; padding: 0; }
+            @page { size: A4; margin: 15mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="toolbar"><a href="javascript:history.back()">Back</a><button type="button" onclick="window.print()">Print / Save as PDF</button></div>
+    <main id="sheet" class="sheet"><p class="empty">Loading…</p></main>
+    <script src="/static/js/p2-common.js"></script>
+    <script src="/static/js/report-print.js"></script>
+</body>
+</html>

@@ -38,7 +38,7 @@ def _person(x1: int, y1: int, x2: int, y2: int, conf: float = 0.9) -> Detection:
 
 # --- P0-1 -------------------------------------------------------------------
 
-@pytest.mark.parametrize("preset", ["china1", "china2", "china3"])
+@pytest.mark.parametrize("preset", ["classroom-01", "classroom-02", "classroom-03"])
 def test_runs_use_the_seats_saved_from_the_web_calibration(preset, calibrated_demo_rooms):
     seating = build_scene_seating(get_demo_config(preset))
     assert seating.source == "database"
@@ -499,7 +499,10 @@ def render_setup():
     seat = SeatDefinition(seat_id="SEAT-01", room_id="R", seat_code="SEAT-01", polygon=_square(50, 50))
     mgr = SeatManager(room_id="R")
     mgr.load_seats([seat])
-    mgr.occupancies["SEAT-01"] = SeatOccupancy(seat=seat, state=SeatState.OCCUPIED)
+    mgr.occupancies["SEAT-01"] = SeatOccupancy(
+        seat=seat, state=SeatState.OCCUPIED,
+        assigned_detection=Detection(class_id=0, class_name="person", confidence=0.9, bbox=(70, 60, 130, 140)),
+    )
     tracker = SeatRiskTracker(room_id="R", cooldown_duration_ms=5000.0)
     return mgr, tracker, DemoHUDOverlayRenderer(debug_overlay=False), np.zeros((300, 300, 3), dtype=np.uint8)
 

@@ -300,6 +300,8 @@ class StatisticsSummaryResponse(BaseModel):
     active_rooms: int
     completed_sessions: int
     unreviewed_events_count: int = 0
+    pending_by_severity: Dict[str, int] = {}
+    closed_unresolved_count: int = 0
     events_by_pattern: Dict[str, int] = {}
     events_by_review_status: Dict[str, int] = {}
     monitored_rooms: int = 0
@@ -309,9 +311,14 @@ class StatisticsSummaryResponse(BaseModel):
 class RoomRankingItem(BaseModel):
     room_id: str
     room_name: str
+    room_code: Optional[str] = None
     site_name: str
-    risk_score: int
+    risk_score: int  # highest priority among the room's PENDING incidents
     total_events: int
+    pending: int = 0
+    confirmed: int = 0
+    rejected: int = 0
+    inconclusive: int = 0
     status: str
 
 

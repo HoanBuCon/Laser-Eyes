@@ -19,6 +19,7 @@ import threading
 import time
 import uuid
 from collections import deque
+from datetime import datetime
 from dataclasses import asdict, dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -46,6 +47,7 @@ from classroom_monitor.demo.config import (
     resolve_video_path,
 )
 from classroom_monitor.demo.exporter import export_demo_artifacts
+from classroom_monitor.demo.seat_timeline import SeatTimelineRecorder
 from classroom_monitor.demo.paths import demo_runs_root, purge_replay_package, replay_package_dir
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer
 from classroom_monitor.demo.seating import build_scene_seating
@@ -326,8 +328,13 @@ class DemoRuntime:
         max_frames: Optional[int] = None,
         stride: int = 1,
         allow_mock: bool = False,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Serialize starts so two inference workers can never overlap."""
+        """Serialize starts so two inference workers can never overlap.
+
+        ``session_id`` runs the analysis for a scheduled exam session instead
+        of creating an ad-hoc demo session.
+        """
         with self._lifecycle_lock:
             return self._start_locked(
                 preset=preset,
@@ -337,6 +344,7 @@ class DemoRuntime:
                 max_frames=max_frames,
                 stride=stride,
                 allow_mock=allow_mock,
+                session_id=session_id,
             )
 
     def _start_locked(
@@ -348,6 +356,7 @@ class DemoRuntime:
         max_frames: Optional[int] = None,
         stride: int = 1,
         allow_mock: bool = False,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Start demo analysis in LIVE or REPLAY mode in a background worker thread."""
         with self._lock:
@@ -387,7 +396,9 @@ class DemoRuntime:
             }
 
             # Initialize DB Session record
-            session_id = self._init_db_session(preset=preset, run_id=run_id, mode=mode_enum.value)
+            session_id = self._init_db_session(
+                preset=preset, run_id=run_id, mode=mode_enum.value, session_id=session_id
+            )
             self.status.session_id = session_id
 
             if mode_enum == DemoMode.REPLAY:
@@ -477,11 +488,12 @@ class DemoRuntime:
     # DB Persistence Helpers
     # -------------------------------------------------------------------------
 
-    def _init_db_session(self, preset: str, run_id: str, mode: str) -> str:
-        """Create an ExamSession in SQLite for tracking this demo run."""
+    def _init_db_session(self, preset: str, run_id: str, mode: str, session_id: Optional[str] = None) -> str:
+        """Create (or, for a scheduled session, start) the ExamSession of this run."""
         init_db()
         db = SessionLocal()
-        session_id = str(uuid.uuid4())
+        scheduled = db.get(ExamSession, session_id) if session_id else None
+        session_id = scheduled.id if scheduled is not None else str(uuid.uuid4())
         try:
             demo_cfg = get_demo_config(preset)
             room_code = demo_cfg.room_code
@@ -515,15 +527,24 @@ class DemoRuntime:
                 db.add(camera)
                 db.flush()
 
-            sess = ExamSession(
-                id=session_id,
-                room_id=room.id,
-                camera_id=camera.id,
-                exam_name=f"VIGIL AI {mode} Demo ({preset.upper()}) - {run_id}",
-                subject_code=f"ICTU-2026-{preset.upper()}",
-                status="RUNNING",
-            )
-            db.add(sess)
+            if scheduled is not None:
+                scheduled.camera_id = scheduled.camera_id or camera.id
+                scheduled.status = "RUNNING"
+                scheduled.started_at = datetime.utcnow()
+                scheduled.ended_at = None
+                scheduled.run_id = run_id
+                scheduled.source_preset = preset.lower()
+            else:
+                db.add(ExamSession(
+                    id=session_id,
+                    room_id=room.id,
+                    camera_id=camera.id,
+                    exam_name=f"VIGIL AI {mode} Demo ({preset.upper()}) - {run_id}",
+                    subject_code=f"ICTU-2026-{preset.upper()}",
+                    status="RUNNING",
+                    run_id=run_id,
+                    source_preset=preset.lower(),
+                ))
             db.commit()
             self._db_camera_id = camera.id
         except Exception as exc:
@@ -789,6 +810,7 @@ class DemoRuntime:
         episode_engine = TemporalEpisodeEngine(**runtime_cfg["temporal"])
         pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph, **runtime_cfg["patterns"])
         risk_tracker = SeatRiskTracker(room_id=config.room_code, camera_id=config.camera_id, **runtime_cfg["risk"])
+        timeline = SeatTimelineRecorder()
         pipeline = SRSv2Pipeline(
             config=config,
             runtime_config=runtime_cfg,
@@ -929,6 +951,8 @@ class DemoRuntime:
                     if event_id not in evidence_published and job.status != "PENDING":
                         publish_evidence(events_by_id[event_id], job)
 
+                timeline.observe(source_ts_ms, {code: prof.risk_score for code, prof in risk_tracker.profiles.items()})
+
                 # 5. Render Output Frame
                 active_seats_state = {}
                 for s_code, prof in risk_tracker.profiles.items():
@@ -1063,6 +1087,10 @@ class DemoRuntime:
                 scene_metadata=scene_meta,
                 runtime_stats=runtime_stats,
             )
+            try:
+                timeline.write(out_p)
+            except OSError as exc:
+                logger.warning("Could not write the seat timeline: %s", exc)
 
             # Publish to the canonical replay package only for a complete,
             # uninterrupted run; a stopped or frame-limited run must never

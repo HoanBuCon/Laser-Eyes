@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Exams & sessions</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom sessions-page">
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item is-active" aria-current="page"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">07 · Exams &amp; sessions</span>
+            <h1 class="vg-title">Exams &amp; sessions</h1>
+            <span class="vg-subtitle">Schedule a session per room, check it is ready, run the analysis, then review and approve its report.</span>
+        </div>
+        <div class="vg-actions">
+            <button type="button" id="newExamBtn" class="vigil-btn vigil-btn--sm vigil-btn--primary">New exam</button>
+            <button type="button" id="refreshBtn" class="vigil-btn vigil-btn--sm">Refresh</button>
+        </div>
+    </header>
+
+    <main class="vg-page p2-master">
+        <section class="vg-panel p2-list">
+            <div class="vg-panel-head"><h2>Exams</h2><span id="examCount" class="vg-label"></span></div>
+            <div id="examList" class="p2-items"><div class="vg-empty">Loading…</div></div>
+        </section>
+
+        <section class="p2-detail">
+            <div class="vg-panel">
+                <div class="vg-panel-head">
+                    <div class="p2-heading">
+                        <h2 id="examTitle">—</h2>
+                        <span id="examMeta" class="vg-label"></span>
+                    </div>
+                    <div class="vg-actions">
+                        <button type="button" id="scheduleBtn" class="vigil-btn vigil-btn--sm vigil-btn--primary">Schedule sessions</button>
+                        <a id="examReportLink" class="vigil-btn vigil-btn--sm" href="/reports">Exam summary</a>
+                        <button type="button" id="archiveBtn" class="vigil-btn vigil-btn--sm vigil-btn--ghost">Archive</button>
+                    </div>
+                </div>
+                <div class="vg-scroll p2-table-scroll">
+                    <table class="vg-table">
+                        <thead><tr><th>Session</th><th>Room</th><th>Scheduled</th><th>Proctor</th><th>Status</th><th class="num">Incidents</th><th class="num">Pending</th><th></th></tr></thead>
+                        <tbody id="sessionRows"><tr><td colspan="8" class="vg-empty">Choose an exam.</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+            <p id="pageError" class="vg-error" hidden></p>
+        </section>
+    </main>
+
+    <dialog id="examDialog" class="p2-dialog">
+        <form id="examForm" method="dialog">
+            <div class="vg-panel-head"><h2>New exam</h2></div>
+            <div class="vg-panel-body vg-form">
+                <label class="vg-field"><span class="vg-label">Name</span><input id="exName" class="vg-input" required placeholder="Term 1 2026 – Maths 10"></label>
+                <div class="vg-form-row">
+                    <label class="vg-field"><span class="vg-label">Subject code</span><input id="exSubject" class="vg-input" placeholder="MATH10"></label>
+                    <label class="vg-field"><span class="vg-label">Date</span><input id="exDate" class="vg-input" type="date"></label>
+                </div>
+                <label class="vg-field"><span class="vg-label">Notes</span><input id="exDesc" class="vg-input"></label>
+                <p class="vg-error" hidden></p>
+            </div>
+            <div class="p2-dialog-foot"><button type="button" class="vigil-btn vigil-btn--sm" data-close>Cancel</button><button class="vigil-btn vigil-btn--sm vigil-btn--primary" type="submit">Create</button></div>
+        </form>
+    </dialog>
+
+    <dialog id="scheduleDialog" class="p2-dialog p2-dialog--wide">
+        <form id="scheduleForm" method="dialog">
+            <div class="vg-panel-head"><h2>Schedule sessions</h2><span class="vg-label">one session per room</span></div>
+            <div class="vg-panel-body vg-form">
+                <div class="vg-field"><span class="vg-label">Rooms (rooms with Seat ROIs first)</span><div id="roomPicker" class="p2-checklist"></div></div>
+                <div class="vg-form-row">
+                    <label class="vg-field"><span class="vg-label">Starts</span><input id="scStart" class="vg-input" type="datetime-local"></label>
+                    <label class="vg-field"><span class="vg-label">Ends</span><input id="scEnd" class="vg-input" type="datetime-local"></label>
+                    <label class="vg-field"><span class="vg-label">Proctor</span><select id="scProctor" class="vg-select"><option value="">— none —</option></select></label>
+                </div>
+                <p class="vg-error" hidden></p>
+            </div>
+            <div class="p2-dialog-foot"><button type="button" class="vigil-btn vigil-btn--sm" data-close>Cancel</button><button class="vigil-btn vigil-btn--sm vigil-btn--primary" type="submit">Schedule</button></div>
+        </form>
+    </dialog>
+
+    <dialog id="checkDialog" class="p2-dialog">
+        <form method="dialog">
+            <div class="vg-panel-head"><h2 id="checkTitle">Session</h2><span id="checkStatus" class="vg-chip"></span></div>
+            <div class="vg-panel-body vg-form">
+                <ul id="checkItems" class="p2-checks"></ul>
+                <div class="vg-form-row">
+                    <label class="vg-field"><span class="vg-label">Exam</span><select id="ckExam" class="vg-select"></select></label>
+                    <label class="vg-field"><span class="vg-label">Proctor</span><select id="ckProctor" class="vg-select"><option value="">— none —</option></select></label>
+                </div>
+                <div class="vg-field"><span class="vg-label">Analysis</span>
+                    <div class="vg-actions">
+                        <button type="button" id="ckStartLive" class="vigil-btn vigil-btn--sm vigil-btn--primary">Start live analysis</button>
+                        <button type="button" id="ckStop" class="vigil-btn vigil-btn--sm vigil-btn--danger">Stop</button>
+                        <a id="ckMonitor" class="vigil-btn vigil-btn--sm vigil-btn--ghost" href="/demo">Open live monitor</a>
+                    </div>
+                </div>
+                <p class="vg-error" hidden></p>
+            </div>
+            <div class="p2-dialog-foot">
+                <button type="button" id="ckDelete" class="vigil-btn vigil-btn--sm vigil-btn--ghost">Delete session</button>
+                <span class="p2-grow"></span>
+                <button type="button" id="ckSave" class="vigil-btn vigil-btn--sm">Save</button>
+                <button type="button" class="vigil-btn vigil-btn--sm" data-close>Close</button>
+            </div>
+        </form>
+    </dialog>
+
+    <script src="/static/js/p2-common.js"></script>
+    <script src="/static/js/sessions.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

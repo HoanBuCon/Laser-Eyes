@@ -1,19 +1,11 @@
 /**
- * VIGIL AI Enterprise Proctoring Dashboard Application (SRS v1.0)
- *
- * Implements:
- * - 10-20 Concurrent Exam Rooms Multi-Card Grid
- * - Real-time WebSocket event ingestion with HTTP polling fallback
- * - Seat-anchored review incident feed
- * - Dual media evidence viewer (Peak JPEG snapshot + 10s MP4 video clip)
- * - Cryptographic SHA-256 integrity hash verification
- * - Human-in-the-Loop review actions (CONFIRM, REJECT, INCONCLUSIVE)
+ * 01 Operations: a read-only overview of rooms, incident volume and review
+ * progress.  Decisions are taken in one place only, the review queue (/review):
+ * every incident and room here links there.  Numbers come from the same
+ * review-status data the queue uses.
  */
 
 let behaviorChart = null;
-let currentEventId = null;
-let currentSha256 = '';
-let selectedRoomId = null;
 let currentRoomFilterType = 'ALL';
 let ws = null;
 
@@ -94,23 +86,15 @@ function initChart() {
                 data: [],
                 backgroundColor: BEHAVIOR_COLORS,
                 borderWidth: 0,
-                hoverOffset: 6
+                hoverOffset: 4
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: {
-                        color: '#9ca3af',
-                        font: { size: 11, family: 'Inter' },
-                        padding: 10
-                    }
-                }
-            },
-            cutout: '70%'
+            // The legend is drawn next to the chart as compact rows
+            plugins: { legend: { display: false } },
+            cutout: '68%'
         }
     });
 }
@@ -133,18 +117,17 @@ function updateBehaviorChart(counts = {}) {
     const legend = document.getElementById('behaviorLegend');
     if (!legend) return;
     if (!entries.length) {
-        legend.innerHTML = '<div class="text-gray-500">No incidents yet.</div>';
+        legend.innerHTML = '<div class="vg-empty">No incidents yet.</div>';
         return;
     }
     legend.replaceChildren(...entries.map(([name, n], i) => {
         const row = document.createElement('div');
-        row.className = 'flex justify-between gap-2';
+        row.className = 'ops-legend-row';
         const label = document.createElement('span');
         label.textContent = prettyPattern(name);
+        label.title = name;
         label.style.borderLeft = `3px solid ${BEHAVIOR_COLORS[i % BEHAVIOR_COLORS.length]}`;
-        label.style.paddingLeft = '6px';
         const value = document.createElement('span');
-        value.className = 'font-mono text-gray-200';
         value.textContent = n;
         row.append(label, value);
         return row;
@@ -189,80 +172,81 @@ function updateSummaryCounters(stats) {
     setEl('statActiveRooms', stats.monitored_rooms ?? stats.active_rooms ?? 0);
     setEl('statActiveRoomsHint', `of ${stats.active_rooms || 0} rooms have seat ROIs`);
 
-    const highCount = (stats.events_by_severity && stats.events_by_severity.HIGH) || 0;
-    setEl('statHighSeverity', highCount);
-    setEl('statPendingHint', `${stats.unreviewed_events_count || 0} incidents pending review`);
+    // Same number as the "Pending" tab of the review queue
+    const pending = stats.unreviewed_events_count || 0;
+    const pendingHigh = (stats.pending_by_severity && stats.pending_by_severity.HIGH) || 0;
+    setEl('statPending', pending);
+    const closedUnresolved = stats.closed_unresolved_count || 0;
+    const parts = [pending ? `${pendingHigh} high severity · open review queue →` : 'nothing waiting'];
+    if (closedUnresolved) parts.push(`${closedUnresolved} left undecided in closed sessions`);
+    setEl('statPendingHint', parts.join(' · '));
 
     // Share of incidents with a human decision; nothing to review is not "100 %"
     const totalEvents = stats.total_events || 0;
-    const pending = stats.unreviewed_events_count || 0;
-    const decided = totalEvents - pending;
+    const decided = totalEvents - pending - closedUnresolved;
     setEl('statReviewRate', totalEvents > 0 ? `${Math.round((decided / totalEvents) * 100)}%` : '—');
     setEl('statReviewRateHint', totalEvents > 0 ? `${decided} of ${totalEvents} decided by proctors` : 'no incidents yet');
 }
 
-function renderRoomGrid(rooms, rankings) {
-    const grid = document.getElementById('roomCardsGrid');
-    if (!grid) return;
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
 
-    if (!rooms || rooms.length === 0) {
-        grid.innerHTML = `<div class="p-6 text-center text-gray-500 col-span-full">No rooms configured in system.</div>`;
+function riskTone(score) {
+    if (score >= 60) return 'danger';
+    if (score >= 25) return 'warning';
+    return 'good';
+}
+
+function reviewLink(params) {
+    const query = new URLSearchParams(params);
+    return `/review?${query}`;
+}
+
+// One dense row per room, rooms with review work first.  The room's priority
+// is the highest score among its PENDING incidents: decided incidents are not
+// open risk.  A row opens the review queue for that room.
+function renderRoomGrid(rooms, rankings) {
+    const body = document.getElementById('roomCardsGrid');
+    if (!body) return;
+    document.querySelectorAll('[data-room-filter]').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.roomFilter === currentRoomFilterType));
+    });
+
+    const empty = { risk_score: 0, total_events: 0, pending: 0, confirmed: 0, rejected: 0 };
+    const rankMap = {};
+    rankings.forEach((r) => { rankMap[r.room_id] = r; });
+    let displayRooms = (rooms || []).map((room) => ({ room, rank: rankMap[room.id] || empty }));
+    if (currentRoomFilterType === 'NEEDS_REVIEW') displayRooms = displayRooms.filter(({ rank }) => rank.pending > 0);
+    if (currentRoomFilterType === 'MONITORED') displayRooms = displayRooms.filter(({ rank }) => rank.total_events > 0);
+    displayRooms.sort((a, b) => b.rank.pending - a.rank.pending || b.rank.risk_score - a.rank.risk_score || b.rank.total_events - a.rank.total_events);
+
+    const count = document.getElementById('roomCount');
+    if (count) count.textContent = `${displayRooms.length}/${(rooms || []).length}`;
+    if (!displayRooms.length) {
+        body.innerHTML = '<tr><td colspan="8" class="vg-empty">No rooms match this filter.</td></tr>';
         return;
     }
-
-    const rankMap = {};
-    rankings.forEach(r => { rankMap[r.room_id] = r; });
-
-    let displayRooms = rooms;
-    if (currentRoomFilterType === 'HIGH_RISK') {
-        displayRooms = rooms.filter(r => (rankMap[r.id]?.risk_score || 0) >= 30);
-    }
-
-    grid.innerHTML = displayRooms.map(room => {
-        const rank = rankMap[room.id] || { risk_score: 0, total_events: 0 };
-        const isSelected = selectedRoomId === room.id;
-
-        let riskColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
-        let barColor = 'bg-emerald-500';
-        if (rank.risk_score >= 60) {
-            riskColor = 'text-red-400 bg-red-500/20 border-red-500/40 badge-pulse-red';
-            barColor = 'bg-red-500';
-        } else if (rank.risk_score >= 25) {
-            riskColor = 'text-amber-400 bg-amber-500/10 border-amber-500/30';
-            barColor = 'bg-amber-500';
-        }
-
-        const borderStyle = isSelected ? 'border-cyan-400 ring-2 ring-cyan-400/30' : 'border-gray-800 hover:border-gray-700';
-
+    body.innerHTML = displayRooms.map(({ room, rank }) => {
+        const tone = rank.pending ? riskTone(rank.risk_score) : '';
+        const href = reviewLink({ room: room.room_code || '' });
         return `
-        <div onclick="selectRoom('${room.id}', '${room.name}')" class="room-card p-4 rounded-xl bg-gray-900/80 border ${borderStyle} cursor-pointer transition flex flex-col justify-between" aria-current="${isSelected}">
-            <div>
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-mono font-bold text-gray-400 uppercase">${room.room_code || 'ROOM'}</span>
-                    <span class="text-xs px-2 py-0.5 rounded-full border font-bold font-mono ${riskColor}">
-                        Score ${rank.risk_score}
-                    </span>
-                </div>
-                <h3 class="font-bold text-sm text-white mt-1">${room.name}</h3>
-                <p class="text-xs text-gray-400 font-mono mt-0.5">Capacity: ${room.capacity_seats || 24} seats</p>
-            </div>
-
-            <div class="mt-4 pt-3 border-t border-gray-800/80">
-                <div class="flex items-center justify-between text-xs text-gray-400 mb-1">
-                    <span>Risk Level</span>
-                    <span class="font-mono text-gray-200">${rank.risk_score}/100</span>
-                </div>
-                <div class="w-full bg-gray-800 rounded-full h-1.5 overflow-hidden">
-                    <div class="${barColor} h-1.5 rounded-full transition-all duration-500" style="width: ${Math.min(100, rank.risk_score)}%"></div>
-                </div>
-                <div class="flex items-center justify-between text-[11px] text-gray-500 mt-2">
-                    <span>Events: <strong class="text-gray-300 font-mono">${rank.total_events}</strong></span>
-                    <span class="${isSelected ? 'text-cyan-400 font-semibold' : 'text-gray-400'}">${isSelected ? 'Filtering Feed' : 'Click to filter'}</span>
-                </div>
-            </div>
-        </div>
-        `;
+        <tr data-href="${escapeHtml(href)}" title="${rank.pending ? 'Review this room’s pending incidents' : 'Open this room in the review queue'}">
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(room.room_code || 'ROOM')}</td>
+            <td>${escapeHtml(room.name)}</td>
+            <td class="num">${rank.total_events}</td>
+            <td class="num strong">${rank.pending ? `<span class="vg-chip" data-tone="warning">${rank.pending}</span>` : 0}</td>
+            <td class="num">${rank.confirmed}</td>
+            <td class="num">${rank.rejected}</td>
+            <td><div class="ops-priority"><div class="vg-bar" data-tone="${tone}"><i style="width:${rank.pending ? Math.min(100, rank.risk_score) : 0}%"></i></div><span>${rank.pending ? rank.risk_score : '—'}</span></div></td>
+            <td class="num"><a class="vigil-btn vigil-btn--sm vigil-btn--ghost" href="${escapeHtml(href)}">Review</a></td>
+        </tr>`;
     }).join('');
+    body.querySelectorAll('tr[data-href]').forEach((row) => {
+        row.addEventListener('click', (event) => {
+            if (!event.target.closest('a')) window.location.href = row.dataset.href;
+        });
+    });
 }
 
 function filterRooms(type) {
@@ -270,41 +254,20 @@ function filterRooms(type) {
     loadDashboardData();
 }
 
-function selectRoom(roomId, roomName) {
-    if (selectedRoomId === roomId) {
-        selectedRoomId = null;
-        const badge = document.getElementById('selectedRoomFilterBadge');
-        if (badge) badge.classList.add('hidden');
-    } else {
-        selectedRoomId = roomId;
-        const badge = document.getElementById('selectedRoomFilterBadge');
-        if (badge) {
-            badge.innerText = `Room: ${roomName}`;
-            badge.classList.remove('hidden');
-        }
-    }
-    loadDashboardData();
-}
-
 // ==============================================================================
-// 4. Events Feed & Filtering
+// 4. Latest incidents (read-only; same data as the review queue)
 // ==============================================================================
 async function loadEvents() {
-    const sevFilter = document.getElementById('severityFilter')?.value || '';
-    const revFilter = document.getElementById('reviewFilter')?.value || '';
-
-    let url = '/api/v1/events?limit=50';
-    if (selectedRoomId) url += `&room_id=${encodeURIComponent(selectedRoomId)}`;
-    if (sevFilter) url += `&severity=${encodeURIComponent(sevFilter)}`;
-    if (revFilter) url += `&review_status=${encodeURIComponent(revFilter)}`;
-
+    const params = new URLSearchParams({ status: document.getElementById('reviewFilter')?.value || 'ALL', source: 'AI', sort: 'newest', limit: '50' });
+    const severity = document.getElementById('severityFilter')?.value || '';
+    if (severity) params.set('severity', severity);
     try {
-        const res = await fetch(url);
+        const res = await fetch(`/api/v1/proctor/review-queue?${params}`);
         if (!res.ok) return;
-        const events = await res.json();
-        renderEventFeed(events);
+        const data = await res.json();
+        renderEventFeed(data.items || []);
     } catch (e) {
-        console.warn('Failed to load events:', e);
+        console.warn('Failed to load incidents:', e);
     }
 }
 
@@ -312,183 +275,39 @@ function applyEventFilters() {
     loadEvents();
 }
 
-function renderEventFeed(events) {
+const SEVERITY_TONE = { HIGH: 'danger', MEDIUM: 'warning', LOW: '' };
+const REVIEW_TONE = { CONFIRMED: 'danger', REJECTED: 'good', INCONCLUSIVE: '', PENDING: 'warning' };
+
+function renderEventFeed(items) {
     const feed = document.getElementById('eventsFeed');
     if (!feed) return;
-
-    if (!events || events.length === 0) {
-        feed.innerHTML = `<div class="p-8 text-center text-gray-500">No detection events match the current filter.</div>`;
+    if (!items.length) {
+        feed.innerHTML = '<tr><td colspan="8" class="vg-empty">No incidents match the current filter.</td></tr>';
         return;
     }
-
-    feed.innerHTML = events.map(ev => {
-        let badgeCls = 'text-gray-400 bg-gray-500/10 border-gray-500/30';
-        if (ev.severity === 'HIGH') {
-            badgeCls = 'text-red-400 bg-red-500/20 border-red-500/40';
-        } else if (ev.severity === 'MEDIUM') {
-            badgeCls = 'text-amber-400 bg-amber-500/20 border-amber-500/40';
-        }
-
-        let reviewBadgeCls = 'text-gray-400 bg-gray-800';
-        if (ev.review_status === 'CONFIRMED') {
-            reviewBadgeCls = 'text-red-400 bg-red-500/10 border border-red-500/30';
-        } else if (ev.review_status === 'REJECTED') {
-            reviewBadgeCls = 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/30';
-        } else if (ev.review_status === 'INCONCLUSIVE') {
-            reviewBadgeCls = 'text-amber-400 bg-amber-500/10 border border-amber-500/30';
-        }
-
-        const seatLabel = ev.seat_id || `TRACK-#${ev.track_id}`;
-        const shaShort = ev.evidence_hash ? `${ev.evidence_hash.substring(0, 10)}...` : 'N/A';
-
+    feed.innerHTML = items.map((item) => {
+        const when = item.created_at ? new Date(`${item.created_at}${/Z|[+-]\d\d:?\d\d$/.test(item.created_at) ? '' : 'Z'}`) : null;
+        const whenText = when && !Number.isNaN(when.getTime())
+            ? when.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+            : '—';
+        const pattern = item.primary_signal;
+        const pending = item.review_status === 'PENDING';
+        const href = reviewLink({ status: 'ALL', open: `AI:${item.event_id}` });
         return `
-        <div class="review-incident-row p-3.5 rounded-xl bg-gray-900/70 border border-gray-800/80 hover:border-gray-700 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-lg bg-gray-800 flex flex-col items-center justify-center font-mono text-xs text-cyan-300 font-bold border border-gray-700">
-                    <span class="text-[9px] text-gray-400">SEAT</span>
-                    <span>${seatLabel.replace('SEAT-', '')}</span>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <span class="font-bold text-sm text-white font-mono">${ev.behavior}</span>
-                        <span class="text-[11px] px-2 py-0.5 rounded border font-bold ${badgeCls}">${ev.severity}</span>
-                        <span class="text-[10px] px-2 py-0.5 rounded font-mono ${reviewBadgeCls}">${ev.review_status}</span>
-                    </div>
-                    <div class="text-xs text-gray-400 mt-1 flex items-center gap-3">
-                        <span>Confidence: <strong class="text-gray-200 font-mono">${(ev.confidence_peak * 100).toFixed(0)}%</strong></span>
-                        <span>Duration: <strong class="text-gray-200 font-mono">${ev.duration_seconds}s</strong></span>
-                        <span class="font-mono text-[11px] text-gray-500">SHA: ${shaShort}</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-2 self-end sm:self-center">
-                <button onclick="openEvidenceModal('${ev.id}', '${seatLabel}', '${ev.behavior}', '${ev.confidence_peak}', '${ev.duration_seconds}', '${ev.evidence_hash || ''}', '${ev.review_status}')" class="vigil-btn vigil-btn--primary vigil-btn--sm px-3.5 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                    Review Evidence
-                </button>
-            </div>
-        </div>
-        `;
+        <tr data-href="${escapeHtml(href)}">
+            <td style="font-family:var(--vigil-font-mono)">${escapeHtml(whenText)}</td>
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(item.room_code || '—')}</td>
+            <td class="strong" title="${escapeHtml(pattern)}">${escapeHtml(prettyPattern(pattern))}</td>
+            <td><span class="vg-chip" data-tone="${SEVERITY_TONE[item.severity] || ''}">${escapeHtml(item.severity)}</span></td>
+            <td><span class="vg-chip" data-tone="${REVIEW_TONE[item.review_status] || ''}">${escapeHtml(item.review_status)}</span></td>
+            <td>${escapeHtml(item.reviewer_id || '—')}</td>
+            <td class="num">${item.review_priority_score ?? '—'}</td>
+            <td class="num"><a class="vigil-btn vigil-btn--sm ${pending ? 'vigil-btn--primary' : ''}" href="${escapeHtml(href)}">${pending ? 'Review' : 'Open'}</a></td>
+        </tr>`;
     }).join('');
-}
-
-// ==============================================================================
-// 5. Dual Evidence Modal (Snapshot + MP4 Video + SHA-256)
-// ==============================================================================
-function openEvidenceModal(eventId, seatLabel, behavior, confPeak, duration, sha256, reviewStatus) {
-    currentEventId = eventId;
-    currentSha256 = sha256;
-
-    const modal = document.getElementById('evidenceModal');
-    const title = document.getElementById('modalEventTitle');
-    const seatBadge = document.getElementById('modalSeatBadge');
-    const subtitle = document.getElementById('modalEventSubtitle');
-    const shaLabel = document.getElementById('modalSha256');
-    const curRevBadge = document.getElementById('modalCurrentReviewStatus');
-    const img = document.getElementById('modalEvidenceImg');
-    const videoSource = document.getElementById('modalVideoSource');
-    const videoPlayer = document.getElementById('modalEvidenceVideo');
-
-    if (!modal) return;
-
-    seatBadge.innerText = seatLabel;
-    subtitle.innerText = `Behavior: ${behavior} | Peak Confidence: ${(Number(confPeak) * 100).toFixed(0)}% | Duration: ${duration}s`;
-    shaLabel.innerText = sha256 || 'SHA-256 NOT GENERATED';
-    curRevBadge.innerText = reviewStatus || 'PENDING';
-
-    // Set media URLs
-    const snapUrl = `/api/v1/events/${eventId}/evidence`;
-    const videoUrl = `/api/v1/events/${eventId}/video`;
-
-    if (img) img.src = snapUrl;
-    if (videoSource && videoPlayer) {
-        videoSource.src = videoUrl;
-        videoPlayer.load();
-    }
-
-    switchEvidenceTab('snapshot');
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-}
-
-function closeEvidenceModal() {
-    const modal = document.getElementById('evidenceModal');
-    const videoPlayer = document.getElementById('modalEvidenceVideo');
-    if (videoPlayer) videoPlayer.pause();
-
-    if (modal) {
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
-}
-
-function switchEvidenceTab(tab) {
-    const snapViewer = document.getElementById('snapshotViewer');
-    const vidViewer = document.getElementById('videoViewer');
-    const btnSnap = document.getElementById('btnTabSnapshot');
-    const btnVid = document.getElementById('btnTabVideo');
-    const videoPlayer = document.getElementById('modalEvidenceVideo');
-
-    if (btnSnap) btnSnap.setAttribute('aria-selected', String(tab === 'snapshot'));
-    if (btnVid) btnVid.setAttribute('aria-selected', String(tab === 'video'));
-
-    if (tab === 'snapshot') {
-        if (snapViewer) snapViewer.classList.remove('hidden');
-        if (vidViewer) vidViewer.classList.add('hidden');
-        if (videoPlayer) videoPlayer.pause();
-    } else {
-        if (snapViewer) snapViewer.classList.add('hidden');
-        if (vidViewer) vidViewer.classList.remove('hidden');
-        if (videoPlayer) videoPlayer.play().catch(() => {});
-    }
-}
-
-function copySha256() {
-    if (!currentSha256) return;
-    navigator.clipboard.writeText(currentSha256).then(() => {
-        alert('SHA-256 Hash copied to clipboard:\n' + currentSha256);
-    }).catch(() => {
-        prompt('Copy SHA-256 Hash:', currentSha256);
-    });
-}
-
-// ==============================================================================
-// 6. Human-in-the-Loop Review Submission
-// ==============================================================================
-async function submitReviewDecision(decision) {
-    if (!currentEventId) return;
-
-    const reasonCode = document.getElementById('reviewReasonCode')?.value || 'CLEAR_CHEATING';
-    const note = document.getElementById('reviewNoteInput')?.value || '';
-
-    try {
-        const payload = {
-            reviewer_id: 'proctor_admin',
-            decision: decision,
-            reason_code: reasonCode,
-            note: note
-        };
-
-        const res = await fetch(`/api/v1/events/${currentEventId}/review`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+    feed.querySelectorAll('tr[data-href]').forEach((row) => {
+        row.addEventListener('click', (event) => {
+            if (!event.target.closest('a')) window.location.href = row.dataset.href;
         });
-
-        if (res.ok) {
-            const curRevBadge = document.getElementById('modalCurrentReviewStatus');
-            if (curRevBadge) curRevBadge.innerText = decision;
-
-            // Refresh events and stats
-            loadDashboardData();
-            setTimeout(closeEvidenceModal, 600);
-        } else {
-            alert('Failed to submit review decision.');
-        }
-    } catch (err) {
-        console.error('Review submission error:', err);
-        alert('Error submitting review decision.');
-    }
+    });
 }

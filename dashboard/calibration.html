@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VIGIL AI — Interactive Seat ROI Calibration Tool</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
     <!-- TailwindCSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -25,6 +28,7 @@
     <link rel="stylesheet" href="/static/css/vigil-tokens.css">
     <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
     <script src="/static/js/vigil-theme.js"></script>
     <style>
         #calibrationCanvas {
@@ -45,51 +49,44 @@
 
     <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
         <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
-            <span class="vigil-brand-mark">V</span>
-            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>CLASSROOM COPILOT</small></span>
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
         </a>
-        <div class="vigil-nav-label">WORKSPACE</div>
+        <div class="vigil-nav-label">MONITOR</div>
         <nav class="vigil-nav">
-            <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
-            <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
-            <a href="/calibration" class="vigil-nav-item is-active"><span>03</span><strong>Seat calibration</strong></a>
-            <a href="/data-workbench" class="vigil-nav-item"><span>04</span><strong>Data workbench</strong></a>
-            <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item is-active" aria-current="page"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
             <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
+        <div class="vigil-user" data-user-slot></div>
         <div class="vigil-sidebar-note">
             <span class="vigil-sidebar-note-dot"></span>
-            <div><strong>GEOMETRY TOOL</strong><small>Seat regions define spatial context.</small></div>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
         </div>
     </aside>
 
     <!-- Top Navigation Header -->
-    <header class="calibration-topbar border-b border-gray-800/80 bg-gray-950/90 backdrop-blur sticky top-0 z-40">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <a href="/" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 hover:opacity-90 transition">
-                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                </a>
-                <div>
-                    <div class="flex items-center gap-2">
-                        <h1 class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-gray-100 to-cyan-400 bg-clip-text text-transparent">VIGIL AI</h1>
-                        <span class="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">Seat Calibration Tool</span>
-                    </div>
-                    <p class="text-xs text-gray-400 font-mono">Interactive Polygon ROI Editor for Physical Exam Desks</p>
-                </div>
-            </div>
-
-            <div class="flex items-center gap-3">
-                <a href="/" class="px-3.5 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs font-semibold text-gray-200 transition flex items-center gap-1.5 border border-gray-700">
-                    <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
-                    Proctor Dashboard
-                </a>
-                <a href="/data-workbench" class="px-3.5 py-1.5 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-semibold transition flex items-center gap-1.5 shadow">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                    Data Workbench
-                </a>
-                <a href="/docs" target="_blank" class="text-xs text-gray-400 hover:text-cyan-400 font-mono transition">API Docs &rarr;</a>
-            </div>
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">08 · Seat calibration</span>
+            <h1 class="vg-title">Seat calibration</h1>
+            <span class="vg-subtitle">Draw one polygon per desk; the analysis reads Seat ROIs only from here.</span>
+        </div>
+        <div class="vg-actions">
+            <a href="/docs" target="_blank" class="vigil-btn vigil-btn--sm vigil-btn--ghost">API docs</a>
         </div>
     </header>
 
@@ -97,8 +94,8 @@
     <main class="calibration-workspace max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 flex flex-col space-y-4">
 
         <!-- Top Control Bar: Room, Camera & Reference Source Selector -->
-        <div class="calibration-toolbar glass-panel p-4 flex flex-wrap items-center justify-between gap-4">
-            <div class="flex flex-wrap items-center gap-3">
+        <div class="calibration-toolbar glass-panel p-4 flex flex-wrap items-end justify-between gap-4">
+            <div class="flex flex-wrap items-end gap-3">
                 <div>
                     <label class="block text-[11px] text-gray-400 uppercase font-semibold mb-1">Select Room</label>
                     <select id="selectRoom" onchange="onRoomChanged()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-1.5 text-gray-200 focus:outline-none focus:border-cyan-500 min-w-[160px]">
@@ -113,7 +110,7 @@
                     </select>
                 </div>
 
-                <div class="flex items-end gap-2 pt-4 sm:pt-0">
+                <div class="flex flex-wrap items-end gap-2">
                     <!-- One button per demo video, built from GET /api/v1/demo/presets -->
                     <span id="presetVideoButtons" class="flex items-end gap-2"></span>
 
@@ -131,7 +128,7 @@
             </div>
 
             <!-- Global Action Buttons -->
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-end gap-2">
                 <div>
                     <label for="selectCameraView" class="block text-[11px] text-gray-400 uppercase font-semibold mb-1">Camera placement</label>
                     <select id="selectCameraView" onchange="onCameraViewChanged()" class="bg-gray-900 border border-gray-700 text-xs rounded-lg px-3 py-1.5 text-gray-200 focus:outline-none focus:border-cyan-500" title="Decides which neighbour is on each candidate's left or right">
@@ -176,6 +173,7 @@
                         </div>
 
                         <span id="drawingStatusBadge" class="text-[11px] px-2 py-0.5 rounded bg-gray-800 text-gray-400 font-mono">READY</span>
+                        <label class="wall-toggle" title="Neighbour links the analysis infers from the saved ROIs"><input type="checkbox" id="showNeighbours" checked> Neighbours</label>
                     </div>
 
                     <!-- Polygon Tool Buttons -->
@@ -214,6 +212,11 @@
 
             <!-- Right Sidebar: Configured Seat List & Inspector -->
             <div class="calibration-seat-panel glass-panel p-4 flex flex-col justify-between space-y-4">
+                <div id="roomCheck" class="cal-check" aria-live="polite">
+                    <div class="cal-check-head"><span class="vg-label">Room check</span><span id="coverageChip" class="vg-chip">—</span></div>
+                    <div class="vg-bar" id="coverageBar"><i style="width:0%"></i></div>
+                    <ul id="layoutWarnings" class="cal-warnings"></ul>
+                </div>
                 <div>
                     <div class="flex items-center justify-between pb-3 border-b border-gray-800 mb-3">
                         <div>
@@ -294,5 +297,7 @@
 
     <!-- Calibration JavaScript -->
     <script src="/static/js/calibration.js"></script>
+    <script src="/static/js/calibration-layout.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
 </body>
 </html>

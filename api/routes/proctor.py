@@ -13,6 +13,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
+from api.auth import actor_name, current_user
+from storage.review_service import SessionClosed
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
 from storage.db_models import DetectionEvent, ExamSession
@@ -161,12 +163,13 @@ def submit_bookmark_review(
     bookmark_id: str,
     payload: BookmarkReviewRequest,
     db: Session = Depends(get_db),
+    user=Depends(current_user),
 ) -> dict[str, Any]:
     try:
         bookmark = review_bookmark(
             db,
             bookmark_id=bookmark_id,
-            reviewer_id=payload.reviewer_id,
+            reviewer_id=actor_name(user, payload.reviewer_id),
             decision=payload.decision,
             reason_code=payload.reason_code,
             note=payload.note,
@@ -175,6 +178,8 @@ def submit_bookmark_review(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except BookmarkConflict as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except SessionClosed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     result = serialize_bookmark(bookmark, include_reviews=True)
     realtime_manager.broadcast_threadsafe({"type": "PROCTOR_BOOKMARK_REVIEW", "bookmark": result})
     return result
@@ -274,6 +279,7 @@ def get_review_queue(
     pattern_name: Optional[str] = Query(None, alias="pattern"),
     severity: Optional[str] = Query(None),
     session_id: Optional[str] = Query(None),
+    event_id: Optional[str] = Query(None, description="One AI incident by its event id (for links from other pages)"),
     sort: str = Query("newest", pattern="^(newest|priority)$"),
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
@@ -286,7 +292,7 @@ def get_review_queue(
     decided.  ``counts`` are per decision for the other filters, and
     ``facets`` list the rooms and patterns present, for the filter menus.
     """
-    from storage.db_models import ExamRoom
+    from storage.db_models import ExamRoom, ExamSession
 
     ai_query = db.query(DetectionEvent).outerjoin(ExamRoom, DetectionEvent.room_id == ExamRoom.id)
     if room:
@@ -300,21 +306,35 @@ def get_review_queue(
         ai_query = ai_query.filter(DetectionEvent.severity == severity.upper())
     if session_id:
         ai_query = ai_query.filter(DetectionEvent.session_id == session_id)
+    if event_id:
+        ai_query = ai_query.filter(DetectionEvent.event_id == event_id)
 
     items: list[dict[str, Any]] = []
     if source in ("ALL", "AI"):
         items += [_serialize_ai_event(event) for event in ai_query.order_by(DetectionEvent.created_at.desc()).limit(2000)]
     # Bookmarks have no room/pattern/severity of their own: only shown without those filters
-    if source in ("ALL", "MANUAL") and not (room or pattern_name or severity):
+    if source in ("ALL", "MANUAL") and not (room or pattern_name or severity or event_id):
         items += [{**serialize_bookmark(b), "review_status": None} for b in list_bookmarks(db, session_id=session_id, limit=1000)]
         for item in items:
             if item.get("source_type") == "MANUAL_BOOKMARK":
                 item["review_status"] = _bookmark_status(item)
 
+    # A closed session's decisions are frozen with its approved report.  What
+    # was left undecided at closing is not waiting for anyone: it is kept out
+    # of the PENDING tab and counts and shown read-only under ALL.
+    closed_ids = {sid for (sid,) in db.query(ExamSession.id).filter(ExamSession.status == "CLOSED")}
     for item in items:
         item["review_status"] = str(item.get("review_status") or "PENDING").upper()
-    counts = {key: sum(1 for item in items if item["review_status"] == key) for key in REVIEW_STATUSES}
-    if status != "ALL":
+        item["session_closed"] = item.get("session_id") in closed_ids
+    open_pending = lambda item: item["review_status"] == "PENDING" and not item["session_closed"]  # noqa: E731
+    counts = {
+        key: sum(1 for item in items if (open_pending(item) if key == "PENDING" else item["review_status"] == key))
+        for key in REVIEW_STATUSES
+    }
+    closed_unresolved = sum(1 for item in items if item["review_status"] == "PENDING" and item["session_closed"])
+    if status == "PENDING":
+        items = [item for item in items if open_pending(item)]
+    elif status != "ALL":
         items = [item for item in items if item["review_status"] == status]
 
     if sort == "priority":
@@ -338,6 +358,7 @@ def get_review_queue(
         "items": items[offset:offset + limit],
         "total": len(items),
         "counts": counts,
+        "closed_unresolved": closed_unresolved,
         "facets": {
             "rooms": [{"code": code, "name": name, "count": n} for code, name, n in room_rows if code],
             "patterns": sorted(({"name": name, "count": n} for name, n in pattern_rows if name), key=lambda p: -p["count"]),

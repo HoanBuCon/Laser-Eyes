@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>VIGIL AI — Human Data Operations Workbench</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
   <link rel="stylesheet" href="/static/css/vigil-tokens.css">
   <link rel="stylesheet" href="/static/css/vigil-shell.css">
   <link rel="stylesheet" href="/static/css/data_workbench.css">
@@ -13,51 +16,44 @@
 <body class="vigil-classroom workbench-page">
 
   <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
-    <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
-      <span class="vigil-brand-mark">V</span>
-      <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>CLASSROOM COPILOT</small></span>
-    </a>
-    <div class="vigil-nav-label">WORKSPACE</div>
-    <nav class="vigil-nav">
-      <a href="/demo" class="vigil-nav-item"><span>01</span><strong>Live monitor</strong></a>
-      <a href="/review" class="vigil-nav-item"><span>02</span><strong>Review queue</strong></a>
-      <a href="/calibration" class="vigil-nav-item"><span>03</span><strong>Seat calibration</strong></a>
-      <a href="/data-workbench" class="vigil-nav-item is-active"><span>04</span><strong>Data workbench</strong></a>
-      <a href="/" class="vigil-nav-item"><span>05</span><strong>Operations</strong></a>
-      <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
-    </nav>
-    <div class="vigil-sidebar-note">
-      <span class="vigil-sidebar-note-dot"></span>
-      <div><strong>DATA QUALITY</strong><small>Human labels remain authoritative.</small></div>
-    </div>
+      <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+          <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+          <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+      </a>
+      <div class="vigil-nav-label">MONITOR</div>
+      <nav class="vigil-nav">
+          <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+          <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+          <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+      </nav>
+      <div class="vigil-nav-label">REVIEW</div>
+      <nav class="vigil-nav">
+          <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+          <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
+          <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+      </nav>
+      <div class="vigil-nav-label">SETUP</div>
+      <nav class="vigil-nav">
+          <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+          <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+          <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
+          <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+      </nav>
+      <div class="vigil-user" data-user-slot></div>
+      <div class="vigil-sidebar-note">
+          <span class="vigil-sidebar-note-dot"></span>
+          <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+      </div>
   </aside>
 
   <!-- Top Navbar -->
-  <header class="navbar">
-    <a href="/" class="brand">
-      <span class="brand-badge">VIGIL AI</span>
-      <span class="brand-title">Data Operations Workbench</span>
-    </a>
-
-    <div class="nav-links">
-      <a href="/" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-        Live Monitor
-      </a>
-      <a href="/calibration" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
-        Seat ROI Calibration
-      </a>
-      <a href="/data-workbench" class="nav-item active">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-        Data Workbench
-      </a>
-      <a href="/docs" target="_blank" class="nav-item">
-        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        REST API
-      </a>
-
-      <!-- Role Switcher -->
+  <header class="vg-topbar">
+    <div class="vg-topbar-title">
+      <span class="vg-eyebrow">10 · Data workbench</span>
+      <h1 class="vg-title">Data workbench</h1>
+      <span class="vg-subtitle">Images, crops, recordings and dataset versions for model work.</span>
+    </div>
+    <div class="vg-actions">
       <div class="user-badge">
         <span>Role:</span>
         <select id="active-role-select" class="form-select" style="padding: 0.15rem 0.4rem; font-size: 0.75rem;">
@@ -67,6 +63,7 @@
           <option value="ADMIN">System Admin</option>
         </select>
       </div>
+      <a href="/docs" target="_blank" class="vigil-btn vigil-btn--sm vigil-btn--ghost">API docs</a>
     </div>
   </header>
 
@@ -675,5 +672,6 @@
 
   <!-- Client Script -->
   <script src="/static/js/data_workbench.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
 </body>
 </html>

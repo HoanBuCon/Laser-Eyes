@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Playback</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom playback-page">
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item is-active" aria-current="page"><span>05</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>09</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">05 · Playback</span>
+            <h1 class="vg-title">Playback</h1>
+            <span class="vg-subtitle">Replay a whole session with its incidents on a timeline; click an incident to jump 5 s before the behaviour began.</span>
+        </div>
+        <div class="vg-actions">
+            <select id="sessionSelect" class="vg-select pb-session" aria-label="Session"></select>
+            <div class="vg-seg" role="group" aria-label="Video">
+                <button type="button" data-video="source" aria-pressed="true">Original</button>
+                <button type="button" data-video="rendered" aria-pressed="false">AI render</button>
+            </div>
+            <label class="wall-toggle"><input type="checkbox" id="boxesToggle" checked> Incident boxes</label>
+            <select id="speedSelect" class="vg-select" aria-label="Speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option><option value="4">4×</option></select>
+        </div>
+    </header>
+
+    <main class="vg-page pb-layout">
+        <section class="vg-panel pb-video-panel">
+            <div class="pb-stage-wrap">
+                <div class="pb-stage" id="stage">
+                    <video id="video" playsinline preload="auto"></video>
+                    <svg id="boxes" class="wall-boxes" preserveAspectRatio="none" aria-hidden="true"></svg>
+                    <div id="videoEmpty" class="wall-empty" hidden>No video for this session</div>
+                </div>
+            </div>
+            <div class="pb-controls">
+                <button type="button" id="playBtn" class="vigil-btn vigil-btn--sm">Play</button>
+                <button type="button" id="backBtn" class="vigil-btn vigil-btn--sm vigil-btn--ghost" title="Back 5 s (←)">−5 s</button>
+                <button type="button" id="fwdBtn" class="vigil-btn vigil-btn--sm vigil-btn--ghost" title="Forward 5 s (→)">+5 s</button>
+                <span id="clock" class="pb-clock">0:00 / 0:00</span>
+                <span id="nowChip" class="vg-chip">—</span>
+            </div>
+        </section>
+
+        <section class="vg-panel pb-incidents">
+            <div class="vg-panel-head"><h2>Incidents</h2><a id="reviewLink" class="vigil-btn vigil-btn--sm vigil-btn--ghost" href="/review">Open in review queue</a></div>
+            <div id="incidentList" class="pb-incident-list"><div class="vg-empty">Choose a session.</div></div>
+        </section>
+
+        <section class="vg-panel pb-timeline-panel">
+            <div class="vg-panel-head">
+                <h2>Timeline</h2>
+                <span id="timelineNote" class="vg-label"></span>
+            </div>
+            <div id="timeline" class="pb-timeline"></div>
+        </section>
+    </main>
+
+    <script src="/static/js/p2-common.js"></script>
+    <script src="/static/js/playback.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

@@ -17,12 +17,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from api.auth import actor_name, current_user
 from api.dependencies import get_evidence_store
 from api.schemas import EventResponse, EventReviewUpdate, ReviewResponse
 from storage.database import get_db
 from storage.evidence_store import EvidenceStore
 from storage.repositories import EventRepository
-from storage.review_service import ReviewCommand, ReviewTargetMissing, submit_event_review
+from storage.review_service import ReviewCommand, ReviewTargetMissing, SessionClosed, submit_event_review
 
 router = APIRouter(tags=["Detection Events"])
 
@@ -76,6 +77,7 @@ def review_event(
     event_id: str,
     payload: EventReviewUpdate,
     db: Session = Depends(get_db),
+    user=Depends(current_user),
 ):
     """Submit human proctor review decision (CONFIRMED / REJECTED / INCONCLUSIVE)."""
     try:
@@ -83,7 +85,7 @@ def review_event(
             db,
             ReviewCommand(
                 event_id=event_id,
-                reviewer_id=payload.reviewer_id,
+                reviewer_id=actor_name(user, payload.reviewer_id),
                 decision=payload.decision,
                 reason_code=payload.reason_code,
                 note=payload.note,
@@ -91,6 +93,8 @@ def review_event(
         )
     except ReviewTargetMissing as exc:
         raise HTTPException(status_code=404, detail="Event not found") from exc
+    except SessionClosed as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @router.get("/events/{event_id}/evidence")

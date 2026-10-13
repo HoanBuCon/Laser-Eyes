@@ -123,3 +123,6 @@ Desktop.ini
 # ---- 9. Scratch Scripts & Temp Workspace ----
 scratch/
 tmp/
+
+# HyperFrames video projects (renders and captured footage are large)
+videos/

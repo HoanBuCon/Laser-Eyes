@@ -156,6 +156,63 @@ async function runPending(event) {
     }
 }
 
+// --- VIGIL One computers ----------------------------------------------------------
+
+function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function when(iso) {
+    return iso ? new Date(iso + 'Z').toLocaleString() : '—';
+}
+
+async function loadDevices() {
+    const body = document.getElementById('oneDevices');
+    const res = await fetch('/api/v1/one/devices', { cache: 'no-store' });
+    if (res.status === 401 || res.status === 403) {
+        body.innerHTML = '<tr><td class="vg-empty" colspan="5">Sign in as chief or admin to see paired computers.</td></tr>';
+        return;
+    }
+    const devices = res.ok ? await res.json() : [];
+    body.innerHTML = devices.length ? devices.map((d) => `<tr>
+        <td class="strong">${esc(d.name)}<br><small>${esc(d.hostname || '')} ${esc(d.app_version || '')}</small></td>
+        <td>${esc(when(d.paired_at))}<br><small>by ${esc(d.paired_by || '—')}</small></td>
+        <td>${esc(when(d.last_seen_at))}</td>
+        <td>${d.revoked ? '<span class="vg-chip">REVOKED</span>' : '<span class="vg-chip" data-tone="good">ACTIVE</span>'}</td>
+        <td>${d.revoked ? '' : `<button type="button" class="vigil-btn vigil-btn--sm vigil-btn--danger" data-revoke="${esc(d.id)}">Revoke</button>`}</td>
+    </tr>`).join('') : '<tr><td class="vg-empty" colspan="5">No VIGIL One computer paired yet.</td></tr>';
+}
+
+async function createPairingCode() {
+    const res = await fetch('/api/v1/one/pairing-codes', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        document.getElementById('pairHint').textContent = data.detail || `HTTP ${res.status}`;
+        return;
+    }
+    document.getElementById('pairCode').textContent = data.code;
+    const until = new Date(data.expires_at);
+    document.getElementById('pairHint').textContent = `valid until ${until.toLocaleTimeString()} · server ${window.location.host}`;
+    log(`Pairing code created (valid ${Math.round(data.valid_seconds / 60)} min)`);
+}
+
+async function revokeDevice(id) {
+    if (!window.confirm('Revoke this computer? It keeps its data locally but can no longer send to this server.')) return;
+    const res = await fetch(`/api/v1/one/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    log(res.ok ? 'VIGIL One computer revoked' : `Revoke failed (HTTP ${res.status})`, res.ok ? '' : 'danger');
+    loadDevices();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('pairCodeBtn').addEventListener('click', createPairingCode);
+    document.getElementById('oneDevices').addEventListener('click', (event) => {
+        const btn = event.target.closest('[data-revoke]');
+        if (btn) revokeDevice(btn.dataset.revoke);
+    });
+    loadDevices();
+    setInterval(loadDevices, 15000);
+});
+
 document.addEventListener('DOMContentLoaded', () => {
     $('actorInput').value = currentActor();
     $('actorInput').addEventListener('change', () => {

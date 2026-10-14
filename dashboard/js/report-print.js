@@ -51,11 +51,13 @@
             <h2>1. Thông tin ca thi</h2>
             <table class="facts"><tbody>
                 <tr><td>Kỳ thi</td><td>${esc(r.exam ? `${r.exam.name}${r.exam.subject_code ? ` (${r.exam.subject_code})` : ''}` : '—')}</td></tr>
-                <tr><td>Phòng thi</td><td>${esc(r.room ? `${r.room.code} – ${r.room.name}` : '—')}</td></tr>
+                ${s.product === 'ONE'
+                    ? `<tr><td>Thí sinh</td><td>${esc(s.candidate_ref || '—')}${s.candidate_name ? ` – ${esc(s.candidate_name)}` : ''} (VIGIL One, máy tính của thí sinh${s.simulation ? ', dữ liệu mô phỏng' : ''})</td></tr>`
+                    : `<tr><td>Phòng thi</td><td>${esc(r.room ? `${r.room.code} – ${r.room.name}` : '—')}</td></tr>`}
                 <tr><td>Giám thị phụ trách</td><td>${esc(r.proctor || '—')}</td></tr>
                 <tr><td>Thời gian theo lịch</td><td>${s.scheduled_start ? `${dt(s.scheduled_start, false)} – ${dt(s.scheduled_end, false)}` : '—'}</td></tr>
                 <tr><td>Thời gian phân tích</td><td>${dt(s.started_at)} – ${dt(s.ended_at)}</td></tr>
-                <tr><td>Độ phủ vị trí ngồi</td><td>${cov.capacity ? `${cov.seats_with_roi}/${cov.capacity} chỗ (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} chỗ`}</td></tr>
+                ${s.product === 'ONE' ? '' : `<tr><td>Độ phủ vị trí ngồi</td><td>${cov.capacity ? `${cov.seats_with_roi}/${cov.capacity} chỗ (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} chỗ`}</td></tr>`}
             </tbody></table>
             <h2>2. Tổng hợp sự việc AI đề nghị xem xét</h2>
             <table><thead><tr><th>Tổng</th><th class="num">Đã xác nhận</th><th class="num">Bác bỏ</th><th class="num">Chưa rõ</th><th class="num">Chưa xử lý</th><th class="num">TG xử lý TB</th></tr></thead>

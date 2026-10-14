@@ -440,3 +440,42 @@ Mỗi ngày kết thúc bằng: chạy `pytest`, chạy thử end-to-end, commit
   - 3 file `reports/proctor-review-*.json`.
 
 Cần xem xét và commit (hoặc loại) trước khi tách nhánh tính năng. Không dùng `git add .`.
+
+---
+
+## Phụ lục B — Trạng thái triển khai (nhánh `feat/vigil-one-hub`, cập nhật 2026-10-13)
+
+Quyết định §12 dùng theo mặc định đề xuất: tên "VIGIL Hub", có thumbnail live (chỉ trong bộ nhớ, tắt được), DB demo riêng, giữ giao diện web tiếng Anh, nhánh tách từ `DEV`.
+
+| Yêu cầu | Trạng thái | Nơi thực hiện / kiểm chứng |
+|---|---|---|
+| Mô hình dữ liệu (§6.1) | Xong | `storage/db_models.py`, migration `storage/database.py`; chạy trên bản sao DB thật không mất dữ liệu |
+| FR-HUB-01, 12, 13 ghép nối, thu hồi, token | Xong | `storage/one_service.py`, `api/routes/one.py`, UI `/admin`; test `tests/test_one_hub.py` |
+| FR-HUB-02…07 phiên, sự kiện, ảnh, bookmark, nhịp, kết thúc | Xong | idempotent theo `client_session_id` / `event_id` / `request_id`; SHA-256 kiểm tra phía Hub |
+| FR-HUB-08 hàng đợi đa sản phẩm | Xong | API `product=`, bộ lọc trên `/review`, nhãn tiếng Việt của tín hiệu One |
+| FR-HUB-09 video wall | Xong | nguồn "VIGIL One · candidate #k (auto)" trên `/wall` |
+| FR-HUB-10 báo cáo One | Xong | mục Thí sinh trên `/reports` và bản in; luồng duyệt/đóng băng dùng chung |
+| FR-HUB-11 xem lại One | Một phần | API playback trả timeline và ảnh; trang `/playback` chưa có giao diện riêng cho phiên không có video |
+| FR-ONE-01…07, 09 | Xong | `exam_monitor/hub_client.py` (outbox SQLite, retry, đóng app gửi nốt), `exam_monitor/app.py`; test `tests/test_one_hub_client.py` |
+| FR-ONE-08 quyết định review đồng bộ hai chiều | Chưa | quyết định thực hiện trên web Hub |
+| FR-CLS-01 seed demo | Xong | `scripts/seed_demo.py` |
+| FR-CLS-02 dọn dữ liệu | Thay bằng DB demo riêng | xem `docs/DEMO_RUNBOOK_VIGIL_HUB.md` |
+| FR-CLS-03…05 | Chưa | — |
+| Script client mô phỏng | Xong | `scripts/one_fake_client.py` |
+| Runbook | Xong | `docs/DEMO_RUNBOOK_VIGIL_HUB.md` |
+
+Lỗi phát hiện và đã sửa trong quá trình làm:
+
+- Khởi động lại server từng đóng nhầm phiên One đang chạy: `storage/session_lifecycle.py`.
+- "Remove test rooms" từng coi phòng ảo `VIGIL-ONE` là phòng test và sẽ xóa dữ liệu One: `storage/maintenance.py`.
+- Hàng đợi từng trả `video_url` cho bằng chứng dạng ảnh JPEG.
+
+Kiểm chứng:
+- 390/390 test pass (thêm 21 test mới).
+- Chạy thật app desktop VIGIL One (nguồn mô phỏng) với Hub: 3 tín hiệu kèm ảnh `READY` và SHA-256, phiên `COMPLETED`, outbox về 0.
+- `/review`, `/wall`, `/admin` đã kiểm trên trình duyệt.
+
+Chưa kiểm:
+- Webcam và micro thật.
+- Hai máy qua mạng LAN.
+- Rút mạng thật trên app desktop (đã kiểm bằng test giả lập lỗi mạng).

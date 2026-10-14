@@ -72,11 +72,15 @@
         const facts = [
             ['Session', s.name],
             ['Exam', r.exam ? `${r.exam.name}${r.exam.exam_date ? ` · ${r.exam.exam_date}` : ''}` : '—'],
-            ['Room', r.room ? `${r.room.code} · ${r.room.name}` : '—'],
+            s.product === 'ONE'
+                ? ['Candidate', `${s.candidate_ref || '—'}${s.candidate_name ? ` · ${s.candidate_name}` : ''} · VIGIL One${s.simulation ? ' (simulation)' : ''}`]
+                : ['Room', r.room ? `${r.room.code} · ${r.room.name}` : '—'],
             ['Proctor', r.proctor || '—'],
             ['Scheduled', s.scheduled_start ? `${fmt(new Date(s.scheduled_start))} – ${fmt(new Date(s.scheduled_end), false)}` : '—'],
             ['Analysed', s.started_at ? `${fmt(utc(s.started_at))} – ${s.ended_at ? fmt(utc(s.ended_at), false) : '…'}` : '—'],
-            ['Seat coverage', cov.capacity ? `${cov.seats_with_roi} of ${cov.capacity} seats (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} seats`],
+            s.product === 'ONE'
+                ? ['Source', 'Candidate computer webcam (VIGIL One)']
+                : ['Seat coverage', cov.capacity ? `${cov.seats_with_roi} of ${cov.capacity} seats (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} seats`],
             ['Status', s.status],
         ];
         $('rpFacts').innerHTML = facts.map(([k, v]) => `<tr><td class="vg-label">${esc(k)}</td><td class="strong">${esc(v)}</td></tr>`).join('');

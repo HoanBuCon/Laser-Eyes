@@ -34,6 +34,7 @@ class GazeAnalyzer:
         self.object_model_path = Path(object_model_path or OBJECT_MODEL_PATH)
         self.max_faces = max_faces
         self.backend_name = "OpenCV fallback"
+        self.init_error = ""  # why MediaPipe could not start (shown by --selftest)
         self._landmarker = None
         self._object_detector = None
         self._timestamp_ms = 0
@@ -87,8 +88,9 @@ class GazeAnalyzer:
             self._landmarker = FaceLandmarker.create_from_options(options)
             self.backend_name = "MediaPipe Face Landmarker"
             self._init_object_detector(BaseOptions, RunningMode)
-        except Exception:
+        except Exception as exc:
             self._landmarker = None
+            self.init_error = f"{exc.__class__.__name__}: {exc}"
 
     def _init_object_detector(self, base_options_cls, running_mode_cls) -> None:
         if not self.object_model_path.exists():

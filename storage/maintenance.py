@@ -64,7 +64,8 @@ class CleanupPlan:
 
 def plan_test_room_cleanup(db: Session, keep_room_codes: Iterable[str] = ()) -> CleanupPlan:
     """Rooms that can never be analysed (no Seat ROI) and are not demo rooms."""
-    keep = {code.upper() for code in keep_room_codes}
+    # The VIGIL One virtual room has no Seat ROIs by design: never a test room
+    keep = {code.upper() for code in keep_room_codes} | {"VIGIL-ONE"}
     rooms_with_seats = {room_id for (room_id,) in db.query(SeatROI.room_id).distinct()}
     plan = CleanupPlan()
     for room in db.query(ExamRoom).order_by(ExamRoom.created_at).all():

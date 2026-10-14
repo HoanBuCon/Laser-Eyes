@@ -409,7 +409,9 @@ def _contained_persisted_evidence(path_value: Optional[str], extensions: set[str
     candidate = Path(path_value).resolve()
     if candidate.suffix.lower() not in extensions or not candidate.is_file():
         return None
-    roots = [demo_runs_root().resolve(), demo_final_root().resolve()]
+    from storage.one_service import one_evidence_root
+
+    roots = [demo_runs_root().resolve(), demo_final_root().resolve(), one_evidence_root()]
     if not any(root == candidate.parent or root in candidate.parents for root in roots):
         return None
     return candidate

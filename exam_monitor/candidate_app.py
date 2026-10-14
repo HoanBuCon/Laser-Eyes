@@ -1,0 +1,689 @@
+"""VIGIL One — candidate mode, for online exams on the candidate's own computer.
+
+Steps: join (exam code + candidate code + PIN) -> consent -> device check ->
+exam (calibration first, then a small always-on-top window) -> submit.
+
+The candidate cannot change thresholds, review or delete signals, or pick a
+video file: the exam's monitoring policy comes from VIGIL Hub.  Signals are
+not shown to the candidate (policy ``show_alerts_to_candidate``), only what
+they need to fix (no face, too dark) and the connection state.  Everything is
+recorded locally first and sent through the same outbox as the proctor mode.
+"""
+
+from __future__ import annotations
+
+import ctypes
+import json
+import os
+import queue
+import subprocess
+import sys
+import threading
+import time
+import uuid
+from dataclasses import replace
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+import tkinter as tk
+from tkinter import messagebox
+
+import cv2
+from PIL import Image, ImageTk
+
+from .audio import VoiceActivityDetector, speech_is_confirmed
+from .engine import GazeAnalyzer
+from .events import EventDetector, SessionStore
+from .paths import app_data_dir, resource
+from .hub_client import OFFLINE, SYNCED, UNPAIRED, HubClient, HubError
+from .models import EventType, MonitoringEvent, SessionInfo, Severity
+from .sources import CameraSource, DemoSource
+from .theme import COLORS, FONTS, brand_font, set_theme
+
+APP_TITLE = "VIGIL One — Thi trực tuyến"
+LOGO_PATH = resource("assets", "V.png")
+VIRTUAL_CAMERA_HINTS = ("obs", "virtual", "manycam", "snap camera", "xsplit", "droidcam", "epoccam", "camtwist", "e2esoft")
+
+CONSENT_TEXT = (
+    "Trong thời gian làm bài, VIGIL One sử dụng webcam (và micro nếu kỳ thi yêu cầu) của máy này để ghi nhận "
+    "các tín hiệu quan sát như: hướng nhìn, quay đầu, không thấy khuôn mặt, có thêm người, vật thể như điện thoại "
+    "hoặc tài liệu, tiếng nói chuyện.\n\n"
+    "• Phân tích hình ảnh chạy ngay trên máy này. Video không được ghi lại liên tục.\n"
+    "• Khi có tín hiệu, một ảnh chụp kèm mô tả được gửi về máy chủ của đơn vị tổ chức thi.\n"
+    "• Một ảnh nhỏ được gửi định kỳ để giám thị theo dõi; ảnh này không được lưu trữ.\n"
+    "• Các tín hiệu chỉ để giám thị xem xét. Phần mềm không tự kết luận vi phạm; mọi quyết định do giám thị đưa ra.\n"
+    "• Dữ liệu được lưu và xử lý theo quy định của đơn vị tổ chức thi; bạn có quyền hỏi và khiếu nại theo quy chế thi.\n\n"
+    "Không nhận diện khuôn mặt. Không theo dõi các ứng dụng khác trên máy."
+)
+
+
+def data_dir() -> Path:
+    """Candidate-mode files, kept apart from the proctor mode's sessions on the same computer."""
+    return app_data_dir() / "candidate"
+
+
+def display_count() -> int:
+    if sys.platform != "win32":
+        return 1
+    try:
+        return int(ctypes.windll.user32.GetSystemMetrics(80))  # SM_CMONITORS
+    except (AttributeError, OSError):
+        return 1
+
+
+def camera_device_names() -> list[str]:
+    """Names of camera drivers installed on Windows (to spot virtual cameras)."""
+    if sys.platform != "win32":
+        return []
+    cmd = ["powershell", "-NoProfile", "-Command",
+           "Get-CimInstance Win32_PnPEntity | Where-Object { $_.PNPClass -in 'Camera','Image' } | "
+           "ForEach-Object { $_.Name }"]
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=8,
+                             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return [line.strip() for line in out.stdout.splitlines() if line.strip()]
+
+
+def _with_offset(value: Optional[str]) -> Optional[str]:
+    if not value:
+        return value
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return (parsed if parsed.tzinfo else parsed.astimezone()).isoformat(timespec="milliseconds")
+
+
+class Button(tk.Button):
+    def __init__(self, master, text, command=None, primary=True, **kw):
+        super().__init__(master, text=text, command=command, relief="flat", bd=0, cursor="hand2",
+                         bg=COLORS["primary"] if primary else COLORS["surface_alt"],
+                         fg=COLORS["primary_text"] if primary else COLORS["text"],
+                         activebackground=COLORS["primary_hover"] if primary else COLORS["surface_hover"],
+                         activeforeground=COLORS["primary_text"] if primary else COLORS["text"],
+                         font=FONTS["body_medium"], padx=18, pady=9, **kw)
+
+
+class CandidateApp(tk.Tk):
+    def __init__(self, config: dict[str, Any], simulate: bool = False):
+        super().__init__()
+        set_theme("light")
+        self.config_data = config
+        self.simulate = simulate
+        self.title(APP_TITLE)
+        self._set_window_icon()
+        self.configure(bg=COLORS["bg"])
+        self.geometry("880x640+80+50")
+        self.minsize(760, 560)
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+        self.dir = data_dir()
+        self.dir.mkdir(parents=True, exist_ok=True)
+        self._state_path = self.dir / "candidate.json"
+        saved = self._load_state()
+        self.hub_url = config.get("hub_url") or saved.get("hub_url") or "http://127.0.0.1:8000"
+        self.hub = HubClient(self.dir / "hub", base_url=self.hub_url, token=saved.get("token", ""),
+                             on_change=lambda status: self._ui_queue.put(("sync", status)))
+        self.exam: dict[str, Any] = saved.get("exam") or {}
+        self.candidate: dict[str, Any] = saved.get("candidate") or {}
+        self.policy: dict[str, Any] = saved.get("policy") or {}
+        self.store = SessionStore(self.dir)
+
+        self._ui_queue: queue.Queue = queue.Queue()
+        self._worker: Optional[threading.Thread] = None
+        self._stop = threading.Event()
+        self._phase = "idle"          # idle -> check -> exam
+        self._source = None
+        self._analyzer: Optional[GazeAnalyzer] = None
+        self._session: Optional[SessionInfo] = None
+        self._started_mono = 0.0
+        self._checks: dict[str, tuple[str, str]] = {}
+        self._photo = None
+        self._finished = False
+
+        self.body = tk.Frame(self, bg=COLORS["bg"])
+        self.body.pack(fill="both", expand=True)
+        self.after(50, self._pump)
+        self.hub.start()
+        if self.hub.configured and self.exam:
+            self.after(100, self._resume_or_join)
+        else:
+            self._show_join()
+
+    def _set_window_icon(self) -> None:
+        try:
+            icon = Image.open(LOGO_PATH).convert("RGBA")
+            icon.thumbnail((64, 64), Image.Resampling.LANCZOS)
+            self._icon = ImageTk.PhotoImage(icon)
+            self.iconphoto(True, self._icon)
+        except OSError:
+            pass
+
+    # ------------------------------------------------------------ persistence
+    def _load_state(self) -> dict[str, Any]:
+        try:
+            return json.loads(self._state_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _save_state(self) -> None:
+        state = {"hub_url": self.hub.base_url, "token": self.hub.token, "exam": self.exam,
+                 "candidate": self.candidate, "policy": self.policy}
+        self._state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    # ------------------------------------------------------------ layout helpers
+    def _clear(self) -> tk.Frame:
+        for child in self.body.winfo_children():
+            child.destroy()
+        frame = tk.Frame(self.body, bg=COLORS["bg"])
+        frame.pack(fill="both", expand=True, padx=40, pady=28)
+        return frame
+
+    def _header(self, parent, title: str, subtitle: str = "") -> None:
+        row = tk.Frame(parent, bg=COLORS["bg"])
+        row.pack(fill="x", pady=(0, 18))
+        try:
+            logo = Image.open(LOGO_PATH).convert("RGBA")
+            logo.thumbnail((44, 44), Image.Resampling.LANCZOS)
+            self._logo = ImageTk.PhotoImage(logo)
+            tk.Label(row, image=self._logo, bg=COLORS["bg"]).pack(side="left", padx=(0, 12))
+        except OSError:
+            pass
+        text = tk.Frame(row, bg=COLORS["bg"])
+        text.pack(side="left")
+        tk.Label(text, text="vigil one", bg=COLORS["bg"], fg=COLORS["text_muted"], font=brand_font(16)).pack(anchor="w")
+        tk.Label(text, text=title, bg=COLORS["bg"], fg=COLORS["text"], font=FONTS["h1"]).pack(anchor="w")
+        if subtitle:
+            tk.Label(text, text=subtitle, bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["small"]).pack(anchor="w")
+
+    def _preview_label(self, parent, width: int, height: int) -> tk.Label:
+        """Camera preview sized in pixels (a Label without an image measures width/height in characters)."""
+        self._blank = ImageTk.PhotoImage(Image.new("RGB", (width, height), COLORS["video_bg"]))
+        return tk.Label(parent, image=self._blank, bg=COLORS["video_bg"], bd=0)
+
+    def _field(self, parent, label: str, show: str = "", value: str = "") -> tk.Entry:
+        tk.Label(parent, text=label, bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["small"]).pack(anchor="w", pady=(10, 4))
+        entry = tk.Entry(parent, show=show, bg=COLORS["surface"], fg=COLORS["text"], relief="solid", bd=1,
+                         insertbackground=COLORS["text"], font=("Segoe UI", 13), width=34)
+        entry.insert(0, value)
+        entry.pack(anchor="w", ipady=6)
+        return entry
+
+    # ------------------------------------------------------------ step 1: join
+    def _show_join(self, message: str = "") -> None:
+        frame = self._clear()
+        self._header(frame, "Vào phòng thi trực tuyến", "Nhập thông tin do đơn vị tổ chức thi cung cấp")
+        if not self.config_data.get("lock_hub_url"):
+            self.hub_entry = self._field(frame, "Địa chỉ máy chủ thi", value=self.hub_url)
+        else:
+            self.hub_entry = None
+        self.code_entry = self._field(frame, "Mã kỳ thi")
+        self.cand_entry = self._field(frame, "Mã thí sinh", value=self.candidate.get("code", ""))
+        self.pin_entry = self._field(frame, "Mã PIN", show="•")
+        self.join_error = tk.Label(frame, text=message, bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"],
+                                   wraplength=560, justify="left")
+        self.join_error.pack(anchor="w", pady=(12, 0))
+        self.join_button = Button(frame, "VÀO THI  →", self._join)
+        self.join_button.pack(anchor="w", pady=(14, 0))
+        self.bind("<Return>", lambda _e: self._join())
+        self.code_entry.focus_set()
+
+    def _join(self) -> None:
+        if self._phase != "idle":
+            return
+        url = self.hub_entry.get().strip() if self.hub_entry else self.hub_url
+        code, cand, pin = self.code_entry.get().strip(), self.cand_entry.get().strip(), self.pin_entry.get()
+        if not (code and cand and pin):
+            self.join_error.configure(text="Hãy nhập đủ mã kỳ thi, mã thí sinh và PIN.")
+            return
+        self.join_button.configure(state="disabled", text="ĐANG KIỂM TRA…")
+
+        def work():
+            try:
+                self._ui_queue.put(("joined", self.hub.join(url, code, cand, pin)))
+            except HubError as exc:
+                self._ui_queue.put(("join_failed", str(exc)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def _on_joined(self, data: dict[str, Any]) -> None:
+        self.unbind("<Return>")
+        self.exam, self.policy = data["exam"], data["policy"]
+        self.candidate = data["candidate"]
+        self.hub_url = self.hub.base_url
+        self._save_state()
+        if self.candidate.get("consent_given"):
+            self._show_check()
+        else:
+            self._show_consent()
+
+    def _resume_or_join(self) -> None:
+        """A saved token from an earlier start today: continue without asking for the PIN again."""
+        def work():
+            try:
+                res = self.hub.http.get(self.hub._url("/client/policy"), headers=self.hub._headers(), timeout=5)
+                ok = res.status_code == 200
+                self._ui_queue.put(("resume", res.json() if ok else None))
+            except Exception:
+                self._ui_queue.put(("resume", None))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    # ------------------------------------------------------------ step 2: consent
+    def _show_consent(self) -> None:
+        frame = self._clear()
+        self._header(frame, "Thông báo và đồng ý", f"{self.exam.get('name', '')} · Thí sinh {self.candidate.get('code', '')}"
+                     + (f" · {self.candidate['full_name']}" if self.candidate.get("full_name") else ""))
+        box = tk.Text(frame, height=13, wrap="word", bg=COLORS["surface"], fg=COLORS["text"], relief="solid", bd=1,
+                      font=FONTS["body"], padx=14, pady=12)
+        box.insert("1.0", CONSENT_TEXT + ("" if self.policy.get("microphone", True) else "\n\nKỳ thi này không dùng micro."))
+        box.configure(state="disabled")
+        box.pack(fill="x")
+        agreed = tk.BooleanVar(value=False)
+        tk.Checkbutton(frame, text="Tôi đã đọc và đồng ý cho VIGIL One giám sát trong thời gian làm bài.",
+                       variable=agreed, bg=COLORS["bg"], fg=COLORS["text"], activebackground=COLORS["bg"],
+                       font=FONTS["body"], command=lambda: go.configure(state="normal" if agreed.get() else "disabled")
+                       ).pack(anchor="w", pady=(14, 6))
+        self.consent_error = tk.Label(frame, text="", bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"])
+        self.consent_error.pack(anchor="w")
+        go = Button(frame, "TIẾP TỤC  →", self._consent)
+        go.configure(state="disabled")
+        go.pack(anchor="w", pady=(8, 0))
+
+    def _consent(self) -> None:
+        def work():
+            try:
+                self.hub.consent()
+                self._ui_queue.put(("consented", None))
+            except HubError as exc:
+                self._ui_queue.put(("consent_failed", str(exc)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    # ------------------------------------------------------------ step 3: device check
+    def _show_check(self) -> None:
+        frame = self._clear()
+        self._header(frame, "Kiểm tra thiết bị", "Ngồi ngay ngắn, nhìn vào màn hình, đủ ánh sáng trên khuôn mặt")
+        row = tk.Frame(frame, bg=COLORS["bg"])
+        row.pack(fill="both", expand=True)
+        self.preview = self._preview_label(row, 480, 270)
+        self.preview.pack(side="left", anchor="n")
+        side = tk.Frame(row, bg=COLORS["bg"])
+        side.pack(side="left", fill="both", expand=True, padx=(22, 0))
+        self.check_labels = {}
+        items = [("camera", "Camera"), ("face", "Đúng một khuôn mặt"), ("light", "Ánh sáng")]
+        if self.policy.get("microphone", True):
+            items.append(("mic", "Micro"))
+        items += [("hub", "Kết nối máy chủ thi"), ("virtual", "Không dùng camera ảo"), ("displays", "Một màn hình")]
+        for key, label in items:
+            lab = tk.Label(side, text=f"…  {label}", bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["body"], anchor="w")
+            lab.pack(fill="x", pady=4)
+            self.check_labels[key] = (lab, label)
+        self.check_hint = tk.Label(side, text="", bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["small"],
+                                   wraplength=280, justify="left")
+        self.check_hint.pack(anchor="w", pady=(12, 0))
+        self.start_button = Button(side, "BẮT ĐẦU LÀM BÀI", self._start_exam)
+        self.start_button.configure(state="disabled")
+        self.start_button.pack(anchor="w", pady=(16, 0))
+        self._set_check("hub", "ok", "")
+        self._phase = "check"
+        self._stop.clear()
+        self._worker = threading.Thread(target=self._camera_loop, daemon=True, name="candidate-camera")
+        self._worker.start()
+        threading.Thread(target=self._system_checks, daemon=True).start()
+
+    def _set_check(self, key: str, state: str, detail: str) -> None:
+        self._checks[key] = (state, detail)
+        self._ui_queue.put(("check", key))
+
+    def _system_checks(self) -> None:
+        names = camera_device_names()
+        virtual = [n for n in names if any(h in n.lower() for h in VIRTUAL_CAMERA_HINTS)]
+        self._virtual_names = virtual
+        self._set_check("virtual", "warn" if virtual else "ok", ", ".join(virtual))
+        screens = display_count()
+        self._screens = screens
+        self._set_check("displays", "warn" if screens > 1 else "ok", f"{screens} màn hình" if screens > 1 else "")
+        if self.policy.get("microphone", True) and not self.simulate:
+            vad = VoiceActivityDetector()
+            state = vad.start()
+            vad.stop()
+            self._set_check("mic", "ok" if state.available else "warn", "" if state.available else "Không mở được micro")
+        elif self.policy.get("microphone", True):
+            self._set_check("mic", "ok", "mô phỏng")
+
+    def _render_check(self, key: str) -> None:
+        if key not in self.check_labels:
+            return
+        lab, label = self.check_labels[key]
+        state, detail = self._checks[key]
+        mark, color = {"ok": ("✓", COLORS["good"]), "warn": ("!", COLORS["warning"]), "fail": ("✗", COLORS["danger"])}[state]
+        lab.configure(text=f"{mark}  {label}" + (f" — {detail}" if detail else ""), fg=color)
+        ready = all(self._checks.get(k, ("fail", ""))[0] != "fail" for k in ("camera", "face", "light")) \
+            and all(k in self._checks for k in ("camera", "face", "light"))
+        if hasattr(self, "start_button") and self._phase == "check":
+            self.start_button.configure(state="normal" if ready else "disabled")
+            hints = []
+            if self._checks.get("face", ("ok", ""))[0] == "fail":
+                hints.append("Hãy ngồi vào giữa khung hình, chỉ một người.")
+            if self._checks.get("light", ("ok", ""))[0] == "fail":
+                hints.append("Bật đèn hoặc quay mặt về phía nguồn sáng.")
+            if any(self._checks.get(k, ("ok", ""))[0] == "warn" for k in ("virtual", "displays", "mic")):
+                hints.append("Các mục có dấu ! vẫn cho phép làm bài nhưng sẽ được báo cho giám thị.")
+            self.check_hint.configure(text="\n".join(hints))
+
+    # ------------------------------------------------------------ camera + analysis worker
+    def _open_source(self):
+        if self.simulate:
+            return DemoSource()
+        source = CameraSource(int(self.config_data.get("camera_index", 0)))
+        if not source.capture.isOpened():
+            source.release()
+            return None
+        return source
+
+    def _camera_loop(self) -> None:
+        source = self._open_source()
+        if source is None:
+            self._set_check("camera", "fail", "Không mở được camera — kiểm tra quyền camera của Windows")
+            return
+        self._source = source
+        self._set_check("camera", "ok", "mô phỏng" if self.simulate else "")
+        if not self.simulate:
+            self._analyzer = GazeAnalyzer()
+            self._analyzer.set_allowed_materials({"book"} if self.policy.get("allow_materials") else set())
+        detector = EventDetector()
+        for name, seconds in (self.policy.get("thresholds") or {}).items():
+            try:
+                detector.set_threshold(EventType(name), float(seconds))
+            except ValueError:
+                pass
+        audio: Optional[VoiceActivityDetector] = None
+        last_check = last_live = last_screen = 0.0
+        frames, fps_started = 0, time.monotonic()
+        try:
+            while not self._stop.is_set():
+                ok, frame = source.read()
+                now = time.monotonic()
+                if not ok or frame is None:
+                    if self._phase == "exam":
+                        self._emit(MonitoringEvent(uuid.uuid4().hex[:10].upper(), self._session.session_id,
+                                                   EventType.CAMERA_INTERRUPTED, Severity.HIGH,
+                                                   datetime.now().isoformat(timespec="seconds"), datetime.now().isoformat(timespec="seconds"),
+                                                   0.0, "Camera bị gián đoạn.", 1.0), frame=None)
+                    self._ui_queue.put(("camera_lost", None))
+                    break
+                result = source.last_result if self.simulate else self._analyzer.analyze(frame, now)
+                if self._phase == "exam":
+                    if audio is None and self.policy.get("microphone", True) and not self.simulate:
+                        audio = VoiceActivityDetector()
+                        audio.start()
+                    if audio is not None:
+                        state = audio.snapshot()
+                        result = replace(result, is_talking=speech_is_confirmed(result.talking_score, result.is_talking, state))
+                    for event in detector.update(result, self._session.session_id, now):
+                        self._emit(event, frame)
+                    frames += 1
+                    if now - last_live >= float(self.hub.live_settings.get("interval") or 5):
+                        last_live = now
+                        self._push_live(frame, result, frames, fps_started, now)
+                    if now - last_screen >= 60:
+                        last_screen = now
+                        if display_count() > 1 and not getattr(self, "_screens_flagged", False):
+                            self._screens_flagged = True
+                            self._integrity("multiple_displays", f"Máy đang nối {display_count()} màn hình.")
+                    self._session.frame_count = frames
+                    self._session.average_fps = frames / max(0.001, now - fps_started)
+                elif now - last_check >= 0.4:
+                    last_check = now
+                    faces = int(result.face_count)
+                    self._set_check("face", "ok" if faces == 1 else "fail",
+                                    "" if faces == 1 else ("không thấy khuôn mặt" if faces == 0 else f"{faces} khuôn mặt"))
+                    dark = float(getattr(result, "brightness", 120)) < 55
+                    self._set_check("light", "fail" if dark else "ok", "quá tối" if dark else "")
+                self._ui_queue.put(("frame", (frame, result)))
+                if self.simulate:
+                    time.sleep(1 / 30)
+        finally:
+            if audio is not None:
+                audio.stop()
+            source.release()
+
+    def _emit(self, event: MonitoringEvent, frame) -> None:
+        """Record a signal locally, then queue it (and its snapshot) for VIGIL Hub."""
+        session = self._session
+        if frame is not None:
+            path = self.store.evidence_dir / f"{session.session_id}_{event.event_id}.jpg"
+            cv2.imwrite(str(path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+            event.evidence_path = str(path)
+        session.events.append(event)
+        elapsed = max(0.0, (time.monotonic() - self._started_mono - event.duration_seconds) * 1000.0)
+        self.hub.add_event(session.session_id, {
+            "event_id": f"{session.session_id}-{event.event_id}"[:36], "event_type": event.event_type.value,
+            "severity": event.severity.value, "started_at": _with_offset(event.started_at),
+            "ended_at": _with_offset(event.ended_at), "duration_seconds": round(event.duration_seconds, 2),
+            "session_elapsed_ms": round(elapsed, 1), "confidence": round(float(event.confidence), 3),
+            "label": event.label, "reason": event.reason,
+        }, event.evidence_path)
+
+    def _integrity(self, kind: str, reason: str) -> None:
+        """Set-up facts the Hub turns into integrity signals (virtual camera, several screens)."""
+        session = self._session
+        now = datetime.now().astimezone().isoformat(timespec="milliseconds")
+        self.hub.add_event(session.session_id, {
+            "event_id": f"{session.session_id}-{kind[:6].upper()}{uuid.uuid4().hex[:4]}"[:36], "event_type": kind,
+            "severity": "medium", "started_at": now, "ended_at": now, "duration_seconds": 0,
+            "session_elapsed_ms": round((time.monotonic() - self._started_mono) * 1000.0, 1), "confidence": 1.0,
+            "reason": reason,
+        })
+
+    def _push_live(self, frame, result, frames: int, fps_started: float, now: float) -> None:
+        settings = self.hub.live_settings
+        jpeg = None
+        if settings.get("enabled", True):
+            width = int(settings.get("width") or 320)
+            h, w = frame.shape[:2]
+            small = cv2.resize(frame, (width, max(1, int(h * width / max(1, w)))), interpolation=cv2.INTER_AREA) if w > width else frame
+            ok, enc = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            jpeg = enc.tobytes() if ok else None
+        labels = {"center": "THẲNG", "left": "TRÁI", "right": "PHẢI", "up": "TRÊN", "down": "DƯỚI", "unknown": "—"}
+        eye = "—" if not result.face_count else ("ĐANG HỌC" if not result.calibrated else (
+            f"NGOÀI • {labels.get(result.eye_direction, '—')}" if result.eyes_outside_zone else "TRONG VÙNG"))
+        self.hub.update_live(self._session.session_id, {
+            "fps": round(frames / max(0.001, now - fps_started), 1), "eye": eye,
+            "head": labels.get(result.head_direction, "—") if result.face_count else "—",
+            "people": int(result.detected_people_count), "alerts": len(self._session.events),
+            "risk_score": self._session.risk_score, "calibrated": bool(result.calibrated),
+            "source_kind": "SIMULATION" if self.simulate else "CAMERA", "frame_count": frames,
+        }, jpeg)
+
+    # ------------------------------------------------------------ step 4: exam
+    def _start_exam(self) -> None:
+        key = datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:4].upper()
+        self._session = SessionInfo(session_id=key, candidate_id=self.candidate.get("code", ""),
+                                    exam_name=self.exam.get("name", ""), started_at=datetime.now().isoformat(timespec="seconds"),
+                                    source_name="Mô phỏng" if self.simulate else "Camera", exam_id=self.exam.get("id"))
+        self.hub.open_session(key, {
+            "candidate_ref": self.candidate.get("code", ""), "exam_id": self.exam.get("id"), "source_kind": "SIMULATION" if self.simulate else "CAMERA",
+            "simulation": self.simulate, "started_at": _with_offset(self._session.started_at),
+            "client_time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+        })
+        self._started_mono = time.monotonic()
+        if self._analyzer is not None:
+            self._analyzer.begin_calibration()
+        self._phase = "exam"
+        if getattr(self, "_virtual_names", None):
+            self._integrity("virtual_camera", "Máy có cài camera ảo: " + ", ".join(self._virtual_names))
+        if getattr(self, "_screens", 1) > 1:
+            self._screens_flagged = True
+            self._integrity("multiple_displays", f"Máy đang nối {self._screens} màn hình khi bắt đầu làm bài.")
+        self._show_exam()
+
+    def _show_exam(self) -> None:
+        for child in self.body.winfo_children():
+            child.destroy()
+        width, height = 340, 330
+        x = max(0, self.winfo_screenwidth() - width - 24)
+        self.minsize(300, 280)
+        self.geometry(f"{width}x{height}+{x}+24")
+        self.attributes("-topmost", True)
+        frame = tk.Frame(self.body, bg=COLORS["bg"])
+        frame.pack(fill="both", expand=True, padx=12, pady=10)
+        top = tk.Frame(frame, bg=COLORS["bg"])
+        top.pack(fill="x")
+        self.rec_dot = tk.Label(top, text="●", bg=COLORS["bg"], fg=COLORS["danger"], font=("Segoe UI", 10))
+        self.rec_dot.pack(side="left")
+        tk.Label(top, text="vigil one", bg=COLORS["bg"], fg=COLORS["text"], font=brand_font(14)).pack(side="left", padx=4)
+        tk.Label(top, text="· ĐANG GIÁM SÁT", bg=COLORS["bg"], fg=COLORS["text"], font=FONTS["tiny"]).pack(side="left")
+        self.timer = tk.Label(top, text="00:00", bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["mono"])
+        self.timer.pack(side="right")
+        self.preview = self._preview_label(frame, 316, 178)
+        self.preview.pack(pady=(8, 6))
+        self.exam_hint = tk.Label(frame, text="Nhìn vào giữa màn hình vài giây để hiệu chỉnh…", bg=COLORS["bg"],
+                                  fg=COLORS["warning"], font=FONTS["small"], wraplength=310, justify="left")
+        self.exam_hint.pack(anchor="w")
+        self.sync_label = tk.Label(frame, text="", bg=COLORS["bg"], fg=COLORS["text_dim"], font=FONTS["tiny"])
+        self.sync_label.pack(anchor="w", pady=(2, 6))
+        Button(frame, "NỘP BÀI / KẾT THÚC", self._submit).pack(fill="x")
+        # Fit the window to its content (text height depends on the screen's DPI), top-right corner
+        self.update_idletasks()
+        width, height = max(width, self.body.winfo_reqwidth()), self.body.winfo_reqheight()
+        self.geometry(f"{width}x{height}+{max(0, self.winfo_screenwidth() - width - 24)}+24")
+        self._tick()
+
+    def _tick(self) -> None:
+        if self._phase != "exam":
+            return
+        elapsed = int(time.monotonic() - self._started_mono)
+        self.timer.configure(text=f"{elapsed // 60:02d}:{elapsed % 60:02d}")
+        self.after(1000, self._tick)
+
+    def _finish(self, reason: str) -> None:
+        """Stop analysing, save locally, close the session on the Hub (SUBMITTED or QUIT)."""
+        if self._finished or self._session is None:
+            return
+        self._finished = True
+        self._phase = "done"
+        self._stop.set()
+        if self._worker:
+            self._worker.join(timeout=5)
+        self._session.ended_at = datetime.now().isoformat(timespec="seconds")
+        self.store.save_session(self._session)
+        self.hub.stop_session(self._session.session_id, {
+            "ended_at": _with_offset(self._session.ended_at), "frame_count": self._session.frame_count,
+            "average_fps": round(self._session.average_fps, 2), "reason": reason,
+        })
+
+    def _submit(self) -> None:
+        if not messagebox.askyesno("Nộp bài", "Kết thúc giám sát và xác nhận bạn đã nộp bài?", parent=self):
+            return
+        self._finish("SUBMITTED")
+        self.attributes("-topmost", False)
+        frame = self._clear()
+        self._header(frame, "Đã kết thúc", "Cảm ơn bạn. Đang gửi nốt dữ liệu về máy chủ thi…")
+        self.done_label = tk.Label(frame, text="", bg=COLORS["bg"], fg=COLORS["text"], font=FONTS["body"],
+                                   wraplength=520, justify="left")
+        self.done_label.pack(anchor="w")
+        self.update_idletasks()
+        self.geometry(f"{max(640, self.body.winfo_reqwidth())}x{max(300, self.body.winfo_reqheight())}+120+120")
+        self._wait_sent()
+
+    def _wait_sent(self) -> None:
+        status = self.hub.status()
+        if status.pending == 0:
+            self.done_label.configure(text="✓ Máy chủ thi đã nhận đủ dữ liệu. Bạn có thể đóng cửa sổ này.", fg=COLORS["good"])
+            self._clear_token()
+            return
+        note = "Đang chờ mạng…" if status.state == OFFLINE else "Đang gửi…"
+        self.done_label.configure(text=f"{note} Còn {status.pending} mục. Đừng tắt máy cho tới khi xong.", fg=COLORS["text"])
+        self.after(1000, self._wait_sent)
+
+    def _clear_token(self) -> None:
+        self._state_path.unlink(missing_ok=True)
+
+    # ------------------------------------------------------------ UI pump
+    def _pump(self) -> None:
+        latest = None
+        try:
+            while True:
+                kind, payload = self._ui_queue.get_nowait()
+                if kind == "frame":
+                    latest = payload
+                elif kind == "joined":
+                    self._on_joined(payload)
+                elif kind == "join_failed":
+                    self.join_button.configure(state="normal", text="VÀO THI  →")
+                    self.join_error.configure(text=payload)
+                elif kind == "resume":
+                    if payload is None:
+                        self.hub.configure(self.hub_url, "")
+                        self._show_join("Phiên đăng nhập trước đã hết hạn. Hãy vào lại.")
+                    else:
+                        self.policy = payload
+                        self._show_check()
+                elif kind == "consented":
+                    self.candidate["consent_given"] = True
+                    self._save_state()
+                    self._show_check()
+                elif kind == "consent_failed":
+                    self.consent_error.configure(text=payload)
+                elif kind == "check":
+                    if self._phase == "check":
+                        self._render_check(payload)
+                elif kind == "camera_lost":
+                    messagebox.showerror("Camera", "Không đọc được hình từ camera. Hãy kiểm tra camera rồi mở lại phần mềm.", parent=self)
+                elif kind == "sync":
+                    self._render_sync(payload)
+        except queue.Empty:
+            pass
+        if latest is not None:
+            self._render_frame(*latest)
+        self.after(40, self._pump)
+
+    def _render_frame(self, frame, result) -> None:
+        if not hasattr(self, "preview") or not self.preview.winfo_exists():
+            return
+        target_w = 316 if self._phase == "exam" else 480
+        h, w = frame.shape[:2]
+        rgb = cv2.cvtColor(cv2.resize(frame, (target_w, int(h * target_w / w))), cv2.COLOR_BGR2RGB)
+        self._photo = ImageTk.PhotoImage(Image.fromarray(rgb))
+        self.preview.configure(image=self._photo)
+        if self._phase == "exam":
+            if not result.face_count:
+                hint, color = "Không thấy khuôn mặt — hãy ngồi vào khung hình.", COLORS["danger"]
+            elif float(getattr(result, "brightness", 120)) < 55:
+                hint, color = "Hình quá tối — hãy bật thêm đèn.", COLORS["warning"]
+            elif not result.calibrated and not self.simulate:
+                hint, color = "Nhìn vào giữa màn hình vài giây để hiệu chỉnh…", COLORS["warning"]
+            else:
+                hint, color = "Đang làm bài. Giữ cửa sổ này mở cho tới khi nộp bài.", COLORS["good"]
+            self.exam_hint.configure(text=hint, fg=color)
+
+    def _render_sync(self, status) -> None:
+        if not hasattr(self, "sync_label") or not self.sync_label.winfo_exists():
+            return
+        text = {SYNCED: "● Đã kết nối máy chủ thi", OFFLINE: f"● Mất kết nối — {status.pending} mục được giữ lại, sẽ tự gửi",
+                UNPAIRED: "● Máy chủ từ chối phiên này — báo giám thị"}.get(status.state, f"● Đang gửi {status.pending} mục…")
+        color = {SYNCED: COLORS["good"], OFFLINE: COLORS["danger"], UNPAIRED: COLORS["danger"]}.get(status.state, COLORS["warning"])
+        self.sync_label.configure(text=text, fg=color)
+
+    def _on_close(self) -> None:
+        if self._phase == "exam":
+            if not messagebox.askyesno(
+                "Thoát khi chưa nộp bài?",
+                "Bạn chưa bấm Nộp bài. Nếu thoát bây giờ, việc rời phòng thi sẽ được ghi nhận và báo cho giám thị.\n\nVẫn thoát?",
+                icon="warning", parent=self,
+            ):
+                return
+            self._finish("QUIT")
+        self._stop.set()
+        self.hub.drain(timeout=3.0)
+        self.destroy()
+
+
+def run(config: Optional[dict[str, Any]] = None, simulate: bool = False) -> None:
+    app = CandidateApp(config or {}, simulate=simulate)
+    app.mainloop()

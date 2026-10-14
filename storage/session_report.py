@@ -88,6 +88,11 @@ def build_session_report(db: Session, session: ExamSession, serialize: Callable[
             "started_at": _iso(session.started_at),
             "ended_at": _iso(session.ended_at),
             "run_id": session_run_id(db, session),
+            # VIGIL One: one candidate on their own computer instead of a room camera
+            "product": session.product or "CLASSROOM",
+            "candidate_ref": session.subject_ref,
+            "candidate_name": session.subject_name,
+            "simulation": bool(session.simulation),
         },
         "exam": {"id": exam.id, "name": exam.name, "subject_code": exam.subject_code, "exam_date": exam.exam_date} if exam else None,
         "room": {"id": room.id, "code": room.room_code, "name": room.name, "capacity": capacity} if room else None,

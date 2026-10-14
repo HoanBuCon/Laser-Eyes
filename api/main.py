@@ -34,6 +34,7 @@ from api.routes import (
     demo,
     events,
     inference,
+    one,
     proctor,
     rooms,
     seats,
@@ -79,10 +80,32 @@ async def lifespan(app: FastAPI):
 
     runtime.register_event_callback(publish_event)
     runtime.register_status_callback(publish_status)
+
+    async def watch_one_connections():
+        """Online exams: flag candidates whose VIGIL One went silent (every 10 s)."""
+        from storage.online_exam_service import check_connections
+
+        def check():
+            session = SessionLocal()
+            try:
+                return check_connections(session)
+            finally:
+                session.close()
+
+        while True:
+            await asyncio.sleep(10)
+            try:
+                if await asyncio.to_thread(check):
+                    realtime_manager.broadcast_threadsafe({"type": "ONE_EVENTS", "reason": "connection_lost"})
+            except Exception as exc:  # never let the watchdog take the server down
+                logger.warning("VIGIL One connection watchdog: %s", exc)
+
+    watchdog = asyncio.create_task(watch_one_connections())
     logger.info("VIGIL AI Enterprise Proctoring Server is ready!")
     try:
         yield
     finally:
+        watchdog.cancel()
         runtime.unregister_event_callback(publish_event)
         runtime.unregister_status_callback(publish_status)
         realtime_manager.clear_event_loop(loop)
@@ -114,11 +137,15 @@ def _cors_origins() -> list[str]:
     return ["http://127.0.0.1:8000", "http://localhost:8000"]
 
 
+_DEVICE_PATHS = ("/api/v1/one/client/", "/api/one/client/")
+
+
 @app.middleware("http")
 async def protect_network_demo(request: Request, call_next):
     """Require the opt-in demo token for API calls when one is configured."""
     token = os.getenv("VIGIL_DEMO_TOKEN")
-    if token and request.url.path.startswith(("/api/", "/demo/")):
+    # VIGIL One desktops authenticate with their own device token instead
+    if token and request.url.path.startswith(("/api/", "/demo/")) and not request.url.path.startswith(_DEVICE_PATHS):
         supplied = request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
         if not supplied or not secrets.compare_digest(supplied, token):
             return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
@@ -136,7 +163,7 @@ async def revalidate_dashboard_files(request: Request, call_next):
     return response
 
 
-_OPEN_PATHS = ("/login", "/static/", "/api/v1/auth/", "/health", "/ready", "/api/v1/health", "/api/v1/ready", "/favicon.ico")
+_OPEN_PATHS = ("/api/v1/one/client/", "/api/one/client/", "/login", "/static/", "/api/v1/auth/", "/health", "/ready", "/api/v1/health", "/api/v1/ready", "/favicon.ico")
 
 
 @app.middleware("http")
@@ -189,6 +216,7 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(auth_routes.router, prefix=prefix)
     app.include_router(exams.router, prefix=prefix)
     app.include_router(reports.router, prefix=prefix)
+    app.include_router(one.router, prefix=prefix)
 
 
 @app.get("/health", tags=["Health"])
@@ -285,6 +313,7 @@ if dashboard_dir.exists():
         ("/reports", "reports.html"),
         ("/reports/print", "report-print.html"),
         ("/users", "users.html"),
+        ("/online", "online.html"),
     ):
         app.add_api_route(route, _page(page), methods=["GET"], tags=["Dashboard"], include_in_schema=False)
 

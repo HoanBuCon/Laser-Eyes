@@ -374,7 +374,7 @@ body.vigil-classroom [class*="border-gray-"] { border-color: var(--vigil-border)
 @media (max-width: 1120px) { .vigil-user { display: none; } }
 @media (max-height: 760px) { .vigil-sidebar-note { display: none; } }
 
-/* Official VIGIL AI logo (dashboard/assets/brand, generated from assets/vigil_ai.png) */
+/* Official VIGIL AI logo (dashboard/assets/brand, generated from assets/V.png) */
 .vigil-brand-logo { display: block; width: auto; height: 32px; flex: 0 0 auto; object-fit: contain; }
 .login-brand .vigil-brand-logo { height: 56px; }
 
@@ -397,3 +397,12 @@ body.vigil-classroom [class*="border-gray-"] { border-color: var(--vigil-border)
 .font-dmc5 .login-brand .vigil-brand-copy strong { font-size: 1.9rem; }
 /* The narrow-sidebar rule hides .vigil-brand-copy; the sign-in page has no sidebar */
 .login-brand .vigil-brand-copy { display: grid !important; }
+
+/* Page titles in the DMC5 font too (English titles only: the font has lowercase a-z and space, no digits or accents) */
+.font-dmc5 .vg-title {
+  font-family: "DMC5", var(--vigil-font-sans);
+  font-weight: 400;
+  letter-spacing: -0.08em;
+  word-spacing: .25em;
+  text-transform: lowercase;
+}

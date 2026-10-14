@@ -7,6 +7,10 @@
  * kept for a few seconds after its last occurrence.  The live tile shows the
  * analysis stream, which already carries the same clean boxes.  Seat ROIs are
  * never drawn here.  Every tile keeps its source's aspect ratio.
+ *
+ * VIGIL One tiles ("VIGIL One · candidate #k") follow the k-th candidate
+ * currently in an exam on a VIGIL One computer: the small live frame the
+ * desktop sends every 2 s, its connection and its latest readings.
  */
 
 const LAYOUTS = { 1: [1, 1], 4: [2, 2], 6: [3, 2], 9: [3, 3] };
@@ -60,6 +64,7 @@ async function loadSources() {
     sourceOptions = [
         ...presets.map((p) => ({ id: `preset:${p.name}`, label: `${p.title} · replay`, preset: p.name })),
         { id: 'live', label: 'Live analysis stream' },
+        ...Array.from({ length: 9 }, (_, k) => ({ id: `one-slot:${k}`, label: `VIGIL One · candidate #${k + 1} (auto)` })),
         { id: '', label: '— empty —' },
     ];
     const defaults = [...presets.map((p) => `preset:${p.name}`), 'live'];
@@ -108,6 +113,13 @@ async function assignSource(tile, sourceId) {
     tile.empty.hidden = Boolean(sourceId);
     if (!sourceId) {
         setStatus(tile, 'EMPTY');
+        return;
+    }
+    if (sourceId.startsWith('one-slot:')) {
+        setStatus(tile, 'VIGIL ONE');
+        tile.empty.hidden = false;
+        tile.empty.textContent = 'Waiting for a VIGIL One candidate';
+        pollOne();
         return;
     }
     if (sourceId === 'live') {
@@ -286,6 +298,48 @@ async function pollLive() {
     } catch (e) { /* server restarting */ }
 }
 
+// --- VIGIL One tiles --------------------------------------------------------------
+
+async function pollOne() {
+    const oneTiles = tiles.filter((t) => String(t.source || '').startsWith('one-slot:'));
+    if (!oneTiles.length) return;
+    let sessions = [];
+    try {
+        const res = await fetch('/api/v1/one/sessions', { cache: 'no-store' });
+        if (res.ok) sessions = await res.json();
+    } catch (e) { return; /* server restarting */ }
+    oneTiles.forEach((tile) => {
+        const session = sessions[Number(tile.source.split(':')[1])];
+        if (!session) {
+            tile.img.hidden = true;
+            tile.empty.hidden = false;
+            tile.empty.textContent = 'Waiting for a VIGIL One candidate';
+            tile.time.textContent = '';
+            setStatus(tile, 'VIGIL ONE');
+            return;
+        }
+        const live = session.live || {};
+        const lost = session.connection !== 'LIVE';
+        const signals = session.total_events || 0;
+        const label = `ONE · ${session.candidate_ref || '—'}${session.simulation ? ' · SIMULATION' : ''}`;
+        setStatus(tile, lost ? `${label} · CONNECTION LOST` : (signals ? `${label} · ${signals} SIGNALS` : label), lost ? 'danger' : (signals ? 'warning' : 'good'));
+        tile.time.textContent = [live.eye && `Eyes ${live.eye}`, live.head && `Head ${live.head}`, live.people !== undefined && `${live.people} person(s)`]
+            .filter(Boolean).join(' · ');
+        if (!lost) {
+            const next = new Image();
+            next.onload = () => {
+                tile.img.src = next.src;
+                tile.img.hidden = false;
+                tile.empty.hidden = true;
+            };
+            next.src = `${session.thumbnail_url}?t=${Date.now()}`;
+        } else if (tile.img.hidden) {
+            tile.empty.hidden = false;
+            tile.empty.textContent = 'No live frame from this computer';
+        }
+    });
+}
+
 // --- Controls -------------------------------------------------------------------
 
 // Native fullscreen when the browser allows it; otherwise (embedded views,
@@ -371,4 +425,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     requestAnimationFrame(frameLoop);
     pollLive();
     setInterval(pollLive, 2000);
+    pollOne();
+    setInterval(pollOne, 2000);
 });

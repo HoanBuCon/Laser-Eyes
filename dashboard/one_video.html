@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Session video</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <link rel="stylesheet" href="/static/css/online.css">
+    <link rel="stylesheet" href="/static/css/one-video.css">
+    <script src="/static/js/vigil-theme.js"></script>
+</head>
+<body class="vigil-classroom one-video-page">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="36" height="36">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+            <a href="/online" class="vigil-nav-item"><span>04</span><strong>Online exams</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>05</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item is-active" aria-current="page"><span>06</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>07</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>08</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>09</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>10</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">06 · Playback · VIGIL One</span>
+            <h1 class="vg-title">Session video</h1>
+            <span class="vg-subtitle" id="ovSubtitle">The whole exam of one candidate, recorded by VIGIL One.</span>
+        </div>
+        <div class="vg-actions">
+            <button type="button" id="ovMerge" class="vigil-btn vigil-btn--sm" hidden>Join video now</button>
+            <a id="ovDownload" class="vigil-btn vigil-btn--sm" hidden download>Download MP4</a>
+            <a id="ovReview" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/review?product=ONE">Review signals</a>
+        </div>
+    </header>
+
+    <main class="vg-page">
+        <section class="vg-panel ov-player-panel">
+            <div class="vg-panel-head"><h2 id="ovTitle">Candidate</h2><span class="vg-label" id="ovStatus">—</span></div>
+            <div class="ov-stage">
+                <video id="ovVideo" controls playsinline preload="metadata"></video>
+                <div id="ovEmpty" class="ov-empty" hidden></div>
+            </div>
+            <div class="ov-timeline" id="ovTimeline" aria-label="Signals on the session timeline">
+                <div class="ov-track"><div class="ov-progress" id="ovProgress"></div></div>
+                <div id="ovMarks"></div>
+            </div>
+            <div class="ov-facts" id="ovFacts"></div>
+        </section>
+
+        <section class="vg-panel">
+            <div class="vg-panel-head"><h2>Signals</h2><span class="vg-label">click to jump to the moment</span></div>
+            <div id="ovSignals" class="ov-signals"><div class="vg-empty">Loading…</div></div>
+        </section>
+    </main>
+
+    <script src="/static/js/one-video.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

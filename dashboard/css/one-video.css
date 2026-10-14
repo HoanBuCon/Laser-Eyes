@@ -1,0 +1,23 @@
+/* Session video (VIGIL One): the whole exam of one candidate */
+.ov-stage { position: relative; background: #050506; aspect-ratio: 16 / 9; display: grid; place-items: center; }
+.ov-stage video { width: 100%; height: 100%; object-fit: contain; background: #050506; display: block; }
+.ov-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; opacity: .7; font-size: 13px; padding: 24px; text-align: center; }
+.ov-timeline { position: relative; height: 30px; margin: 12px 16px 4px; cursor: pointer; }
+.ov-track { position: absolute; left: 0; right: 0; top: 13px; height: 4px; border-radius: 2px; background: var(--vigil-border); overflow: hidden; }
+.ov-progress { height: 100%; width: 0; background: var(--vigil-text); }
+.ov-mark { position: absolute; top: 6px; width: 4px; height: 18px; margin-left: -2px; padding: 0; border: 0; border-radius: 2px;
+    background: var(--vigil-warning); cursor: pointer; }
+.ov-mark[data-severity="HIGH"], .ov-mark[data-severity="CRITICAL"] { background: var(--vigil-danger); }
+.ov-mark:hover { transform: scaleY(1.25); }
+.ov-gap { position: absolute; top: 10px; width: 2px; height: 10px; margin-left: -1px; background: var(--vigil-text-dim); }
+.ov-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 18px; padding: 10px 16px 16px; }
+.ov-facts > div { display: grid; gap: 2px; min-width: 0; }
+.ov-fact { font-family: var(--vigil-font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.ov-signals { display: grid; gap: 6px; padding: 12px 16px 16px; }
+.ov-signal { appearance: none; display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; text-align: left;
+    padding: 8px 10px; font: inherit; font-size: 13px; color: inherit; cursor: pointer;
+    background: transparent; border: 1px solid var(--vigil-border); border-radius: 6px; }
+.ov-signal:hover { background: var(--vigil-surface-hover); }
+.ov-signal-time { font-family: var(--vigil-font-mono); }
+.vg-label[data-tone="good"] { color: var(--vigil-good); }
+.vg-label[data-tone="warning"] { color: var(--vigil-warning); }

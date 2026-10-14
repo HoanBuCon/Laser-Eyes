@@ -345,7 +345,14 @@ function renderDetail(item) {
         video.src = videoUrl;
         video.load();
     } else {
-        setVideoStatus(item.evidence_error || (manual ? 'Bookmarks keep a frame, not a clip.' : (isOne(item) ? 'VIGIL One sends a snapshot per signal, not a clip.' : 'No clip for this incident.')));
+        setVideoStatus(item.evidence_error || (manual ? 'Bookmarks keep a frame, not a clip.' : (isOne(item) ? 'No clip for this signal yet; the whole exam video has it.' : 'No clip for this incident.')));
+    }
+    // VIGIL One records the whole exam: open it at this signal's moment
+    const sessionVideo = isOne(item) && item.session_id;
+    $('dSessionVideo').classList.toggle('hidden', !sessionVideo);
+    if (sessionVideo) {
+        const at = item.first_seen_ms ?? item.source_timestamp_ms;
+        $('dSessionVideo').href = `/one-video?session=${encodeURIComponent(item.session_id)}${at != null ? `&t=${Math.round(at)}` : ''}`;
     }
     $('dSnapshot').src = snapshotUrl || '';
     $('dSnapshotLink').href = snapshotUrl || '#';

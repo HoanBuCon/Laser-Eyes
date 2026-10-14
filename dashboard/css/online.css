@@ -1,6 +1,11 @@
 /* 04 Online exams: candidates sitting the exam on their own computer with VIGIL One */
-.on-kpi { text-align: left; cursor: pointer; font: inherit; color: inherit; }
-.on-kpi[aria-pressed="true"] { outline: 2px solid var(--vigil-text); outline-offset: -2px; }
+/* The KPI tiles are buttons (they filter the grid): drop the browser's button look, keep the shell's tile */
+.on-kpi { appearance: none; -webkit-appearance: none; margin: 0; text-align: left; cursor: pointer; font: inherit; color: inherit;
+    background: transparent; border: 0; border-right: 1px solid var(--vigil-border); border-radius: 0; }
+.on-kpi:last-child { border-right: 0; }
+.on-kpi:hover { background: var(--vigil-surface-hover); }
+.on-kpi:focus-visible { outline: 2px solid var(--vigil-focus-ring); outline-offset: -2px; }
+.on-kpi[aria-pressed="true"] { background: var(--vigil-surface-alt); box-shadow: inset 0 -2px 0 var(--vigil-text); }
 .on-setup-grid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(320px, 1.4fr); gap: 28px; padding: 16px; }
 .on-joincode { display: flex; align-items: center; gap: 14px; margin: 6px 0 10px; }
 .on-joincode code { font-family: var(--vigil-font-mono); font-size: 34px; letter-spacing: .25em; }

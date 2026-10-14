@@ -27,6 +27,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -217,6 +218,13 @@ class ExamSession(Base):
     simulation = Column(Boolean, default=False)
     last_heartbeat_at = Column(DateTime, nullable=True)
     live_status_json = Column(Text, nullable=True)
+    # VIGIL One full-session recording: segments uploaded during the exam, joined into one MP4 at the end
+    video_status = Column(String(20), nullable=True)   # RECORDING, MERGING, READY, PARTIAL, FAILED
+    video_path = Column(String(500), nullable=True)
+    video_sha256 = Column(String(64), nullable=True)
+    video_duration_s = Column(Float, nullable=True)
+    video_gaps_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] of the exam with no video
+    video_error = Column(Text, nullable=True)
 
     # Relationships
     room = relationship("ExamRoom", back_populates="sessions")
@@ -693,6 +701,23 @@ class PairingCode(Base):
     expires_at = Column(DateTime, nullable=False)
     used_at = Column(DateTime, nullable=True)
     device_id = Column(String(36), ForeignKey("client_devices.id"), nullable=True)
+
+
+class SessionVideoSegment(Base):
+    """One piece of a VIGIL One session recording, as uploaded (kept after joining, with its digest)."""
+
+    __tablename__ = "session_video_segments"
+    __table_args__ = (UniqueConstraint("session_id", "seq", name="uq_session_video_segment"),)
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=False, index=True)
+    seq = Column(Integer, nullable=False)              # 0, 1, 2 ... in recording order
+    start_ms = Column(Float, nullable=False)           # from the start of the session
+    duration_s = Column(Float, nullable=False)
+    file_path = Column(String(500), nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    file_size_bytes = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
 
 class Candidate(Base):

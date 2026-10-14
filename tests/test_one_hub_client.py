@@ -12,7 +12,7 @@ import requests
 
 from exam_monitor.hub_client import DISABLED, OFFLINE, SYNCED, UNPAIRED, HubClient, HubError
 from storage.db_models import DetectionEvent, EvidenceFile, ExamSession, ProctorBookmark
-from test_one_hub import _sign_in, client, db  # noqa: F401  (fixtures)
+from test_one_hub import _mp4, _sign_in, client, db  # noqa: F401  (fixtures)
 
 
 class Flaky:
@@ -92,6 +92,22 @@ def test_full_session_reaches_the_hub(client, db, tmp_path):  # noqa: F811
     assert db.query(ProctorBookmark).one().request_id == "rq-1"
 
 
+def test_clip_follows_its_signal_to_the_hub(client, db, tmp_path):  # noqa: F811
+    hub = _pair(client, db, tmp_path, Flaky(client))
+    key = "20261014-091500-CL01"
+    hub.open_session(key, {"candidate_ref": "SV-02", "exam_name": "Thi thử"})
+    hub.add_event(key, _event("ev-clip"), evidence_path=_jpeg_file(tmp_path / "ev.jpg"))
+    clip = tmp_path / "ev.mp4"
+    clip.write_bytes(_mp4(tmp_path))
+    hub.add_clip(key, "ev-clip", str(clip))
+    _drain(hub)
+    assert hub.status().state == SYNCED and hub.status().failed == 0
+    db.expire_all()
+    evidence = db.query(EvidenceFile).one()
+    assert evidence.video_path.endswith(".mp4") and evidence.snapshot_path.endswith(".jpg")
+    assert evidence.video_sha256 == hashlib.sha256(clip.read_bytes()).hexdigest()
+
+
 def test_network_drop_keeps_items_and_resends_without_duplicates(client, db, tmp_path):  # noqa: F811
     http = Flaky(client)
     hub = _pair(client, db, tmp_path, http)
@@ -153,3 +169,17 @@ def test_unpaired_client_records_nothing(tmp_path):
     hub.open_session("S", {"candidate_ref": "x"})
     hub.add_event("S", _event(str(uuid.uuid4())))
     assert hub.status().pending == 0 and hub.status().state == DISABLED
+
+
+def test_plain_http_only_inside_the_local_network(monkeypatch):
+    from ipaddress import ip_network
+
+    from exam_monitor import hub_client
+
+    monkeypatch.setattr(hub_client, "_local_networks", lambda: [ip_network("172.172.0.0/16")])
+    for url in ("http://127.0.0.1:8000", "http://localhost:8000", "http://192.168.1.10:8000", "http://10.0.0.5:8000",
+                "http://172.172.0.102:8000", "http://hub-pc:8000", "https://thi.truong.edu.vn"):
+        hub_client.check_transport(url)  # accepted
+    for url in ("http://thi.truong.edu.vn", "http://8.8.8.8:8000", "http://172.173.0.1:8000"):
+        with pytest.raises(HubError):
+            hub_client.check_transport(url)

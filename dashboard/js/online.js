@@ -238,13 +238,15 @@ async function renderDetail() {
     }
     $('dReview').href = `/review?status=ALL&product=ONE&session_id=${encodeURIComponent(session.session_id)}`;
     $('dReport').href = `/reports?session=${encodeURIComponent(session.session_id)}`;
+    $('dVideo').href = `/one-video?session=${encodeURIComponent(session.session_id)}`;
     try {
         const q = await api(`/api/v1/proctor/review-queue?status=ALL&product=ONE&limit=100&session_id=${encodeURIComponent(session.session_id)}`);
         $('dSignals').innerHTML = q.items.length ? q.items.map((item) => {
             const manual = item.source_type === 'MANUAL_BOOKMARK';
             const img = item.snapshot_url || (manual ? `/api/v1/proctor/bookmarks/${item.bookmark_id}/snapshot` : '');
             const when = item.first_seen_ms != null ? `${(item.first_seen_ms / 1000).toFixed(0)} s` : '';
-            return `<div class="on-signal">${img ? `<img src="${esc(img)}" alt="">` : '<span></span>'}
+            const at = item.first_seen_ms != null ? `&t=${Math.round(item.first_seen_ms)}` : '';
+            return `<div class="on-signal">${img ? `<a href="/one-video?session=${encodeURIComponent(session.session_id)}${at}" title="Watch this moment"><img src="${esc(img)}" alt=""></a>` : '<span></span>'}
                 <div><strong>${esc(manual ? 'Marked frame' : (item.label || item.primary_signal))}</strong><br><small>${esc(item.reason || item.note || '')}</small></div>
                 <span class="vg-chip">${esc(when || item.review_status)}</span></div>`;
         }).join('') : '<div class="vg-empty">No signal so far.</div>';

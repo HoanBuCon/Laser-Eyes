@@ -12,9 +12,11 @@ Two audiences:
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Response, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -24,6 +26,7 @@ from storage.database import get_db
 from storage.db_models import ClientDevice, ExamSession
 from storage import one_service as one
 from storage import online_exam_service as online
+from storage import one_video
 from storage.db_models import Exam
 from storage.proctor_service import serialize_bookmark
 
@@ -121,6 +124,56 @@ def get_thumbnail(session_id: str) -> Response:
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
+# ---------------------------------------------------------------- full-session video (web)
+
+def _one_session(db: Session, session_id: str) -> ExamSession:
+    session = db.get(ExamSession, session_id)
+    if session is None or session.product != "ONE":
+        raise HTTPException(status_code=404, detail="Phiên VIGIL One không tồn tại.")
+    return session
+
+
+def _queue_merge(request: Request, background: BackgroundTasks, session_id: str) -> None:
+    provider = request.app.dependency_overrides.get(get_db, get_db)
+    background.add_task(one_video.merge_in_background, session_id, provider)
+
+
+@router.get("/sessions/{session_id}/video")
+def get_session_video(session_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    return one_video.info(db, _one_session(db, session_id))
+
+
+@router.get("/sessions/{session_id}/video/file")
+def get_session_video_file(session_id: str, db: Session = Depends(get_db)):
+    session = _one_session(db, session_id)
+    path = Path(session.video_path or "")
+    if session.video_status not in ("READY", "PARTIAL") or not path.is_file():
+        raise HTTPException(status_code=404, detail="Video cả phiên chưa sẵn sàng.")
+    name = f"VIGIL-One_{session.subject_ref or 'candidate'}_{session.id[:8]}.mp4"
+    return FileResponse(str(path), media_type="video/mp4", filename=name, content_disposition_type="inline",
+                        headers={"X-Vigil-Sha256": session.video_sha256 or ""})
+
+
+@router.get("/sessions/{session_id}/video/segments/{seq}")
+def get_session_video_segment(session_id: str, seq: int, db: Session = Depends(get_db)):
+    _one_session(db, session_id)
+    segment = next((s for s in one_video.segments(db, session_id) if s.seq == seq), None)
+    if segment is None or not Path(segment.file_path).is_file():
+        raise HTTPException(status_code=404, detail="Đoạn video không tồn tại.")
+    return FileResponse(segment.file_path, media_type="video/mp4", headers={"X-Vigil-Sha256": segment.sha256})
+
+
+@router.post("/sessions/{session_id}/video/merge", status_code=202)
+def merge_session_video(session_id: str, request: Request, background: BackgroundTasks, db: Session = Depends(get_db),
+                        _user=Depends(require_roles("CHIEF", "ADMIN", always=True))) -> dict[str, Any]:
+    """Join what has arrived so far (e.g. a candidate whose app never sent the end of the session)."""
+    session = _one_session(db, session_id)
+    session.video_status = "MERGING"
+    db.commit()
+    _queue_merge(request, background, session_id)
+    return one_video.info(db, session)
+
+
 # ---------------------------------------------------------------- client (device token)
 
 class PairRequest(BaseModel):
@@ -210,6 +263,54 @@ async def post_evidence(
     return {"event_id": event_id, "status": evidence.status, "sha256": evidence.video_sha256, "bytes": evidence.file_size_bytes}
 
 
+@router.post("/client/events/{event_id}/clip")
+async def post_clip(
+    event_id: str,
+    video: UploadFile = File(...),
+    sha256: str = Form(""),
+    device: ClientDevice = Depends(device_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    data = await video.read(one.MAX_CLIP_BYTES + 1)
+    if len(data) > one.MAX_CLIP_BYTES:
+        raise HTTPException(status_code=413, detail="Clip vượt quá giới hạn.")
+    try:
+        evidence = one.attach_clip(db, device, event_id, data, sha256 or None)
+    except one.OneNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except one.OneError as exc:
+        raise HTTPException(status_code=422 if "Clip" in str(exc) or "SHA" in str(exc) or "MP4" in str(exc) else 403, detail=str(exc)) from exc
+    return {"event_id": event_id, "status": evidence.status, "sha256": evidence.video_sha256, "bytes": evidence.file_size_bytes}
+
+
+@router.post("/client/sessions/{session_id}/video")
+async def post_video_segment(
+    session_id: str,
+    request: Request,
+    background: BackgroundTasks,
+    video: UploadFile = File(...),
+    seq: int = Form(...),
+    start_ms: float = Form(...),
+    duration_s: float = Form(...),
+    sha256: str = Form(""),
+    device: ClientDevice = Depends(device_auth),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """One segment of the full-session recording (accepted after the end too: the queue may still be catching up)."""
+    session = _owned(db, device, session_id)
+    data = await video.read(one_video.MAX_SEGMENT_BYTES + 1)
+    if len(data) > one_video.MAX_SEGMENT_BYTES:
+        raise HTTPException(status_code=413, detail="Đoạn video vượt quá giới hạn.")
+    try:
+        segment, created = one_video.add_segment(db, session, seq=seq, start_ms=start_ms, duration_s=duration_s,
+                                                 data=data, sha256=sha256 or None)
+    except one_video.VideoError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if created and session.status in ("COMPLETED", "CLOSED"):
+        _queue_merge(request, background, session.id)
+    return {"seq": segment.seq, "sha256": segment.sha256, "bytes": segment.file_size_bytes, "created": created}
+
+
 @router.post("/client/sessions/{session_id}/bookmarks")
 async def post_bookmark(
     session_id: str,
@@ -277,12 +378,17 @@ class StopRequest(BaseModel):
 
 
 @router.post("/client/sessions/{session_id}/stop")
-def stop(session_id: str, payload: StopRequest, device: ClientDevice = Depends(device_auth), db: Session = Depends(get_db)) -> dict[str, Any]:
+def stop(session_id: str, payload: StopRequest, request: Request, background: BackgroundTasks,
+         device: ClientDevice = Depends(device_auth), db: Session = Depends(get_db)) -> dict[str, Any]:
     session = _owned(db, device, session_id)
     already_ended = session.status in ("COMPLETED", "CLOSED")
     session = one.stop_session(db, session, payload.model_dump())
     if not already_ended:
         online.on_stop(db, session, payload.reason)
+        if one_video.needs_merge(db, session):
+            session.video_status = "MERGING"
+            db.commit()
+            _queue_merge(request, background, session.id)
     result = one.serialize_live(session)
     realtime_manager.broadcast_threadsafe({"type": "ONE_SESSION_STOPPED", "session": result})
     return {"session": result}

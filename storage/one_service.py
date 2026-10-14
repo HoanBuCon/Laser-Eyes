@@ -44,6 +44,7 @@ SOURCE_PRODUCT = "VIGIL_ONE"
 ONE_ROOM_CODE = "VIGIL-ONE"
 PAIRING_TTL_SECONDS = 600
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
+MAX_CLIP_BYTES = 25 * 1024 * 1024
 MAX_EVENTS_PER_BATCH = 100
 # Unambiguous characters for a code read off a screen and typed by hand
 _CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -357,8 +358,8 @@ def attach_evidence(db: Session, device: ClientDevice, event_id: str, data: byte
     owned_session(db, device, event.session_id)
     digest = _check_jpeg(data, sha256)
     existing = db.query(EvidenceFile).filter(EvidenceFile.event_id == event.id).first()
-    if existing is not None and existing.status == "READY":
-        if existing.video_sha256 != digest:
+    if existing is not None and existing.snapshot_path and Path(existing.snapshot_path).is_file():
+        if hashlib.sha256(Path(existing.snapshot_path).read_bytes()).hexdigest() != digest:
             raise OneError("Sự kiện này đã có ảnh bằng chứng khác.")
         return existing
     folder = one_evidence_root() / event.session_id
@@ -368,11 +369,56 @@ def attach_evidence(db: Session, device: ClientDevice, event_id: str, data: byte
     temp_path.write_bytes(data)
     os.replace(temp_path, final_path)
     evidence = existing or EvidenceFile(event_id=event.id, file_path=str(final_path))
-    evidence.file_path = str(final_path)
     evidence.snapshot_path = str(final_path)
-    evidence.video_path = None
-    evidence.video_sha256 = digest  # the one integrity digest column the review UI reads
-    evidence.file_type = "image/jpeg"
+    if not evidence.video_path:  # a clip that arrived first stays the primary file
+        evidence.file_path = str(final_path)
+        evidence.video_sha256 = digest  # the one integrity digest column the review UI reads
+        evidence.file_type = "image/jpeg"
+        evidence.file_size_bytes = len(data)
+    evidence.status = "READY"
+    evidence.error_message = None
+    db.add(evidence)
+    db.commit()
+    db.refresh(evidence)
+    return evidence
+
+
+def _check_mp4(data: bytes, sha256: Optional[str]) -> str:
+    if not data:
+        raise OneError("Clip rỗng.")
+    if len(data) > MAX_CLIP_BYTES:
+        raise OneError(f"Clip vượt quá {MAX_CLIP_BYTES // (1024 * 1024)} MB.")
+    if data[4:8] != b"ftyp":
+        raise OneError("Chỉ nhận clip MP4.")
+    digest = hashlib.sha256(data).hexdigest()
+    if sha256 and sha256.strip().lower() != digest:
+        raise OneError("SHA-256 không khớp với nội dung clip.")
+    return digest
+
+
+def attach_clip(db: Session, device: ClientDevice, event_id: str, data: bytes, sha256: Optional[str]) -> EvidenceFile:
+    """The short MP4 around a One signal.  It becomes the evidence's primary file (and digest)."""
+    event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
+    if event is None or event.source_product != SOURCE_PRODUCT:
+        raise OneNotFound("Sự kiện không tồn tại.")
+    owned_session(db, device, event.session_id)
+    digest = _check_mp4(data, sha256)
+    existing = db.query(EvidenceFile).filter(EvidenceFile.event_id == event.id).first()
+    if existing is not None and existing.video_path:
+        if existing.video_sha256 != digest:
+            raise OneError("Sự kiện này đã có clip bằng chứng khác.")
+        return existing
+    folder = one_evidence_root() / event.session_id
+    folder.mkdir(parents=True, exist_ok=True)
+    final_path = folder / f"{event.event_id}.mp4"
+    temp_path = folder / f".{event.event_id}.{uuid.uuid4().hex}.tmp"
+    temp_path.write_bytes(data)
+    os.replace(temp_path, final_path)
+    evidence = existing or EvidenceFile(event_id=event.id, file_path=str(final_path))
+    evidence.file_path = str(final_path)
+    evidence.video_path = str(final_path)
+    evidence.video_sha256 = digest
+    evidence.file_type = "video/mp4"
     evidence.file_size_bytes = len(data)
     evidence.status = "READY"
     evidence.error_message = None

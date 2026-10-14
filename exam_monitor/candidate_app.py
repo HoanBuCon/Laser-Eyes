@@ -33,6 +33,8 @@ import cv2
 from PIL import Image, ImageTk
 
 from .audio import VoiceActivityDetector, speech_is_confirmed
+from .clip_recorder import ClipRecorder
+from .session_recorder import SessionRecorder
 from .engine import GazeAnalyzer
 from .events import EventDetector, SessionStore
 from .paths import app_data_dir, resource
@@ -138,6 +140,8 @@ class CandidateApp(tk.Tk):
 
         self._ui_queue: queue.Queue = queue.Queue()
         self._worker: Optional[threading.Thread] = None
+        self._clips: Optional[ClipRecorder] = None
+        self._recorder: Optional[SessionRecorder] = None
         self._stop = threading.Event()
         self._phase = "idle"          # idle -> check -> exam
         self._source = None
@@ -422,6 +426,15 @@ class CandidateApp(tk.Tk):
                     break
                 result = source.last_result if self.simulate else self._analyzer.analyze(frame, now)
                 if self._phase == "exam":
+                    if self._clips is None and self.policy.get("video_clips", True):
+                        session_id = self._session.session_id
+                        self._clips = ClipRecorder(lambda event_id, path: self.hub.add_clip(session_id, event_id, path))
+                    if self._clips is not None:
+                        self._clips.push(frame, now)
+                    if self._recorder is None and self.policy.get("record_video", True):
+                        self._recorder = self._start_recording()
+                    if self._recorder is not None:
+                        self._recorder.push(frame, now)
                     if audio is None and self.policy.get("microphone", True) and not self.simulate:
                         audio = VoiceActivityDetector()
                         audio.start()
@@ -454,7 +467,19 @@ class CandidateApp(tk.Tk):
         finally:
             if audio is not None:
                 audio.stop()
+            if self._recorder is not None:
+                self._recorder.close()  # the last minute of video is queued before the session's stop
+            if self._clips is not None:
+                self._clips.close()  # clips are queued before the session's stop
             source.release()
+
+    def _start_recording(self) -> SessionRecorder:
+        session_id = self._session.session_id
+        return SessionRecorder(
+            self.dir / "recordings" / session_id,
+            lambda seq, path, start_ms, duration_s: self.hub.add_video_segment(session_id, seq, start_ms, duration_s, path),
+            fps=float(self.policy.get("video_fps") or 10), width=int(self.policy.get("video_width") or 640),
+            started=self._started_mono)
 
     def _emit(self, event: MonitoringEvent, frame) -> None:
         """Record a signal locally, then queue it (and its snapshot) for VIGIL Hub."""
@@ -465,8 +490,11 @@ class CandidateApp(tk.Tk):
             event.evidence_path = str(path)
         session.events.append(event)
         elapsed = max(0.0, (time.monotonic() - self._started_mono - event.duration_seconds) * 1000.0)
+        hub_event_id = f"{session.session_id}-{event.event_id}"[:36]
+        if frame is not None and self._clips is not None:
+            self._clips.request(hub_event_id, self.store.evidence_dir / f"{session.session_id}_{event.event_id}.mp4")
         self.hub.add_event(session.session_id, {
-            "event_id": f"{session.session_id}-{event.event_id}"[:36], "event_type": event.event_type.value,
+            "event_id": hub_event_id, "event_type": event.event_type.value,
             "severity": event.severity.value, "started_at": _with_offset(event.started_at),
             "ended_at": _with_offset(event.ended_at), "duration_seconds": round(event.duration_seconds, 2),
             "session_elapsed_ms": round(elapsed, 1), "confidence": round(float(event.confidence), 3),
@@ -573,7 +601,7 @@ class CandidateApp(tk.Tk):
         self._phase = "done"
         self._stop.set()
         if self._worker:
-            self._worker.join(timeout=5)
+            self._worker.join(timeout=40)  # the last clips and video are written before the stop is queued
         self._session.ended_at = datetime.now().isoformat(timespec="seconds")
         self.store.save_session(self._session)
         self.hub.stop_session(self._session.session_id, {

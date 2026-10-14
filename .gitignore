@@ -131,3 +131,4 @@ videos/
 
 # Generated per build by packaging/build_vigil_one.py (Hub address of that build)
 packaging/vigil-one.json
+

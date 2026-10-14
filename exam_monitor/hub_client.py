@@ -59,8 +59,30 @@ def normalize_url(url: str) -> str:
     return url
 
 
+MAX_REJECTED_ATTEMPTS = 3
+
+
+def _local_networks() -> list:
+    """The /16 networks of this computer's own addresses (school LANs often use non-standard ranges)."""
+    import socket
+    from ipaddress import ip_network
+
+    networks = []
+    try:
+        addresses = {info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)}
+    except OSError:
+        addresses = set()
+    for address in addresses:
+        try:
+            networks.append(ip_network(f"{address}/16", strict=False))
+        except ValueError:
+            pass
+    return networks
+
+
 def check_transport(url: str) -> None:
-    """Plain HTTP only to this computer or a private LAN; anything on the Internet needs HTTPS."""
+    """Plain HTTP only inside the local network (this computer, a private range or this computer's own
+    network); a Hub reached by name on the Internet needs HTTPS."""
     from ipaddress import ip_address
     from urllib.parse import urlparse
 
@@ -68,14 +90,19 @@ def check_transport(url: str) -> None:
     if parsed.scheme == "https":
         return
     host = (parsed.hostname or "").lower()
-    if host in ("localhost", "") or host.endswith(".local"):
+    if host in ("localhost", "") or host.endswith((".local", ".lan", ".home.arpa")) or "." not in host:
         return
     try:
-        if ip_address(host).is_private or ip_address(host).is_loopback:
-            return
+        address = ip_address(host)
     except ValueError:
-        pass
-    raise HubError("Địa chỉ VIGIL Hub trên Internet phải dùng https:// để bảo vệ dữ liệu thí sinh.")
+        address = None
+    if address is not None:
+        if address.is_private or address.is_loopback or address.is_link_local:
+            return
+        if any(address in network for network in _local_networks()):
+            return
+    raise HubError("Địa chỉ VIGIL Hub ngoài mạng nội bộ phải dùng https:// để bảo vệ dữ liệu thí sinh. "
+                   "Trong cùng mạng LAN, hãy nhập địa chỉ IP của máy chủ thi (ví dụ http://192.168.1.10:8000).")
 
 
 class HubClient:
@@ -86,12 +113,16 @@ class HubClient:
         self.base_url = normalize_url(base_url)
         self.token = token or ""
         self.http = session or requests.Session()
+        # The heartbeat has its own connection and thread: a long video upload must not make the Hub
+        # believe the candidate is gone
+        self.live_http = session or requests.Session()
         self.on_change = on_change
         self._db_path = self.data_dir / "one_outbox.db"
         self._lock = threading.Lock()
         self._wake = threading.Event()
         self._stop = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._live_thread: Optional[threading.Thread] = None
         self._live: dict[str, tuple[dict[str, Any], Optional[bytes]]] = {}
         self._last_live_sent = 0.0
         # What the Hub asked for in its last heartbeat reply (online exams adapt the live picture)
@@ -122,6 +153,8 @@ class HubClient:
                 "attempts INTEGER NOT NULL DEFAULT 0, dead INTEGER NOT NULL DEFAULT 0, last_error TEXT)"
             )
             conn.execute("CREATE TABLE IF NOT EXISTS sessions (session_key TEXT PRIMARY KEY, server_id TEXT NOT NULL)")
+            # Items a Hub rejected get another chance at each start (the Hub may have been updated since)
+            conn.execute(f"UPDATE outbox SET dead = 0 WHERE dead = 1 AND attempts < {MAX_REJECTED_ATTEMPTS}")
 
     def _enqueue(self, kind: str, session_key: str, payload: dict[str, Any], file_path: Optional[str] = None) -> None:
         if not self.configured:
@@ -236,6 +269,14 @@ class HubClient:
         if evidence_path:
             self._enqueue("evidence", session_key, {"event_id": event["event_id"]}, evidence_path)
 
+    def add_clip(self, session_key: str, event_id: str, clip_path: str) -> None:
+        """The short MP4 around a signal (sent after the signal and its snapshot)."""
+        self._enqueue("clip", session_key, {"event_id": event_id}, clip_path)
+
+    def add_video_segment(self, session_key: str, seq: int, start_ms: float, duration_s: float, path: str) -> None:
+        """One segment of the full-session recording."""
+        self._enqueue("video", session_key, {"seq": seq, "start_ms": round(start_ms, 1), "duration_s": round(duration_s, 3)}, path)
+
     def add_bookmark(self, session_key: str, form: dict[str, Any], image_path: Optional[str]) -> None:
         self._enqueue("bookmark", session_key, form, image_path)
 
@@ -276,6 +317,8 @@ class HubClient:
         self._stop.clear()
         self._thread = threading.Thread(target=self._run, name="hub-sync", daemon=True)
         self._thread.start()
+        self._live_thread = threading.Thread(target=self._run_live, name="hub-live", daemon=True)
+        self._live_thread.start()
 
     def drain(self, timeout: float = 3.0) -> bool:
         """Try to send what is waiting before the app exits. True if nothing is left."""
@@ -294,8 +337,9 @@ class HubClient:
     def close(self, timeout: float = 3.0) -> None:
         self._stop.set()
         self._wake.set()
-        if self._thread:
-            self._thread.join(timeout=timeout)
+        for thread in (self._thread, self._live_thread):
+            if thread:
+                thread.join(timeout=timeout)
 
     def _run(self) -> None:
         while not self._stop.is_set():
@@ -303,17 +347,27 @@ class HubClient:
             if self.configured and self._state != UNPAIRED:
                 try:
                     progressed = self.flush_once()
-                    self._send_live()
                     delay = 0.05 if progressed else LIVE_INTERVAL / 2
                 except HubError:
                     delay = BACKOFF[min(self._attempt - 1, len(BACKOFF) - 1)] if self._attempt else 1
             self._wake.wait(timeout=delay)
             self._wake.clear()
 
+    def _run_live(self) -> None:
+        while not self._stop.is_set():
+            if self.configured and self._state != UNPAIRED:
+                try:
+                    self._send_live()
+                except Exception:  # a lost live frame is not worth stopping for
+                    pass
+            self._stop.wait(0.5)
+
     def flush_once(self) -> bool:
         """Send the oldest waiting item. True if something was sent (or dropped as invalid)."""
         with self._lock, self._conn() as conn:
-            row = conn.execute("SELECT * FROM outbox WHERE dead = 0 ORDER BY id LIMIT 1").fetchone()
+            # Signals and snapshots first, the full-session video after them, the end of a session last
+            row = conn.execute("SELECT * FROM outbox WHERE dead = 0 ORDER BY CASE kind WHEN 'stop' THEN 2 "
+                               "WHEN 'video' THEN 1 ELSE 0 END, id LIMIT 1").fetchone()
         if row is None:
             if self._state not in (SYNCED, UNPAIRED):
                 self._state = SYNCED
@@ -378,6 +432,22 @@ class HubClient:
             self._check(self.http.post(self._url(f"/client/events/{payload['event_id']}/evidence"), headers=self._headers(),
                                        files={"image": ("evidence.jpg", data, "image/jpeg")},
                                        data={"sha256": hashlib.sha256(data).hexdigest()}, timeout=HTTP_TIMEOUT * 2))
+        elif kind == "clip":
+            data = _read(row["file_path"])
+            if data is None:
+                raise _Rejected("Clip bằng chứng không còn trên máy.")
+            self._check(self.http.post(self._url(f"/client/events/{payload['event_id']}/clip"), headers=self._headers(),
+                                       files={"video": ("clip.mp4", data, "video/mp4")},
+                                       data={"sha256": hashlib.sha256(data).hexdigest()}, timeout=HTTP_TIMEOUT * 6))
+        elif kind == "video":
+            data = _read(row["file_path"])
+            if data is None:
+                raise _Rejected("Đoạn video không còn trên máy.")
+            form = {k: str(v) for k, v in payload.items()}
+            form["sha256"] = hashlib.sha256(data).hexdigest()
+            self._check(self.http.post(self._url(f"/client/sessions/{server_id}/video"), headers=self._headers(),
+                                       files={"video": (f"seg_{payload['seq']:05d}.mp4", data, "video/mp4")}, data=form,
+                                       timeout=(HTTP_TIMEOUT, 180)))
         elif kind == "bookmark":
             data = _read(row["file_path"])
             if data is None:
@@ -404,7 +474,7 @@ class HubClient:
         pending, _ = self.counts()
         files = {"thumbnail": ("live.jpg", jpeg, "image/jpeg")} if jpeg and self.live_settings.get("enabled", True) else None
         try:
-            res = self.http.post(self._url(f"/client/sessions/{server_id}/heartbeat"), headers=self._headers(),
+            res = self.live_http.post(self._url(f"/client/sessions/{server_id}/heartbeat"), headers=self._headers(),
                                  data={"status": json.dumps({**status, "pending_sync": pending}, ensure_ascii=False)},
                                  files=files, timeout=HTTP_TIMEOUT)
         except requests.RequestException:

@@ -83,6 +83,12 @@
                     <div class="vg-label" style="margin-top:14px">Monitoring policy</div>
                     <label class="on-check"><input type="checkbox" data-policy="microphone"> Microphone (voice + lip movement)</label>
                     <label class="on-check"><input type="checkbox" data-policy="allow_materials"> Books / notes allowed</label>
+                    <label class="on-check"><input type="checkbox" data-policy="record_video"> Record the whole exam (one video per candidate)</label>
+                    <label class="on-check">Recording
+                        <select class="vg-select on-mini" data-policy="video_width"><option>480</option><option>640</option><option>960</option><option>1280</option></select> px,
+                        <select class="vg-select on-mini" data-policy="video_fps"><option>5</option><option>10</option><option>15</option></select> fps
+                    </label>
+                    <label class="on-check"><input type="checkbox" data-policy="video_clips"> Video clip with each signal (5 s before + 4 s after)</label>
                     <label class="on-check"><input type="checkbox" data-policy="live_preview"> Small live picture for this page</label>
                     <label class="on-check">Live picture every
                         <select class="vg-select on-mini" data-policy="live_interval"><option>2</option><option>3</option><option>5</option><option>10</option></select> s
@@ -122,6 +128,7 @@
                 <div id="dSignals" class="on-signals"><div class="vg-empty">Loading…</div></div>
                 <div class="on-row">
                     <a id="dReview" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/review">Review these signals</a>
+                    <a id="dVideo" class="vigil-btn vigil-btn--sm" href="/one-video">Whole exam video</a>
                     <a id="dReport" class="vigil-btn vigil-btn--sm" href="/reports">Session report</a>
                 </div>
             </div>

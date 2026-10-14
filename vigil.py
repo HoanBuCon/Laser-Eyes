@@ -162,7 +162,9 @@ def main() -> int:
     try:
         if not args.one_only:
             if _hub_ready(args.port):
-                _say(f"A VIGIL Hub is already running on port {args.port}: using it.")
+                _say(f"A VIGIL Hub is already running on port {args.port}: using it, with the code and options it was started with.")
+                _say("If it is left over from an earlier run (old code, another --demo-token / --lan), close that window "
+                     f"or stop it, then run this again; or use a free port: --port {args.port + 1}")
             else:
                 cmd = [sys.executable, str(ROOT / "server.py"), "--port", str(args.port)]
                 if args.lan:

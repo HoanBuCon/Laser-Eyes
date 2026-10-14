@@ -23,7 +23,7 @@ Dành cho học sinh tham gia kỳ thi trực tuyến có giám sát bằng VIGI
 
 ## 3. Trong giờ thi
 
-1. Mở **VIGIL One**, nhập **Mã kỳ thi**, **Mã thí sinh**, **Mã PIN**, rồi bấm **VÀO THI**.
+1. Mở **VIGIL One**, nhập **Địa chỉ máy chủ thi** (nếu được hỏi, do giám thị cung cấp, ví dụ `http://192.168.1.10:8000`), **Mã kỳ thi**, **Mã thí sinh**, **Mã PIN**, rồi bấm **VÀO THI**.
 2. Đọc thông báo về dữ liệu, tick **Tôi đã đọc và đồng ý**, rồi bấm **TIẾP TỤC**.
 3. **Kiểm tra thiết bị:**
    - các mục Camera, Đúng một khuôn mặt, Ánh sáng phải có dấu ✓;

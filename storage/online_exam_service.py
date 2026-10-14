@@ -39,6 +39,10 @@ BOOST_SECONDS = 60
 DEFAULT_POLICY: dict[str, Any] = {
     "microphone": True,          # voice + lip movement cue
     "allow_materials": False,    # books / notes allowed on the desk
+    "video_clips": True,         # short MP4 (5 s before + 4 s after) with each signal
+    "record_video": True,        # the whole exam on video, uploaded during the exam, one file per candidate
+    "video_width": 640,
+    "video_fps": 10,
     "live_preview": True,        # small live picture for the proctors' grid
     "live_width": 320,
     "live_interval": 5,          # seconds between live pictures
@@ -85,6 +89,8 @@ def update_policy(db: Session, exam: Exam, changes: dict[str, Any]) -> dict[str,
         current[key] = value
     current["live_width"] = max(160, min(1280, int(current["live_width"])))
     current["live_interval"] = max(1, min(60, int(current["live_interval"])))
+    current["video_width"] = max(320, min(1280, int(current["video_width"])))
+    current["video_fps"] = max(2, min(30, int(current["video_fps"])))
     exam.one_policy_json = json.dumps(current, ensure_ascii=False)
     db.commit()
     return current

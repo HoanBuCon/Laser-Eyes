@@ -130,6 +130,12 @@ def init_db(custom_engine=None) -> None:
                     ("last_heartbeat_at", "DATETIME"),
                     ("live_status_json", "TEXT"),
                     ("candidate_id", "VARCHAR(36)"),
+                    ("video_status", "VARCHAR(20)"),
+                    ("video_path", "VARCHAR(500)"),
+                    ("video_sha256", "VARCHAR(64)"),
+                    ("video_duration_s", "FLOAT"),
+                    ("video_gaps_json", "TEXT"),
+                    ("video_error", "TEXT"),
                 ):
                     if name not in session_cols:
                         conn.execute(text(f"ALTER TABLE exam_sessions ADD COLUMN {name} {ddl}"))

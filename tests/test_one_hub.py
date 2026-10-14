@@ -7,6 +7,7 @@ import hashlib
 import io
 import json
 import uuid
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -214,6 +215,49 @@ def test_evidence_checks_digest_and_is_served_to_reviewers(client, db):
     assert item["snapshot_url"] and item["video_url"] is None and item["sha256"] == digest
     served = client.get(item["snapshot_url"])
     assert served.status_code == 200 and served.content == image
+
+
+def _mp4(tmp_path, frames=6) -> bytes:
+    from exam_monitor.clip_recorder import ClipRecorder
+
+    ready = []
+    recorder = ClipRecorder(lambda event_id, path: ready.append(path), before=1, after=1, fps=4, width=160)
+    frame = np.zeros((120, 160, 3), dtype=np.uint8)
+    for i in range(frames):
+        recorder.push(frame, now=i * 0.25)
+        if i == 2:
+            recorder.request("ev", tmp_path / "clip.mp4", now=0.5)
+    recorder.close()
+    assert ready, "the recorder wrote no clip"
+    return Path(ready[0]).read_bytes()
+
+
+def test_clip_becomes_the_video_evidence_next_to_the_snapshot(client, db, tmp_path):
+    headers = _paired(client, db)
+    sid = _open(client, headers)["session"]["session_id"]
+    client.post(f"/api/v1/one/client/sessions/{sid}/events", headers=headers, json={"events": [_event("e-clip")]})
+    image, clip = _jpeg(), _mp4(tmp_path)
+    assert client.post("/api/v1/one/client/events/e-clip/evidence", headers=headers,
+                       files={"image": ("e.jpg", image, "image/jpeg")}).status_code == 200
+    not_mp4 = client.post("/api/v1/one/client/events/e-clip/clip", headers=headers,
+                          files={"video": ("c.mp4", image, "video/mp4")})
+    assert not_mp4.status_code == 422
+    bad = client.post("/api/v1/one/client/events/e-clip/clip", headers=headers,
+                      files={"video": ("c.mp4", clip, "video/mp4")}, data={"sha256": "0" * 64})
+    assert bad.status_code == 422
+    digest = hashlib.sha256(clip).hexdigest()
+    ok = client.post("/api/v1/one/client/events/e-clip/clip", headers=headers,
+                     files={"video": ("c.mp4", clip, "video/mp4")}, data={"sha256": digest})
+    assert ok.status_code == 200 and ok.json()["sha256"] == digest
+    again = client.post("/api/v1/one/client/events/e-clip/clip", headers=headers,
+                        files={"video": ("c.mp4", clip, "video/mp4")}, data={"sha256": digest})
+    assert again.status_code == 200
+    # the snapshot resent after the clip is still the same snapshot
+    assert client.post("/api/v1/one/client/events/e-clip/evidence", headers=headers,
+                       files={"image": ("e.jpg", image, "image/jpeg")}).status_code == 200
+    item = client.get("/api/v1/proctor/review-queue", params={"product": "ONE"}).json()["items"][0]
+    assert item["snapshot_url"] and item["video_url"] and item["sha256"] == digest
+    assert client.get(item["snapshot_url"]).content == image
 
 
 def test_bookmark_is_manual_and_idempotent(client, db):

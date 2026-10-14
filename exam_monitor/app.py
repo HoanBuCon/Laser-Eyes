@@ -18,6 +18,8 @@ import cv2
 from PIL import Image, ImageGrab, ImageTk
 
 from .audio import VoiceActivityDetector, speech_is_confirmed
+from .clip_recorder import ClipRecorder
+from .session_recorder import SessionRecorder
 from .engine import GazeAnalyzer, OverlayRenderer
 from .events import EventDetector, SessionStore
 from .paths import app_data_dir, resource
@@ -798,7 +800,7 @@ class ExamMonitorApp(tk.Tk):
         source_wrap.grid(row=3, column=0, sticky="ew", padx=14, pady=(2, 7))
         source_wrap.grid_columnconfigure(0, weight=1)
         tk.Label(source_wrap, text="Nguồn hình ảnh", bg=COLORS["surface"], fg=COLORS["text_muted"], font=FONTS["small"]).grid(row=0, column=0, sticky="w", pady=(0, 5))
-        self.source_var = tk.StringVar(value="Mô phỏng có sẵn")
+        self.source_var = tk.StringVar(value="Camera trực tiếp")
         self.source_combo = ttk.Combobox(
             source_wrap,
             textvariable=self.source_var,
@@ -1297,6 +1299,16 @@ class ExamMonitorApp(tk.Tk):
         frames = 0
         fps_started = time.monotonic()
         last_emit = 0.0
+        # Hub only: a short MP4 around each signal (local review keeps using the snapshot)
+        clips = recorder = None
+        if self.hub.configured and self._save_evidence_enabled:
+            clips = ClipRecorder(lambda event_id, path: self.hub.add_clip(session.session_id, event_id, path))
+        if self.hub.configured:
+            # The whole session on video for VIGIL Hub (one file per session once it ends)
+            recorder = SessionRecorder(
+                self.store.evidence_dir.parent / "recordings" / session.session_id,
+                lambda seq, path, start_ms, duration_s: self.hub.add_video_segment(session.session_id, seq, start_ms, duration_s, path),
+                started=self._session_started_monotonic)
         try:
             while not self._stop_worker.is_set():
                 ok, frame = source.read()
@@ -1345,6 +1357,10 @@ class ExamMonitorApp(tk.Tk):
                         audio_level_db=audio_state.level_db,
                         status_text=status_text,
                     )
+                if clips is not None:
+                    clips.push(frame, now)
+                if recorder is not None:
+                    recorder.push(frame, now)
                 created = self.detector.update(result, session.session_id, now)
                 if created:
                     for event in created:
@@ -1352,6 +1368,9 @@ class ExamMonitorApp(tk.Tk):
                             path = self.store.evidence_dir / f"{session.session_id}_{event.event_id}.jpg"
                             cv2.imwrite(str(path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
                             event.evidence_path = str(path)
+                        if clips is not None:
+                            clips.request(f"{session.session_id}-{event.event_id}"[:36],
+                                          self.store.evidence_dir / f"{session.session_id}_{event.event_id}.mp4", now)
                         session.events.append(event)
                         self._sync_event(session, event, now)
                         self._put_message("event", event)
@@ -1375,6 +1394,10 @@ class ExamMonitorApp(tk.Tk):
         finally:
             if audio_detector is not None:
                 audio_detector.stop()
+            if recorder is not None:
+                recorder.close()
+            if clips is not None:
+                clips.close()
             source.release()
             self._put_message("worker_stopped", None)
 

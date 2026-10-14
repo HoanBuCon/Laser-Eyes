@@ -10,9 +10,11 @@ Implements SRS v1.0 specifications:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import secrets
+from typing import Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -138,18 +140,37 @@ def _cors_origins() -> list[str]:
 
 
 _DEVICE_PATHS = ("/api/v1/one/client/", "/api/one/client/")
+DEMO_TOKEN_COOKIE = "vigil_demo_token"
+
+
+def _is_loopback(host: Optional[str]) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host or "").is_loopback
+    except ValueError:
+        return False
 
 
 @app.middleware("http")
 async def protect_network_demo(request: Request, call_next):
     """Require the opt-in demo token for API calls when one is configured."""
     token = os.getenv("VIGIL_DEMO_TOKEN")
+    # The token keeps other computers out; a browser on the Hub computer itself needs none
+    if not token or _is_loopback(request.client.host if request.client else None):
+        return await call_next(request)
     # VIGIL One desktops authenticate with their own device token instead
-    if token and request.url.path.startswith(("/api/", "/demo/")) and not request.url.path.startswith(_DEVICE_PATHS):
-        supplied = request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+    if request.url.path.startswith(("/api/", "/demo/")) and not request.url.path.startswith(_DEVICE_PATHS):
+        supplied = (request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+                    or request.cookies.get(DEMO_TOKEN_COOKIE))
         if not supplied or not secrets.compare_digest(supplied, token):
             return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
-    return await call_next(request)
+    response = await call_next(request)
+    # Opening any page once with ?token=... remembers it, so every page, image and live stream works
+    supplied = request.query_params.get("token")
+    if supplied and secrets.compare_digest(supplied, token) and request.cookies.get(DEMO_TOKEN_COOKIE) != supplied:
+        response.set_cookie(DEMO_TOKEN_COOKIE, supplied, httponly=True, samesite="strict")
+    return response
 
 
 @app.middleware("http")
@@ -238,8 +259,10 @@ def readiness_check():
 async def websocket_events_endpoint(websocket: WebSocket):
     """WebSocket stream for real-time proctoring event notifications & live demo telemetry."""
     token = os.getenv("VIGIL_DEMO_TOKEN")
-    supplied = websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
-    if token and (not supplied or not secrets.compare_digest(supplied, token)):
+    supplied = (websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
+                or websocket.cookies.get(DEMO_TOKEN_COOKIE))
+    local = _is_loopback(websocket.client.host if websocket.client else None)
+    if token and not local and (not supplied or not secrets.compare_digest(supplied, token)):
         await websocket.close(code=1008, reason="Valid demo token required")
         return
     await realtime_manager.connect(websocket)
@@ -314,6 +337,7 @@ if dashboard_dir.exists():
         ("/reports/print", "report-print.html"),
         ("/users", "users.html"),
         ("/online", "online.html"),
+        ("/one-video", "one_video.html"),
     ):
         app.add_api_route(route, _page(page), methods=["GET"], tags=["Dashboard"], include_in_schema=False)
 

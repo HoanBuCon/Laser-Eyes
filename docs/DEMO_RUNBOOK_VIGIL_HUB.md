@@ -108,7 +108,10 @@ venv\Scripts\python.exe -m pytest -q
 
 ## 6. Thi trực tuyến (học sinh dùng VIGIL One trên máy riêng)
 
-1. **Hub:** `python vigil.py --demo --hub-only`. Muốn thí sinh ở nhà truy cập, đưa Hub ra Internet bằng HTTPS (ví dụ Cloudflare Tunnel). Client từ chối `http://` tới địa chỉ Internet.
+1. **Hub:** cùng máy thì `python vigil.py --demo --hub-only`; máy thí sinh khác trong mạng nội bộ thì `python vigil.py --demo --hub-only --lan --demo-token <bí-mật>` và lấy IP máy Hub bằng `ipconfig` (lần đầu Windows hỏi tường lửa: cho phép mạng **Private**).
+   VIGIL One gửi thẳng tới Hub qua mạng nội bộ, không cần phần mềm trung gian. Địa chỉ `http://` được chấp nhận với localhost, dải IP riêng (10.x, 172.16–31.x, 192.168.x) và mọi địa chỉ cùng mạng /16 với máy thí sinh (ví dụ `172.172.x.x`). Hub đặt ở xa trên Internet thì phải có `https://`.
+   Ngoài ảnh live và ảnh bằng chứng, mỗi tín hiệu kèm **clip MP4** (5 giây trước + 4 giây sau), bật/tắt ở chính sách kỳ thi.
+   **Video toàn bộ buổi thi:** VIGIL One ghi liên tục (H.264, mặc định 640 px, 10 fps, khoảng 1,5–3 MB/phút) và gửi lên Hub từng đoạn 1 phút trong lúc thi (mất mạng thì giữ lại và gửi sau). Khi phiên kết thúc, Hub ghép thành **một file `session.mp4`** cho cả buổi (ffmpeg `-c copy`, không nén lại) kèm SHA-256; các đoạn gốc và SHA-256 của chúng được giữ. Xem tại `/one-video?session=<id>` (nút **Whole exam video** ở `/online` và ở trang Review): bấm một tín hiệu để nhảy tới đúng lúc đó, các phút bị thiếu được ghi rõ. Hub cần **FFmpeg** để ghép; chưa ghép được thì trang vẫn phát nối từng đoạn.
 2. **Web:** đăng nhập `chief` → **Online exams** (`/online`) → chọn kỳ thi → **Exam setup**:
    - **Open joining** để lấy mã vào thi (7 ký tự);
    - dán danh sách thí sinh (mỗi dòng: `mã, họ tên, PIN`; bỏ trống PIN thì hệ thống tự cấp);

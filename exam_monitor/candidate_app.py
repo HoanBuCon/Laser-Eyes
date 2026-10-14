@@ -124,7 +124,11 @@ class CandidateApp(tk.Tk):
         self.dir.mkdir(parents=True, exist_ok=True)
         self._state_path = self.dir / "candidate.json"
         saved = self._load_state()
-        self.hub_url = config.get("hub_url") or saved.get("hub_url") or "http://127.0.0.1:8000"
+        # A locked address (school build) always wins; an editable one remembers what the candidate typed last
+        first, second = (config.get("hub_url"), saved.get("hub_url"))
+        if not config.get("lock_hub_url"):
+            first, second = second, first
+        self.hub_url = first or second or "http://127.0.0.1:8000"
         self.hub = HubClient(self.dir / "hub", base_url=self.hub_url, token=saved.get("token", ""),
                              on_change=lambda status: self._ui_queue.put(("sync", status)))
         self.exam: dict[str, Any] = saved.get("exam") or {}

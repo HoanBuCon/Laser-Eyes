@@ -52,6 +52,7 @@ def main() -> int:
     parser.add_argument("--hub", required=True, help="VIGIL Hub address the candidates connect to (https:// on the Internet)")
     parser.add_argument("--version", default="2.0.0")
     parser.add_argument("--proctor", action="store_true", help="Build the proctor-mode app instead of candidate mode")
+    parser.add_argument("--unlock", action="store_true", help="Let candidates edit the Hub address (test builds)")
     parser.add_argument("--skip-pyinstaller", action="store_true", help="Reuse dist\\VIGIL One from an earlier build")
     args = parser.parse_args()
 
@@ -61,7 +62,7 @@ def main() -> int:
                                "--distpath", str(ROOT / "dist"), "--workpath", str(ROOT / "build" / "pyinstaller"),
                                str(PACK / "vigil_one.spec")], cwd=ROOT)
     config = {"mode": "proctor" if args.proctor else "candidate", "hub_url": args.hub.rstrip("/"),
-              "lock_hub_url": not args.proctor, "camera_index": 0}
+              "lock_hub_url": not (args.proctor or args.unlock), "camera_index": 0}
     (PACK / "vigil-one.json").write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
     shutil.copy2(PACK / "vigil-one.json", ROOT / "dist" / "VIGIL One" / "vigil-one.json")
     print(f"[build] app folder: {ROOT / 'dist' / 'VIGIL One'} (config: {config})")

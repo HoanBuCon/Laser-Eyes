@@ -10,7 +10,7 @@ from pathlib import Path
 from storage.db_models import ExamRoom, ExamSession
 from test_one_hub import _event, _open, _paired, _sign_in, client, db  # noqa: F401  (fixtures)
 
-SIDEBAR_PAGES = ("index.html", "demo.html", "wall.html", "online.html", "one_video.html", "review.html", "playback.html",
+SIDEBAR_PAGES = ("index.html", "demo.html", "wall.html", "online.html", "one_video.html", "one_monitor.html", "review.html", "playback.html",
                  "reports.html", "sessions.html", "calibration.html", "admin.html", "users.html")
 
 

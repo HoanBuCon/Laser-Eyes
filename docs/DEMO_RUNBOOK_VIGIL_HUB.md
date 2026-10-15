@@ -1,143 +1,114 @@
-# Runbook demo — VIGIL Hub (Classroom) + VIGIL One
+# Runbook demo — VIGIL Hub (Classroom + VIGIL One)
 
-Áp dụng cho nhánh `feat/vigil-one-hub`. Thay thế phần vận hành của `DEMO_RUNBOOK.md` (đã lỗi thời).
+Áp dụng cho nhánh `feat/one-server-analysis`. Thay thế phần vận hành của `DEMO_RUNBOOK.md` (đã lỗi thời).
 
-## Khởi động nhanh (một lệnh, tại thư mục gốc)
+## Kiến trúc trong một câu
+
+**VIGIL Hub** (máy chủ + website) làm mọi việc: giám sát phòng thi bằng camera lớp học (Classroom) và phân tích
+camera của từng thí sinh thi trực tuyến (One). **App VIGIL One** trên máy thí sinh chỉ có một nhiệm vụ: thí sinh nhập
+mã kỳ thi + mã thí sinh + PIN, rồi app gửi hình camera về Hub — không phân tích, không lưu kết luận.
+
+| Luồng | Từ app VIGIL One lên Hub | Hub dùng để |
+|---|---|---|
+| Trực tiếp | WebSocket, ảnh JPEG ~5 khung/giây (640 px) | Phân tích ngay (trễ ~1 giây), giám thị xem trực tiếp trên `/one-monitor` |
+| Lưu trữ | Đoạn video H.264 10 giây qua hàng đợi (mất mạng thì giữ lại, gửi sau) | Video cả buổi, cắt clip bằng chứng, phân tích bù những quãng luồng trực tiếp bị đứt |
+
+## Khởi động — một lệnh, tại thư mục gốc
 
 ```powershell
 python vigil.py --demo
 ```
 
-Lệnh này chạy được nguyên văn trong PowerShell lẫn cmd, không cần `.\`:
-- tạo `data/vigil_demo.db` nếu chưa có;
-- khởi động VIGIL Hub và mở website;
-- tự ghép nối VIGIL One trên cùng máy với Hub;
-- mở app VIGIL One.
+Chạy được nguyên văn trong PowerShell, cmd và Git Bash (hoặc nhấp đúp `start_vigil.bat`):
+- tạo `data/vigil_demo.db` nếu chưa có (tài khoản `admin` / `chief` / `proctor`, mật khẩu `vigil-demo-2026`);
+- khởi động VIGIL Hub, mở website `http://localhost:8000`;
+- mở app thí sinh VIGIL One, đã trỏ sẵn về Hub trên máy này.
 
-`Ctrl+C` trong cửa sổ đó dừng tất cả.
-
-Các tùy chọn khác:
+`Ctrl+C` trong cửa sổ đó dừng tất cả. Nếu trên cổng 8000 còn một Hub chạy **code cũ** (trước `git pull` / đổi nhánh)
+hoặc **database khác**, `vigil.py` tự dừng nó và khởi động lại — Hub cũ là nguyên nhân hay gặp của lỗi
+"mục bị Hub từ chối".
 
 | Lệnh | Khởi động |
 |---|---|
-| `python vigil.py` | Như trên, nhưng dùng database làm việc |
-| `python vigil.py --demo --one-sim` | One vào ngay một phiên mô phỏng |
-| `python vigil.py --hub-only` | Chỉ server và website (máy giám thị) |
-| `python vigil.py --one-only` | Chỉ VIGIL One (laptop thí sinh, đã ghép nối với Hub ở máy khác) |
-| `python vigil.py --demo --lan --demo-token <bí-mật>` | Hub nhận kết nối từ máy khác trong LAN |
+| `python vigil.py` | Như trên, trên database làm việc `data/vigil_proctoring.db` |
+| `python vigil.py --demo --sim` | App VIGIL One với camera mô phỏng (không cần webcam) |
+| `python vigil.py --demo --hub-only` | Chỉ Hub và website (máy giám thị) |
+| `python vigil.py --demo --hub-only --lan --demo-token <bí-mật>` | Hub nhận kết nối từ các máy khác trong mạng nội bộ |
+| `python vigil.py --one-only --hub http://<IP-máy-Hub>:8000` | Chỉ app VIGIL One (máy thí sinh) |
+| `python vigil.py --legacy` | App VIGIL One đời cũ (tự phân tích trên máy) — chỉ để so sánh, không dùng khi thi |
 
-`start_vigil.bat` vẫn dùng được: trong PowerShell gõ `.\start_vigil.bat`.
+`main.py` và `server.py` là thành phần do `vigil.py` gọi; không cần chạy trực tiếp.
 
-## 0. Chuẩn bị thủ công (khi không dùng `vigil.py`)
+## 1. Chuẩn bị kỳ thi trực tuyến (web)
 
-1. Tạo database demo riêng, không đụng DB làm việc:
-
-   ```powershell
-   venv\Scripts\python.exe scripts\seed_demo.py --database data\vigil_demo.db
-   ```
-
-   Script tạo (chạy lại an toàn, không nhân đôi dữ liệu):
-   - tài khoản `admin`, `chief`, `proctor`, mật khẩu mặc định `vigil-demo-2026` (đổi bằng `--password`);
-   - kỳ thi "Kỳ thi trình diễn VIGIL";
-   - các phòng Classroom có sẵn video demo;
-   - phòng ảo `VIGIL-ONE`;
-   - một mã ghép nối (hết hạn sau 10 phút; tạo mã mới trên web khi cần).
-
-2. Khởi động Hub trên database demo:
-
-   ```powershell
-   set DATABASE_URL=sqlite:///data/vigil_demo.db
-   start_vigil.bat --host 0.0.0.0
-   ```
-
-   Dùng `--host 0.0.0.0` khi VIGIL One chạy trên laptop khác trong cùng mạng LAN. Ghi lại địa chỉ IP của máy Hub (`ipconfig`).
-
-3. Hiệu chỉnh ghế cho phòng Classroom dùng trong demo trên `/calibration` (nếu chưa có Seat ROI).
-
-## 1. Ghép nối máy VIGIL One
-
-1. Trên web, đăng nhập `chief`, vào **System** (`/admin`), mục **VIGIL One computers**, bấm **Create pairing code**.
-2. Trên laptop thí sinh: `venv\Scripts\python.exe main.py` → **Cài đặt** → **Kết nối VIGIL Hub**.
-   - Địa chỉ Hub: `http://<IP-máy-Hub>:8000`.
-   - Nhập mã → **GHÉP NỐI**.
-3. Góc trái dưới của One chuyển sang **● ĐÃ ĐỒNG BỘ**; ô **Kỳ thi** lấy danh sách kỳ thi từ Hub.
-
-Thu hồi một máy: `/admin` → **Revoke**. Máy đó vẫn giữ dữ liệu cục bộ, báo "CẦN GHÉP NỐI LẠI" và ngừng gửi.
+Đăng nhập `chief` → **Online exams** (`/online`) → chọn kỳ thi → **Exam setup**:
+- **Open joining** để lấy mã vào thi (7 ký tự);
+- dán danh sách thí sinh (mỗi dòng: `mã, họ tên, PIN`; bỏ trống PIN thì hệ thống tự cấp) → **Download CSV** để phát PIN;
+- chính sách: micro, cho phép tài liệu, ghi video cả buổi, clip theo tín hiệu, và **ngưỡng thời gian** cho từng loại
+  tín hiệu (ví dụ mắt ngoài màn hình 1,6 giây). Đổi ngưỡng giữa buổi thì thí sinh đang thi áp dụng ngay.
 
 ## 2. Kịch bản trình diễn (≈ 10 phút)
 
-| Bước | Trên VIGIL One | Trên web (giám thị) |
+| Bước | Trên app VIGIL One (thí sinh) | Trên web (giám thị) |
 |---|---|---|
-| Thiết lập | Chọn kỳ thi, nhập mã thí sinh, nguồn **Camera trực tiếp**, **BẮT ĐẦU GIÁM SÁT**, nhìn vào tâm màn hình để hiệu chỉnh | `/wall`: một ô chọn phòng Classroom, một ô **VIGIL One · candidate #1 (auto)** |
-| Giám sát | Thí sinh nhìn ra ngoài, cầm điện thoại; **Ctrl+B** để đánh dấu khung hình | Ô One cập nhật mỗi 2 giây; nhãn đổi thành `… · N SIGNALS` |
-| Rà soát | — | `/review`, lọc **VIGIL One**: tín hiệu tiếng Việt, ảnh bằng chứng, "SHA-256 verified"; bookmark hiện là đánh dấu thủ công; Confirm / Reject / Unsure |
-| Kết thúc | **KẾT THÚC PHIÊN** | `/reports`: báo cáo phiên One có mục Thí sinh; duyệt → đóng băng phiên bản SHA-256; bản in tiếng Việt |
-| Độ bền (tùy chọn) | Tắt Wi-Fi laptop: One báo **MẤT KẾT NỐI HUB**, đếm số mục giữ lại; bật lại → **ĐÃ ĐỒNG BỘ** | Dữ liệu lên đủ, không trùng |
+| Vào thi | Nhập mã kỳ thi, mã thí sinh, PIN → đồng ý → kiểm tra thiết bị (Hub chấm: đủ sáng, đúng một khuôn mặt) → **BẮT ĐẦU LÀM BÀI** | **Operations** (chọn **One** hoặc **All** ở đầu thanh bên): bảng VIGIL One hiện thí sinh, "Hub · calibrated" |
+| Hiệu chỉnh | Cửa sổ nhỏ nổi góc phải: "Nhìn vào giữa màn hình vài giây…" cho tới khi Hub hiệu chỉnh xong | Bấm vào thí sinh → **Candidate monitor** (`/one-monitor`): hình trực tiếp, lớp chú thích vùng nhìn an toàn / hướng mắt |
+| Giám sát | Thí sinh nhìn ra ngoài, rời chỗ, có người thứ hai, cầm điện thoại | Số đo cập nhật mỗi giây; tín hiệu xuất hiện sau ~1–2 giây kèm ảnh. **Mark frame** (`Ctrl+B`) đánh dấu khung hình; **Recalibrate gaze** cho thí sinh hiệu chỉnh lại; **Books / notes allowed** cho riêng thí sinh này |
+| Rà soát | — | `/review` lọc **VIGIL One**: ảnh + clip 9 giây, "SHA-256 verified"; Confirm / Reject / Unsure |
+| Kết thúc | **NỘP BÀI** | **Whole exam video** (`/one-video`): một file cho cả buổi, bấm tín hiệu để nhảy tới lúc đó; `/reports`: duyệt báo cáo phiên |
+| Độ bền (tùy chọn) | Tắt Wi-Fi 30 giây rồi bật lại: app giữ video, tự gửi lại | Hub phân tích bù quãng mất hình trực tiếp từ video lưu trữ; không mất, không trùng tín hiệu |
 
-## 3. Phương án dự phòng
+Classroom chạy song song: `/demo` → chọn phòng → **Start LIVE**; `/wall` ghép ô phòng thi và ô thí sinh One.
+
+## 3. Thí sinh mô phỏng
+
+Thêm thí sinh mô phỏng bằng một video webcam đã quay sẵn (Hub phân tích thật, như thí sinh thật):
+
+```powershell
+python scripts\one_fake_client.py --hub http://127.0.0.1:8000 --join <mã> --candidate HS004 --pin <PIN> --video D:\webcam.mp4
+```
+
+`--speed 2` phát nhanh gấp đôi; `--no-live` chỉ gửi video lưu trữ (giống thí sinh qua Internet chậm, tín hiệu trễ
+~10–15 giây). Không có video: bỏ `--video`, thêm `--seconds 600` để có thí sinh với tín hiệu dựng sẵn.
+
+## 4. Phương án dự phòng
 
 | Sự cố | Cách xử lý |
 |---|---|
-| Mạng hội trường chặn kết nối giữa hai máy | Chạy Hub và One trên cùng một laptop, địa chỉ `http://127.0.0.1:8000` |
-| Webcam hỏng / không có quyền camera | One chọn nguồn **Mô phỏng có sẵn** (mọi màn hình đều gắn nhãn MÔ PHỎNG / SIMULATION) |
-| Cần thêm thí sinh trên video wall | `venv\Scripts\python.exe scripts\one_fake_client.py --hub http://127.0.0.1:8000 --code <mã> --candidate SV-02 --seconds 600` |
+| Mạng hội trường chặn kết nối giữa hai máy | Chạy tất cả trên một laptop: `python vigil.py --demo` |
+| Webcam hỏng / không có quyền camera | `python vigil.py --demo --sim` (mọi màn hình gắn nhãn SIMULATION) |
+| App báo "N mục bị máy chủ từ chối: …" | Đọc lý do hiện ngay dưới dòng trạng thái; thường do Hub cũ — chạy lại `python vigil.py --demo` |
+| Hub quá tải khi nhiều thí sinh | Tăng `VIGIL_ONE_ANALYSIS_WORKERS` (mặc định 2); Hub tự bỏ bớt khung khi không kịp, không bị dồn trễ |
 | Pipeline Classroom chậm | Dùng replay preset thay cho phân tích live |
 | Mọi thứ hỏng | Phát video giới thiệu `videos/vigil-ai-promo/renders/vigil-promo-v6-final2-*-1080p60.mp4` |
 
-## 4. Kiểm tra nhanh trước giờ demo
+## 5. Kiểm tra nhanh trước giờ demo
 
 ```powershell
 venv\Scripts\python.exe -m pytest -q
 ```
 
 - [ ] Toàn bộ test pass.
-- [ ] Đăng nhập được ba tài khoản.
-- [ ] Ghép nối One thành công.
-- [ ] Tín hiệu One vào `/review` trong vài giây.
-- [ ] Ô One trên `/wall` có hình.
-- [ ] Rút mạng 60 giây rồi nối lại: không mất dữ liệu.
-- [ ] Duyệt được báo cáo phiên One.
+- [ ] `python vigil.py --demo` mở được website và app VIGIL One.
+- [ ] Thí sinh vào thi được; `/one-monitor` có hình trực tiếp, "Analysis on the Hub: live".
+- [ ] Tín hiệu vào `/review` trong vài giây, có ảnh; clip có sau ~10 giây.
+- [ ] Rút mạng 30 giây rồi nối lại: không mất video, không mất tín hiệu.
+- [ ] Duyệt được báo cáo phiên One; video cả buổi ở trạng thái READY.
 
-## 5. Lưu ý vận hành
+## 6. Lưu ý vận hành
 
-- Dữ liệu One luôn được ghi trên máy thí sinh trước (`data/sessions`, `data/evidence`), rồi mới gửi lên Hub qua hàng đợi `data/one_outbox.db`.
-- Ảnh live thu nhỏ chỉ nằm trong bộ nhớ của Hub, không ghi xuống đĩa. Tắt được trong **Cài đặt** của One.
-- Khởi động lại Hub giữa buổi **không** đóng phiên One đang chạy; phiên Classroom đang chạy thì được đánh dấu `INTERRUPTED` như trước.
+- App VIGIL One không phân tích và không cần GPU; nó không nạp MediaPipe/torch. Mọi phân tích chạy trên Hub
+  (`storage/one_analysis.py`), cùng máy với Classroom. Biến môi trường của Hub: `VIGIL_ONE_ANALYSIS=0` tắt phân tích
+  One; `VIGIL_ONE_ANALYSIS_WORKERS=<n>` số luồng (mỗi luồng nhận luồng trực tiếp lẫn video lưu trữ, mỗi thí sinh luôn
+  do một luồng xử lý). Trạng thái: `GET /api/v1/one/analysis/status`, bảng VIGIL One ở Operations.
+- Băng thông mỗi thí sinh khoảng 1,5–2 Mbps (hình trực tiếp) + 0,3 Mbps (video lưu trữ). 30 thí sinh ≈ 60 Mbps: dùng
+  mạng có dây hoặc Wi-Fi 5 GHz tốt. Thi qua Internet: Hub cần `https://`, khi đó luồng trực tiếp đi qua `wss://`.
+- Địa chỉ `http://` chỉ được chấp nhận với localhost, dải IP riêng (10.x, 172.16–31.x, 192.168.x) và cùng mạng /16 với
+  máy thí sinh. Lần đầu chạy `--lan`, Windows hỏi tường lửa: cho phép mạng **Private**.
+- Hình trực tiếp chỉ nằm trong bộ nhớ của Hub. Video lưu trữ, ảnh và clip bằng chứng nằm trong `data/one_evidence`
+  (SHA-256 cho từng file); video cả buổi được ghép bằng FFmpeg (`-c copy`, không nén lại).
+- Khởi động lại Hub giữa buổi **không** đóng phiên One đang chạy: app tự nối lại luồng trực tiếp, Hub phân tích bù
+  phần bị đứt từ video lưu trữ và tiếp tục với hiệu chỉnh đã lưu.
 - `/admin` › **Remove test rooms** không bao giờ xóa phòng ảo `VIGIL-ONE`.
-
-
-## 6. Thi trực tuyến (học sinh dùng VIGIL One trên máy riêng)
-
-1. **Hub:** cùng máy thì `python vigil.py --demo --hub-only`; máy thí sinh khác trong mạng nội bộ thì `python vigil.py --demo --hub-only --lan --demo-token <bí-mật>` và lấy IP máy Hub bằng `ipconfig` (lần đầu Windows hỏi tường lửa: cho phép mạng **Private**).
-   VIGIL One gửi thẳng tới Hub qua mạng nội bộ, không cần phần mềm trung gian. Địa chỉ `http://` được chấp nhận với localhost, dải IP riêng (10.x, 172.16–31.x, 192.168.x) và mọi địa chỉ cùng mạng /16 với máy thí sinh (ví dụ `172.172.x.x`). Hub đặt ở xa trên Internet thì phải có `https://`.
-   Ngoài ảnh live và ảnh bằng chứng, mỗi tín hiệu kèm **clip MP4** (5 giây trước + 4 giây sau), bật/tắt ở chính sách kỳ thi.
-   **Video toàn bộ buổi thi:** VIGIL One ghi liên tục (H.264, mặc định 640 px, 10 fps, khoảng 1,5–3 MB/phút) và gửi lên Hub từng đoạn 1 phút trong lúc thi (mất mạng thì giữ lại và gửi sau). Khi phiên kết thúc, Hub ghép thành **một file `session.mp4`** cho cả buổi (ffmpeg `-c copy`, không nén lại) kèm SHA-256; các đoạn gốc và SHA-256 của chúng được giữ. Xem tại `/one-video?session=<id>` (nút **Whole exam video** ở `/online` và ở trang Review): bấm một tín hiệu để nhảy tới đúng lúc đó, các phút bị thiếu được ghi rõ. Hub cần **FFmpeg** để ghép; chưa ghép được thì trang vẫn phát nối từng đoạn.
-   **Phân tích tại Hub (mặc định, `analysis_mode = server`):** máy thí sinh chỉ quay và gửi video (đoạn 10 giây, cùng các khoảng micro nghe thấy tiếng nói); Hub chạy phân tích ánh mắt/đầu/khuôn mặt/vật thể trên video đó, cắt ảnh và clip bằng chứng ngay trên Hub. Máy thí sinh không cần GPU, và mọi phát hiện nằm ở một nơi với Classroom. Tín hiệu đến chậm hơn thời gian thực khoảng một đoạn video (≈ 10–15 giây). Đổi về phân tích trên máy thí sinh (`client`) trong chính sách kỳ thi nếu Hub quá tải. Biến môi trường của Hub: `VIGIL_ONE_ANALYSIS=0` tắt phân tích tại Hub; `VIGIL_ONE_ANALYSIS_WORKERS=<n>` số luồng phân tích (mặc định 2; mỗi thí sinh luôn do một luồng xử lý theo thứ tự). Trạng thái: `GET /api/v1/one/analysis/status` và bảng **VIGIL One** ở trang Operations.
-2. **Web:** đăng nhập `chief` → **Online exams** (`/online`) → chọn kỳ thi → **Exam setup**:
-   - **Open joining** để lấy mã vào thi (7 ký tự);
-   - dán danh sách thí sinh (mỗi dòng: `mã, họ tên, PIN`; bỏ trống PIN thì hệ thống tự cấp);
-   - **Download CSV** để phát PIN cho thí sinh;
-   - chỉnh chính sách: micro, cho phép tài liệu, ảnh live.
-3. **Máy học sinh:** `python main.py --candidate --hub <địa chỉ Hub>` (sau này là bộ cài VIGIL One). Thí sinh nhập mã kỳ thi, mã thí sinh, PIN → đồng ý → kiểm tra thiết bị → **BẮT ĐẦU LÀM BÀI**. Khi thi, cửa sổ nhỏ luôn nổi ở góc phải trên. Kết thúc bằng **NỘP BÀI**.
-4. **Giám thị:** `/online` hiện lưới thí sinh; mất kết nối và nhiều tín hiệu lên đầu. Bấm vào một thí sinh để xem ảnh lớn (tự tăng tần suất) và các tín hiệu; quyết định tại `/review` (lọc **VIGIL One**).
-5. **Một dashboard cho cả hai:** nút **All / Classroom / One** ở đầu thanh bên chọn sản phẩm cho mọi trang (nhớ giữa các trang và các tab). Operations hiện phòng thi và bảng **VIGIL One** (thí sinh đang kết nối, phân tích tại Hub đã bắt kịp chưa); Review, Reports, Exams & sessions lọc theo lựa chọn; trang chỉ thuộc sản phẩm kia được ẩn khỏi menu.
-
-Thử nhanh không cần webcam:
-
-```powershell
-python vigil.py --demo --candidate --one-sim
-```
-
-Thêm thí sinh mô phỏng:
-
-```powershell
-python scripts\one_fake_client.py --hub http://127.0.0.1:8000 --join <mã> --candidate HS003 --pin <PIN> --seconds 600
-```
-
-Thí sinh mô phỏng bằng một video webcam đã quay sẵn (Hub phân tích thật, như thí sinh thật ở chế độ `server`):
-
-```powershell
-python scripts\one_fake_client.py --hub http://127.0.0.1:8000 --join <mã> --candidate HS004 --pin <PIN> --video D:\webcam.mp4 --speed 1
-```
-
-`--speed 2` gửi nhanh gấp đôi thời gian thực; `--segment-seconds` đổi độ dài đoạn (mặc định theo chính sách kỳ thi).
+- Thêm class Tailwind vào trang web thì build lại CSS theo lệnh ở đầu `dashboard/tailwind.config.js` (website chạy
+  không cần Internet).

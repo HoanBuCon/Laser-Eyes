@@ -4,20 +4,15 @@ VIGIL AI is an **AI-assisted exam monitoring** prototype. It creates observable 
 
 Current implementation status and measured limitations are in [docs/PROTOTYPE_CURRENT_STATUS.md](docs/PROTOTYPE_CURRENT_STATUS.md). This repository contains two products with separate perception engines.
 
-## Product A — VIGIL Local
+## Product A — VIGIL One (formerly VIGIL Local)
 
-- One candidate, close webcam/video geometry.
-- MediaPipe face/iris, personalized gaze calibration, head orientation, optional microphone activity and EfficientDet object observations.
-- Tkinter desktop UI; local session/evidence storage.
-- Detected material is separate from prohibited material. Books can be allowed for an open-book session.
+- One candidate, close webcam geometry: MediaPipe face/iris, personalized gaze calibration, head orientation,
+  microphone activity fused with lip movement, EfficientDet object observations.
+- Since this branch the perception runs **on VIGIL Hub**, not on the candidate's computer (see
+  [VIGIL One on the same Hub](#vigil-one-on-the-same-hub)); the candidate app only captures and streams.
+- Detected material is separate from prohibited material. Books can be allowed for an open-book exam or candidate.
 
-Launch:
-
-```powershell
-venv\Scripts\python.exe main.py
-```
-
-The UI includes guided calibration, an explicit Recalibrate action and an allowed-material toggle. A held tracking estimate may support display/release grace but cannot activate new gaze/head evidence.
+The earlier desktop app that analysed on the candidate's computer is kept for comparison: `python vigil.py --legacy`.
 
 ## Product B — VIGIL Classroom / SRS v2
 
@@ -25,13 +20,11 @@ The UI includes guided calibration, an explicit Recalibrate action and an allowe
 - YOLO11 Pose, seat mapping, SixDRepNet head orientation, temporal episodes, behavior patterns, review-priority scoring, evidence and a web review queue.
 - CLI and web adapters use the same `SRSv2Pipeline` semantic core.
 
-### Start — one command
+### Start
 
-```powershell
-.\start_vigil.bat
-```
-
-(Or double-click `start_vigil.bat`.) On the first run it creates the Python environment. Each start checks the GPU, models, `ffmpeg` and the seat calibration of every room, starts the server on `http://localhost:8000` and opens the browser. Arguments are passed through, e.g. `.\start_vigil.bat --port 8080`, or `.\start_vigil.bat --host 0.0.0.0 --demo-token "choose-a-secret"` for LAN access (a token is mandatory beyond localhost). Stop the system with `Ctrl+C` in that window.
+`python vigil.py` (see [Start — one command](#start--one-command)) starts the Hub with Classroom. On start the Hub checks
+the GPU, models, `ffmpeg` and the seat calibration of every room. `--hub-only --lan --demo-token "choose-a-secret"`
+opens it to the local network (a token is mandatory beyond localhost). Stop the system with `Ctrl+C` in that window.
 
 ### Demo videos
 
@@ -53,11 +46,34 @@ For best speed keep a laptop on AC power: a GPU in power-saving state (for examp
 
 `scripts/run_demo_video.py --video classroom-01|classroom-02|classroom-03` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
 
+## Start — one command
+
+```powershell
+python vigil.py --demo
+```
+
+`vigil.py` is the only entry point (`start_vigil.bat` calls it). With no option it starts everything on this computer:
+VIGIL Hub (website, VIGIL Classroom, VIGIL One analysis) and the VIGIL One candidate app connected to it. `--hub-only`,
+`--one-only --hub http://<hub>:8000`, `--sim`, `--lan --demo-token <secret>` and `--legacy` choose parts; a Hub left
+running with older code or another database is detected through `/health` and restarted. See
+[the runbook](docs/DEMO_RUNBOOK_VIGIL_HUB.md).
+
 ## VIGIL One on the same Hub
 
-VIGIL One (online exams, one candidate on their own computer) runs on the same Hub as Classroom. By default (`analysis_mode = server` in the exam policy) the candidate app only records and uploads 10-second H.264 segments plus the stretches in which its microphone heard speech; the Hub analyses them (`storage/one_analysis.py`, a queue of segments that survives restarts), raises review incidents and cuts snapshot and clip evidence itself. `client` mode keeps the earlier on-device analysis as a fallback. Hub settings: `VIGIL_ONE_ANALYSIS=0` disables the analysis, `VIGIL_ONE_ANALYSIS_WORKERS` sets the number of workers (default 2). `scripts/one_fake_client.py --video <webcam.mp4>` plays a recorded webcam video as a candidate. See [the runbook](docs/DEMO_RUNBOOK_VIGIL_HUB.md), section 6.
+VIGIL One (online exams, one candidate on their own computer) is a capture-only app: the candidate enters the join code,
+their candidate code and PIN, and the app streams the camera to the Hub over a WebSocket (~5 fps JPEG,
+`exam_monitor/live_stream.py`) while recording the whole exam in 10-second H.264 segments. It loads no AI model. The Hub
+analyses the live frames as they arrive (`storage/one_live.py`, `storage/one_analysis.py`), about a second behind the
+candidate, raises review incidents with snapshots and cuts their clips from the recording; recorded frames the stream
+missed are analysed as a backfill. Proctors watch a candidate on `/one-monitor` (live picture with the analysis drawn
+on it, readings, Mark frame, Recalibrate gaze, Books/notes allowed). Hub settings: `VIGIL_ONE_ANALYSIS=0` disables the
+analysis, `VIGIL_ONE_ANALYSIS_WORKERS` sets the number of workers (default 2). `scripts/one_fake_client.py --video
+<webcam.mp4>` plays a recorded webcam video as a candidate.
 
-The web dashboard is shared: the **All / Classroom / One** switcher at the top of the sidebar sets the product every page shows. The pages work without Internet: Tailwind is compiled into `dashboard/css/tailwind-build.css` and Chart.js is vendored; after adding Tailwind classes, rebuild the stylesheet with the command at the top of `dashboard/tailwind.config.js`.
+The web dashboard is shared: the **All / Classroom / One** switcher at the top of the sidebar sets the product every page
+shows. The pages work without Internet: Tailwind is compiled into `dashboard/css/tailwind-build.css` and Chart.js is
+vendored; after adding Tailwind classes, rebuild the stylesheet with the command at the top of
+`dashboard/tailwind.config.js`.
 
 ## Real, degraded and mock modes
 

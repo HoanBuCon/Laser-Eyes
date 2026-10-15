@@ -278,3 +278,39 @@ def test_clip_is_cut_across_two_segments(tmp_path):
     frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     cap.release()
     assert 9 <= frames <= 13  # ~2.2 s at 5 fps, taken from both segments
+
+
+# ---------------------------------------------------------------- the candidate's computer in SERVER mode
+
+def test_candidate_app_keeps_speech_intervals_per_segment():
+    import threading
+    from types import SimpleNamespace
+
+    from exam_monitor.candidate_app import CandidateApp
+
+    app = SimpleNamespace(_speech_lock=threading.Lock(), _speech=[], _speech_open=None, _started_mono=100.0)
+    for t, voice in ((100.5, True), (101.0, True), (101.7, False), (109.0, True)):
+        CandidateApp._track_speech(app, voice, t)
+    assert app._speech == [[500.0, 1700.0]] and app._speech_open == 9000.0
+    # the segment 0-10 s gets the closed stretch and the open one cut at its end
+    assert CandidateApp._speech_between(app, 0.0, 10000.0) == [[500.0, 1700.0], [9000.0, 10000.0]]
+    assert CandidateApp._speech_between(app, 10000.0, 20000.0) == [[10000.0, 20000.0]]
+    assert CandidateApp._server_analysis(SimpleNamespace(policy={"analysis_mode": "server"}, simulate=False))
+    assert not CandidateApp._server_analysis(SimpleNamespace(policy={"analysis_mode": "client"}, simulate=False))
+    assert not CandidateApp._server_analysis(SimpleNamespace(policy={}, simulate=True))
+
+
+def test_hub_client_sends_speech_as_json_with_the_segment(tmp_path):
+    import sqlite3
+
+    from exam_monitor.hub_client import HubClient
+
+    hub = HubClient(tmp_path / "hub", base_url="http://127.0.0.1:9", token="t")  # never started: nothing is sent
+    video = tmp_path / "seg.mp4"
+    video.write_bytes(b"....ftypisom")
+    hub.add_video_segment("k1", 0, 0.0, 10.0, str(video), speech=[[1.0, 2.25]])
+    hub.add_video_segment("k1", 1, 10000.0, 10.0, str(video))
+    with sqlite3.connect(tmp_path / "hub" / "one_outbox.db") as conn:
+        payloads = [json.loads(row[0]) for row in conn.execute("SELECT payload FROM outbox WHERE kind='video' ORDER BY id")]
+    assert json.loads(payloads[0]["speech"]) == [[1.0, 2.2]] or json.loads(payloads[0]["speech"]) == [[1.0, 2.3]]
+    assert "speech" not in payloads[1]

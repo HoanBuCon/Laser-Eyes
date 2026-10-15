@@ -543,7 +543,7 @@ class CandidateApp(tk.Tk):
                               status_text="Máy chủ đang phân tích")
 
     def _track_speech(self, voice: bool, now: float) -> None:
-        t_ms = (now - self._started_mono) * 1000.0
+        t_ms = round((now - self._started_mono) * 1000.0, 1)
         with self._speech_lock:
             if voice and self._speech_open is None:
                 self._speech_open = t_ms

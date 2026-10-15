@@ -266,10 +266,14 @@ def test_the_hub_checks_the_camera_before_the_exam(client, db):  # noqa: F811
     assert client.post("/api/v1/one/client/check", files={"image": ("c.jpg", jpeg.tobytes(), "image/jpeg")}).status_code == 401
 
 
-def test_clip_is_cut_across_two_segments(tmp_path):
+def test_clip_is_cut_across_two_segments(tmp_path, monkeypatch):
     segs = _segments(tmp_path / "rec", lambda t: int(t * 20) % 255, 4.0)
+    scratch = tmp_path / "tmp"
+    scratch.mkdir()
+    monkeypatch.setattr(one_analysis.tempfile, "tempdir", str(scratch))
     data = one_analysis.cut_clip([(path, start, dur) for _, path, start, dur in segs], 1000.0, 3200.0)
     assert data is not None and data[4:8] == b"ftyp"
+    assert list(scratch.iterdir()) == []  # nothing left behind, and nothing held open (Windows)
     out = tmp_path / "clip.mp4"
     out.write_bytes(data)
     import cv2

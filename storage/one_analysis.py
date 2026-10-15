@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import queue
+import shutil
 import tempfile
 import threading
 import time
@@ -388,45 +389,50 @@ class OneAnalysisService:
 
 def cut_clip(pieces: list[tuple[str, float, float]], from_ms: float, to_ms: float) -> Optional[bytes]:
     """Frames between from_ms and to_ms (session time) of consecutive segments, as one MP4."""
+    # A private folder rather than mkstemp: on Windows a file still held open (the mkstemp handle,
+    # or a writer/reader not yet released) cannot be deleted
+    folder = tempfile.mkdtemp(prefix="vigil-one-clip-")
+    tmp = Path(folder) / "clip.mp4"
     writer = None
-    fps = 10.0
-    tmp = Path(tempfile.mkstemp(prefix="vigil-one-clip-", suffix=".mp4")[1])
     try:
         for path, start_ms, duration_s in pieces:
             cap = cv2.VideoCapture(path)
-            total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-            frame_ms = (duration_s * 1000.0 / total) if total > 0 else 100.0
-            fps = 1000.0 / frame_ms
-            index = 0
-            while True:
-                ok, frame = cap.read()
-                if not ok or frame is None:
-                    break
-                t_ms = start_ms + index * frame_ms
-                index += 1
-                if t_ms < from_ms or t_ms > to_ms:
-                    continue
-                if writer is None:
-                    h, w = frame.shape[:2]
-                    for backend, code in _CLIP_CODECS:
-                        candidate = cv2.VideoWriter(str(tmp), backend, cv2.VideoWriter_fourcc(*code), fps, (w, h))
-                        if candidate.isOpened():
-                            writer = candidate
-                            break
+            try:
+                total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+                frame_ms = (duration_s * 1000.0 / total) if total > 0 else 100.0
+                fps = 1000.0 / frame_ms
+                index = 0
+                while True:
+                    ok, frame = cap.read()
+                    if not ok or frame is None:
+                        break
+                    t_ms = start_ms + index * frame_ms
+                    index += 1
+                    if t_ms < from_ms or t_ms > to_ms:
+                        continue
                     if writer is None:
-                        return None
-                writer.write(frame)
-            cap.release()
+                        h, w = frame.shape[:2]
+                        for backend, code in _CLIP_CODECS:
+                            candidate = cv2.VideoWriter(str(tmp), backend, cv2.VideoWriter_fourcc(*code), fps, (w, h))
+                            if candidate.isOpened():
+                                writer = candidate
+                                break
+                            candidate.release()
+                        if writer is None:
+                            return None
+                    writer.write(frame)
+            finally:
+                cap.release()
         if writer is None:
             return None
         writer.release()
         writer = None
-        data = tmp.read_bytes()
+        data = tmp.read_bytes() if tmp.is_file() else b""
         return data if data[4:8] == b"ftyp" else None
     finally:
         if writer is not None:
             writer.release()
-        tmp.unlink(missing_ok=True)
+        shutil.rmtree(folder, ignore_errors=True)
 
 
 # ---------------------------------------------------------------- device check before the exam

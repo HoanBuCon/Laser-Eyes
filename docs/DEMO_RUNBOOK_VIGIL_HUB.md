@@ -112,6 +112,7 @@ venv\Scripts\python.exe -m pytest -q
    VIGIL One gửi thẳng tới Hub qua mạng nội bộ, không cần phần mềm trung gian. Địa chỉ `http://` được chấp nhận với localhost, dải IP riêng (10.x, 172.16–31.x, 192.168.x) và mọi địa chỉ cùng mạng /16 với máy thí sinh (ví dụ `172.172.x.x`). Hub đặt ở xa trên Internet thì phải có `https://`.
    Ngoài ảnh live và ảnh bằng chứng, mỗi tín hiệu kèm **clip MP4** (5 giây trước + 4 giây sau), bật/tắt ở chính sách kỳ thi.
    **Video toàn bộ buổi thi:** VIGIL One ghi liên tục (H.264, mặc định 640 px, 10 fps, khoảng 1,5–3 MB/phút) và gửi lên Hub từng đoạn 1 phút trong lúc thi (mất mạng thì giữ lại và gửi sau). Khi phiên kết thúc, Hub ghép thành **một file `session.mp4`** cho cả buổi (ffmpeg `-c copy`, không nén lại) kèm SHA-256; các đoạn gốc và SHA-256 của chúng được giữ. Xem tại `/one-video?session=<id>` (nút **Whole exam video** ở `/online` và ở trang Review): bấm một tín hiệu để nhảy tới đúng lúc đó, các phút bị thiếu được ghi rõ. Hub cần **FFmpeg** để ghép; chưa ghép được thì trang vẫn phát nối từng đoạn.
+   **Phân tích tại Hub (mặc định, `analysis_mode = server`):** máy thí sinh chỉ quay và gửi video (đoạn 10 giây, cùng các khoảng micro nghe thấy tiếng nói); Hub chạy phân tích ánh mắt/đầu/khuôn mặt/vật thể trên video đó, cắt ảnh và clip bằng chứng ngay trên Hub. Máy thí sinh không cần GPU, và mọi phát hiện nằm ở một nơi với Classroom. Tín hiệu đến chậm hơn thời gian thực khoảng một đoạn video (≈ 10–15 giây). Đổi về phân tích trên máy thí sinh (`client`) trong chính sách kỳ thi nếu Hub quá tải. Biến môi trường của Hub: `VIGIL_ONE_ANALYSIS=0` tắt phân tích tại Hub; `VIGIL_ONE_ANALYSIS_WORKERS=<n>` số luồng phân tích (mặc định 2; mỗi thí sinh luôn do một luồng xử lý theo thứ tự). Trạng thái: `GET /api/v1/one/analysis/status` và bảng **VIGIL One** ở trang Operations.
 2. **Web:** đăng nhập `chief` → **Online exams** (`/online`) → chọn kỳ thi → **Exam setup**:
    - **Open joining** để lấy mã vào thi (7 ký tự);
    - dán danh sách thí sinh (mỗi dòng: `mã, họ tên, PIN`; bỏ trống PIN thì hệ thống tự cấp);
@@ -119,6 +120,7 @@ venv\Scripts\python.exe -m pytest -q
    - chỉnh chính sách: micro, cho phép tài liệu, ảnh live.
 3. **Máy học sinh:** `python main.py --candidate --hub <địa chỉ Hub>` (sau này là bộ cài VIGIL One). Thí sinh nhập mã kỳ thi, mã thí sinh, PIN → đồng ý → kiểm tra thiết bị → **BẮT ĐẦU LÀM BÀI**. Khi thi, cửa sổ nhỏ luôn nổi ở góc phải trên. Kết thúc bằng **NỘP BÀI**.
 4. **Giám thị:** `/online` hiện lưới thí sinh; mất kết nối và nhiều tín hiệu lên đầu. Bấm vào một thí sinh để xem ảnh lớn (tự tăng tần suất) và các tín hiệu; quyết định tại `/review` (lọc **VIGIL One**).
+5. **Một dashboard cho cả hai:** nút **All / Classroom / One** ở đầu thanh bên chọn sản phẩm cho mọi trang (nhớ giữa các trang và các tab). Operations hiện phòng thi và bảng **VIGIL One** (thí sinh đang kết nối, phân tích tại Hub đã bắt kịp chưa); Review, Reports, Exams & sessions lọc theo lựa chọn; trang chỉ thuộc sản phẩm kia được ẩn khỏi menu.
 
 Thử nhanh không cần webcam:
 
@@ -131,3 +133,11 @@ Thêm thí sinh mô phỏng:
 ```powershell
 python scripts\one_fake_client.py --hub http://127.0.0.1:8000 --join <mã> --candidate HS003 --pin <PIN> --seconds 600
 ```
+
+Thí sinh mô phỏng bằng một video webcam đã quay sẵn (Hub phân tích thật, như thí sinh thật ở chế độ `server`):
+
+```powershell
+python scripts\one_fake_client.py --hub http://127.0.0.1:8000 --join <mã> --candidate HS004 --pin <PIN> --video D:\webcam.mp4 --speed 1
+```
+
+`--speed 2` gửi nhanh gấp đôi thời gian thực; `--segment-seconds` đổi độ dài đoạn (mặc định theo chính sách kỳ thi).

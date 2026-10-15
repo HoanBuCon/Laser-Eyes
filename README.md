@@ -53,6 +53,12 @@ For best speed keep a laptop on AC power: a GPU in power-saving state (for examp
 
 `scripts/run_demo_video.py --video classroom-01|classroom-02|classroom-03` and `scripts/run_demo_all_videos.py` run the same pipeline headless for benchmarks, reading the same web calibration. `venv\Scripts\python.exe -m pytest` runs the test suite against a temporary database.
 
+## VIGIL One on the same Hub
+
+VIGIL One (online exams, one candidate on their own computer) runs on the same Hub as Classroom. By default (`analysis_mode = server` in the exam policy) the candidate app only records and uploads 10-second H.264 segments plus the stretches in which its microphone heard speech; the Hub analyses them (`storage/one_analysis.py`, a queue of segments that survives restarts), raises review incidents and cuts snapshot and clip evidence itself. `client` mode keeps the earlier on-device analysis as a fallback. Hub settings: `VIGIL_ONE_ANALYSIS=0` disables the analysis, `VIGIL_ONE_ANALYSIS_WORKERS` sets the number of workers (default 2). `scripts/one_fake_client.py --video <webcam.mp4>` plays a recorded webcam video as a candidate. See [the runbook](docs/DEMO_RUNBOOK_VIGIL_HUB.md), section 6.
+
+The web dashboard is shared: the **All / Classroom / One** switcher at the top of the sidebar sets the product every page shows. The pages work without Internet: Tailwind is compiled into `dashboard/css/tailwind-build.css` and Chart.js is vendored; after adding Tailwind classes, rebuild the stylesheet with the command at the top of `dashboard/tailwind.config.js`.
+
 ## Real, degraded and mock modes
 
 Competition LIVE defaults to fail-closed. If YOLO-Pose cannot load, the run enters `ERROR`; it never silently substitutes synthetic people. Synthetic perception is available only with explicit `--allow-mock`/`allow_mock=true`, and the UI, API and manifest identify it as `MOCK` with a simulation watermark. Recorded replay is reported as `DEGRADED`/recorded, not live inference.

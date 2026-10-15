@@ -11,12 +11,17 @@ Two audiences:
 
 from __future__ import annotations
 
+import asyncio
 import json
+import time
+import uuid
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import (APIRouter, BackgroundTasks, Depends, File, Form, Header, HTTPException, Request, Response, UploadFile,
+                     WebSocket, WebSocketDisconnect)
+from fastapi.responses import FileResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -26,7 +31,7 @@ from storage.database import get_db
 from storage.db_models import ClientDevice, ExamSession
 from storage import one_service as one
 from storage import online_exam_service as online
-from storage import one_analysis, one_video
+from storage import one_analysis, one_live, one_video
 from storage.db_models import Exam
 from storage.proctor_service import serialize_bookmark
 
@@ -547,6 +552,190 @@ def delete_candidate(exam_id: str, candidate_id: str, db: Session = Depends(get_
     except one.OneError as exc:
         raise _bad(exc) from exc
     return {"deleted": candidate_id}
+
+
+# ---------------------------------------------------------------- live video (app -> Hub -> web)
+
+LIVE_STATUS_SECONDS = 1.0
+MJPEG_IDLE_SECONDS = 60.0   # no new picture for this long: end the stream (the page reconnects)
+
+
+def _live_session(provider, token: Optional[str], session_id: str) -> tuple[Optional[str], Optional[str]]:
+    """(error, None) or (None, session id) for a candidate app opening its live stream."""
+    gen = provider()
+    db = next(gen)
+    try:
+        device = one.device_for_token(db, token)
+        if device is None:
+            return "Thiết bị chưa được ghép nối hoặc đã bị thu hồi.", None
+        try:
+            session = one.owned_session(db, device, session_id)
+        except one.OneError as exc:
+            return str(exc), None
+        if session.analysis_mode != "SERVER":
+            return "Phiên này không phân tích trên Hub.", None
+        if session.status not in ("RUNNING", "STOPPING", "INTERRUPTED"):
+            return "Phiên đã kết thúc.", None
+        return None, session.id
+    finally:
+        gen.close()
+
+
+def _live_reply(provider, session_id: str) -> dict[str, Any]:
+    gen = provider()
+    db = next(gen)
+    try:
+        session = db.get(ExamSession, session_id)
+        if session is None:
+            return {"ended": True}
+        live = one.serialize_live(session)
+        return {"session_status": session.status, "ended": session.status not in ("RUNNING", "STOPPING", "INTERRUPTED"),
+                "analysis": (live.get("live") or {}).get("analysis"), "stream": one_live.stats(session_id)}
+    finally:
+        gen.close()
+
+
+@router.websocket("/client/sessions/{session_id}/live")
+async def live_stream(websocket: WebSocket, session_id: str):
+    """The candidate app's live frames (binary: header length, JSON {t, voice}, JPEG).
+
+    The Hub analyses them straight away and answers about once a second with what it sees
+    (calibration, faces), which the app turns into hints for the candidate."""
+    auth = websocket.headers.get("authorization") or ""
+    token = auth[7:].strip() if auth.lower().startswith("bearer ") else websocket.query_params.get("token")
+    provider = websocket.app.dependency_overrides.get(get_db, get_db)
+    error, sid = await run_in_threadpool(_live_session, provider, token, session_id)
+    if error:
+        await websocket.close(code=1008, reason=error[:120])
+        return
+    await websocket.accept()
+    last_reply = 0.0
+    try:
+        while True:
+            message = await websocket.receive()
+            if message.get("type") == "websocket.disconnect":
+                break
+            data = message.get("bytes")
+            if data:
+                try:
+                    header, jpeg = one_live.parse_message(data)
+                    voice = header.get("voice")
+                    one_live.put_frame(sid, jpeg, float(header.get("t") or 0.0), None if voice is None else bool(voice))
+                except (ValueError, TypeError) as exc:
+                    await websocket.send_text(json.dumps({"error": str(exc)}))
+                    continue
+                one_analysis.notify_live(sid)
+            now = time.monotonic()
+            if now - last_reply >= LIVE_STATUS_SECONDS:
+                last_reply = now
+                reply = await run_in_threadpool(_live_reply, provider, sid)
+                await websocket.send_text(json.dumps(reply, ensure_ascii=False))
+                if reply.get("ended"):
+                    await websocket.close(code=1000)
+                    break
+    except WebSocketDisconnect:
+        pass
+    finally:
+        one_live.disconnected(sid)
+
+
+@router.get("/sessions/{session_id}/live.mjpg")
+async def live_mjpeg(session_id: str, request: Request, fps: float = 8.0, overlay: bool = True) -> StreamingResponse:
+    """The candidate's live picture with the analysis drawn on it, for an <img> on the web."""
+    interval = 1.0 / min(15.0, max(1.0, fps))
+
+    async def frames():
+        seq, idle = 0, 0.0
+        while not await request.is_disconnected():
+            item = one_live.view(session_id, seq, annotated=overlay)
+            if item is None:
+                idle += interval
+                if idle > MJPEG_IDLE_SECONDS:
+                    return
+                await asyncio.sleep(interval)
+                continue
+            idle = 0.0
+            seq, jpeg = item
+            yield (b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: " + str(len(jpeg)).encode()
+                   + b"\r\n\r\n" + jpeg + b"\r\n")
+            await asyncio.sleep(interval)
+
+    return StreamingResponse(frames(), media_type="multipart/x-mixed-replace; boundary=frame",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@router.get("/sessions/{session_id}/monitor")
+def monitor_state(session_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
+    """Everything the candidate monitor page shows besides the picture."""
+    session = _one_session(db, session_id)
+    live = one.serialize_live(session)
+    live["stream"] = one_live.stats(session.id)
+    live["subject_name"] = session.subject_name
+    return live
+
+
+def _service_or_503() -> "one_analysis.OneAnalysisService":
+    service = one_analysis.get_service()
+    if service is None:
+        raise HTTPException(status_code=503, detail="Phân tích VIGIL One trên Hub đang tắt (VIGIL_ONE_ANALYSIS=0).")
+    return service
+
+
+@router.post("/sessions/{session_id}/recalibrate")
+def recalibrate(session_id: str, db: Session = Depends(get_db),
+                user=Depends(require_roles("PROCTOR", "CHIEF", "ADMIN"))) -> dict[str, Any]:
+    """Start the candidate's gaze calibration again; their app asks them to look at the screen."""
+    session = _one_session(db, session_id)
+    try:
+        snapshot = _service_or_503().recalibrate(db, session.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    one._audit(db, actor_name(user), "RECALIBRATE_ONE", "EXAM_SESSION", session.id, {})
+    db.commit()
+    return {"calibration": snapshot.get("state", "COLLECTING")}
+
+
+class MaterialsRequest(BaseModel):
+    allowed: bool
+
+
+@router.post("/sessions/{session_id}/materials")
+def set_materials(session_id: str, payload: MaterialsRequest, db: Session = Depends(get_db),
+                  user=Depends(require_roles("PROCTOR", "CHIEF", "ADMIN"))) -> dict[str, Any]:
+    """Books / notes allowed for this candidate (open-book) or not."""
+    session = _one_session(db, session_id)
+    try:
+        _service_or_503().set_allowed_materials(db, session.id, payload.allowed)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    one._audit(db, actor_name(user), "ONE_MATERIALS", "EXAM_SESSION", session.id, {"allowed": payload.allowed})
+    db.commit()
+    return {"allowed": payload.allowed}
+
+
+class ProctorMarkRequest(BaseModel):
+    note: str = Field("", max_length=2000)
+
+
+@router.post("/sessions/{session_id}/mark")
+def proctor_mark(session_id: str, payload: ProctorMarkRequest, db: Session = Depends(get_db),
+                 user=Depends(require_roles("PROCTOR", "CHIEF", "ADMIN"))) -> dict[str, Any]:
+    """A proctor watching live marks the current frame (a manual bookmark, not an AI signal)."""
+    session = _one_session(db, session_id)
+    frame = one_live.latest(session.id)
+    data = frame.jpeg if frame is not None else one.live_thumbnail(session.id)
+    if not data:
+        raise HTTPException(status_code=409, detail="Chưa có hình trực tiếp của thí sinh này.")
+    try:
+        bookmark, _ = one.create_one_bookmark(
+            db, session, request_id=f"web-{uuid.uuid4().hex}", frame_id=frame.seq if frame else 0,
+            session_elapsed_ms=frame.t_ms if frame else None, captured_at=None, note=payload.note,
+            created_by=actor_name(user, "Giám thị"), data=data, sha256=None, source_kind="LIVE_STREAM")
+    except one.OneError as exc:
+        raise _bad(exc) from exc
+    result = serialize_bookmark(bookmark)
+    realtime_manager.broadcast_threadsafe({"type": "PROCTOR_BOOKMARK", "bookmark": result})
+    return {"bookmark": result}
 
 
 @router.post("/sessions/{session_id}/boost")

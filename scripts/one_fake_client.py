@@ -67,6 +67,7 @@ def main() -> int:
     parser.add_argument("--video", help="Recorded webcam video: upload it for the Hub's analysis (SERVER mode)")
     parser.add_argument("--speed", type=float, default=1.0, help="--video playback speed (1 = real time)")
     parser.add_argument("--segment-seconds", type=float, default=0, help="--video segment length (default: exam policy)")
+    parser.add_argument("--no-live", action="store_true", help="--video: upload the recording only, no live stream")
     args = parser.parse_args()
 
     work = Path(tempfile.mkdtemp(prefix="vigil-one-sim-"))
@@ -123,7 +124,8 @@ def main() -> int:
 
 
 def play_video(hub: HubClient, args, exam_id, work: Path) -> int:
-    """SERVER analysis mode with a recorded video standing in for the webcam."""
+    """A recorded video standing in for the webcam: streamed live and recorded, like the candidate app."""
+    from exam_monitor.live_stream import LiveStreamer
     from exam_monitor.session_recorder import SessionRecorder
 
     cap = cv2.VideoCapture(args.video)
@@ -147,6 +149,7 @@ def play_video(hub: HubClient, args, exam_id, work: Path) -> int:
                                lambda seq, path, start_ms, dur: hub.add_video_segment(key, seq, start_ms, dur, path, speech=[]),
                                fps=float(policy.get("video_fps") or 10), width=int(policy.get("video_width") or 640),
                                segment_seconds=seconds, started=started)
+    streamer = None if args.no_live else LiveStreamer(hub, key, fps=float(policy.get("analysis_fps") or 5), width=640)
     index, last_live = 0, 0.0
     try:
         while True:
@@ -162,13 +165,21 @@ def play_video(hub: HubClient, args, exam_id, work: Path) -> int:
             if wait > 0:
                 time.sleep(wait)
             recorder.push(img, started + video_t / max(0.1, args.speed))
+            if streamer is not None:
+                streamer.push(img, video_t / max(0.1, args.speed) * 1000.0, None)
             if time.monotonic() - last_live >= 2.0:
                 last_live = time.monotonic()
-                small = cv2.resize(img, (320, max(1, int(img.shape[0] * 320 / img.shape[1]))))
-                ok2, enc = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-                hub.update_live(key, {"fps": round(src_fps, 1), "source_kind": "VIDEO_FILE"}, enc.tobytes() if ok2 else None)
+                jpeg = None
+                if streamer is None or not streamer.connected:  # the live stream already carries the picture
+                    small = cv2.resize(img, (320, max(1, int(img.shape[0] * 320 / img.shape[1]))))
+                    ok2, enc = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                    jpeg = enc.tobytes() if ok2 else None
+                hub.update_live(key, {"fps": round(src_fps, 1), "source_kind": "VIDEO_FILE"}, jpeg)
     except KeyboardInterrupt:
         pass
+    if streamer is not None:
+        print(f"Live stream: {streamer.sent} frames sent{'' if not streamer.last_error else ' (last error: ' + streamer.last_error + ')'}")
+        streamer.close()
     recorder.close()
     hub.stop_session(key, {"frame_count": index, "average_fps": round(src_fps, 2), "reason": "SUBMITTED"})
     hub.drain(timeout=60)

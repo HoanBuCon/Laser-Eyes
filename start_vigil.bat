@@ -1,18 +1,15 @@
 @echo off
 :: =====================================================================
-::  VIGIL AI CLASSROOM - the single way to start the system.
+::  VIGIL AI - double-click shortcut for:   python vigil.py
 ::
-::  Double-click this file, or run from a terminal:
-::      start_vigil.bat
-::      start_vigil.bat --port 8080
-::      start_vigil.bat --host 0.0.0.0 --demo-token "choose-a-secret"   (LAN)
-::
-::  Everything else - seat calibration, live analysis, replay, review and
-::  export - is done in the website this command opens.
+::  vigil.py is the one way to start the system (Hub, website, Classroom,
+::  VIGIL One). Options are passed through, e.g.:
+::      start_vigil.bat --demo
+::      start_vigil.bat --hub-only --lan --demo-token "choose-a-secret"
 :: =====================================================================
 setlocal
 cd /d "%~dp0"
-title VIGIL AI Classroom
+title VIGIL AI
 
 set "PYTHON_EXE="
 if exist "venv\Scripts\python.exe" set "PYTHON_EXE=venv\Scripts\python.exe"
@@ -26,11 +23,11 @@ if not defined PYTHON_EXE (
     ".venv\Scripts\python.exe" -m pip install -r requirements-hpe.txt
 )
 
-"%PYTHON_EXE%" server.py --open-browser %*
+"%PYTHON_EXE%" vigil.py %*
 set "EXIT_CODE=%ERRORLEVEL%"
 if not "%EXIT_CODE%"=="0" (
     echo.
-    echo [VIGIL] The server stopped with exit code %EXIT_CODE%.
+    echo [VIGIL] VIGIL stopped with exit code %EXIT_CODE%.
     pause
 )
 endlocal & exit /b %EXIT_CODE%

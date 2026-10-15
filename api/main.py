@@ -250,11 +250,26 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(one.router, prefix=prefix)
 
 
+try:
+    from vigil_build import fingerprint as _fingerprint
+
+    _BUILD = _fingerprint()  # the code this Hub started with
+except Exception:  # pragma: no cover - a packaged Hub without the source tree
+    _BUILD = "unknown"
+
+
+def _database_name() -> str:
+    from storage.database import DATABASE_URL as url
+
+    return Path(url.split("///", 1)[-1]).name if url.startswith("sqlite") else url.split("@")[-1].split("?")[0]
+
+
 @app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
-    """Service liveness probe."""
-    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0"}
+    """Service liveness probe; ``build`` and ``database`` let vigil.py spot a Hub left over from older code."""
+    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0", "build": _BUILD,
+            "database": _database_name(), "features": ["one-live-stream", "one-server-analysis"]}
 
 
 @app.get("/ready", tags=["Health"])
@@ -348,6 +363,7 @@ if dashboard_dir.exists():
         ("/users", "users.html"),
         ("/online", "online.html"),
         ("/one-video", "one_video.html"),
+        ("/one-monitor", "one_monitor.html"),
     ):
         app.add_api_route(route, _page(page), methods=["GET"], tags=["Dashboard"], include_in_schema=False)
 

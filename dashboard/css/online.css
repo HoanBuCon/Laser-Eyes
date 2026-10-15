@@ -42,3 +42,6 @@
 .on-signal { display: grid; grid-template-columns: 64px 1fr auto; gap: 10px; align-items: center; padding: 6px; border: 1px solid var(--vigil-border); border-radius: 6px; font-size: 12px; }
 .on-signal img { width: 64px; height: 36px; object-fit: cover; border-radius: 3px; background: #050506; }
 @media (max-width: 900px) { .on-setup-grid, .on-detail-body { grid-template-columns: 1fr; } }
+.on-thresholds { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 6px 14px; margin-top: 6px; font-size: 12px; }
+.on-thresholds label { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.on-thresholds input { width: 72px; }

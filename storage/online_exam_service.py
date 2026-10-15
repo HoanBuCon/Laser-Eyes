@@ -101,9 +101,29 @@ def update_policy(db: Session, exam: Exam, changes: dict[str, Any]) -> dict[str,
         raise OnlineExamError("analysis_mode must be 'server' or 'client'")
     current["segment_seconds"] = max(4, min(60, int(current["segment_seconds"])))
     current["analysis_fps"] = max(1, min(int(current["video_fps"]), int(current["analysis_fps"])))
+    current["thresholds"] = _clean_thresholds(current.get("thresholds"))
     exam.one_policy_json = json.dumps(current, ensure_ascii=False)
     db.commit()
     return current
+
+
+def _clean_thresholds(value: Any) -> dict[str, float]:
+    """Seconds a behaviour must last before it becomes a signal, per signal type (0.2-60 s)."""
+    from exam_monitor.models import EventType
+
+    if value in (None, ""):
+        return {}
+    if not isinstance(value, dict):
+        raise OnlineExamError("thresholds must be an object {signal type: seconds}")
+    known = {e.value for e in EventType}
+    clean = {}
+    for key, seconds in value.items():
+        if key not in known:
+            raise OnlineExamError(f"Unknown signal type: {key}")
+        if seconds in (None, ""):
+            continue  # back to the default
+        clean[key] = round(max(0.2, min(60.0, float(seconds))), 1)
+    return clean
 
 
 def _new_join_code(db: Session) -> str:

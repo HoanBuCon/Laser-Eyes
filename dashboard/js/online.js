@@ -154,6 +154,11 @@ function renderSetup() {
         if (el.type === 'checkbox') el.checked = Boolean(policy[el.dataset.policy]);
         else el.value = String(policy[el.dataset.policy] ?? '');
     });
+    document.querySelectorAll('[data-threshold]').forEach((el) => {
+        if (document.activeElement === el) return;
+        const value = (policy.thresholds || {})[el.dataset.threshold];
+        el.value = value == null ? '' : String(value);
+    });
 }
 
 async function setJoining(open, rotate = false) {
@@ -173,6 +178,22 @@ async function savePolicy(el) {
         await api(`/api/v1/one/exams/${encodeURIComponent(state.examId)}/policy`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [el.dataset.policy]: value }),
         });
+        await refresh();
+    } catch (e) {
+        $('rosterMsg').textContent = `${e.message} (sign in as chief or admin)`;
+    }
+}
+
+async function saveThresholds() {
+    const thresholds = {};
+    document.querySelectorAll('[data-threshold]').forEach((el) => {
+        if (el.value.trim() !== '') thresholds[el.dataset.threshold] = Number(el.value);
+    });
+    try {
+        await api(`/api/v1/one/exams/${encodeURIComponent(state.examId)}/policy`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ thresholds }),
+        });
+        $('rosterMsg').textContent = 'Thresholds saved; running candidates use them at once.';
         await refresh();
     } catch (e) {
         $('rosterMsg').textContent = `${e.message} (sign in as chief or admin)`;
@@ -249,6 +270,7 @@ async function renderDetail() {
         $('dSignals').innerHTML = '<div class="vg-empty">No session yet.</div>';
         return;
     }
+    $('dMonitor').href = `/one-monitor?session=${encodeURIComponent(session.session_id)}`;
     $('dReview').href = `/review?status=ALL&product=ONE&session_id=${encodeURIComponent(session.session_id)}`;
     $('dReport').href = `/reports?session=${encodeURIComponent(session.session_id)}`;
     $('dVideo').href = `/one-video?session=${encodeURIComponent(session.session_id)}`;
@@ -283,6 +305,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (window.confirm('Make a new join code? The old one stops working; candidates already in keep going.')) setJoining(true, true);
     });
     document.querySelectorAll('[data-policy]').forEach((el) => el.addEventListener('change', () => savePolicy(el)));
+    document.querySelectorAll('[data-threshold]').forEach((el) => el.addEventListener('change', saveThresholds));
     $('rosterImport').addEventListener('click', importRoster);
     $('pinsDownload').addEventListener('click', downloadPins);
     document.querySelectorAll('.on-kpi').forEach((k) => k.addEventListener('click', () => {

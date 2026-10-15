@@ -3,11 +3,13 @@
 Steps: join (exam code + candidate code + PIN) -> consent -> device check ->
 exam (calibration first, then a small always-on-top window) -> submit.
 
-The candidate cannot change thresholds, review or delete signals, or pick a
-video file: the exam's monitoring policy comes from VIGIL Hub.  Signals are
-not shown to the candidate (policy ``show_alerts_to_candidate``), only what
-they need to fix (no face, too dark) and the connection state.  Everything is
-recorded locally first and sent through the same outbox as the proctor mode.
+The app only captures: it streams the camera live to VIGIL Hub (``live_stream``)
+and records the whole exam in short H.264 segments sent through the outbox.  All
+the analysis — gaze, head, faces, objects, speech — runs on the Hub, next to VIGIL
+Classroom, where proctors watch and review.  The candidate cannot change thresholds,
+review or delete signals, or pick a video file; they only see what they need to fix
+(no face, too dark, look at the screen to calibrate) and the connection state.
+``--sim`` keeps a scripted, on-device simulation for demos without a camera.
 """
 
 from __future__ import annotations
@@ -35,8 +37,8 @@ from PIL import Image, ImageTk
 from .audio import VoiceActivityDetector, speech_is_confirmed
 from .clip_recorder import ClipRecorder
 from .session_recorder import SessionRecorder
-from .engine import GazeAnalyzer
 from .events import EventDetector, SessionStore
+from .live_stream import LiveStreamer
 from .paths import app_data_dir, resource
 from .hub_client import OFFLINE, SYNCED, UNPAIRED, HubClient, HubError
 from .models import AnalysisResult, EventType, MonitoringEvent, SessionInfo, Severity
@@ -51,9 +53,9 @@ CONSENT_TEXT = (
     "Trong thời gian làm bài, VIGIL One sử dụng webcam (và micro nếu kỳ thi yêu cầu) của máy này để ghi nhận "
     "các tín hiệu quan sát như: hướng nhìn, quay đầu, không thấy khuôn mặt, có thêm người, vật thể như điện thoại "
     "hoặc tài liệu, tiếng nói chuyện.\n\n"
-    "• Phân tích hình ảnh chạy ngay trên máy này. Video không được ghi lại liên tục.\n"
-    "• Khi có tín hiệu, một ảnh chụp kèm mô tả được gửi về máy chủ của đơn vị tổ chức thi.\n"
-    "• Một ảnh nhỏ được gửi định kỳ để giám thị theo dõi; ảnh này không được lưu trữ.\n"
+    "• Hình ảnh camera được gửi trực tiếp về máy chủ của đơn vị tổ chức thi để giám thị theo dõi và để máy chủ "
+    "phân tích. Phần mềm trên máy này không phân tích hình ảnh.\n"
+    "• Toàn bộ buổi thi được ghi hình và lưu trên máy chủ thi; khi có tín hiệu, máy chủ lưu kèm ảnh và đoạn video ngắn.\n"
     "• Các tín hiệu chỉ để giám thị xem xét. Phần mềm không tự kết luận vi phạm; mọi quyết định do giám thị đưa ra.\n"
     "• Dữ liệu được lưu và xử lý theo quy định của đơn vị tổ chức thi; bạn có quyền hỏi và khiếu nại theo quy chế thi.\n\n"
     "Không nhận diện khuôn mặt. Không theo dõi các ứng dụng khác trên máy."
@@ -145,7 +147,7 @@ class CandidateApp(tk.Tk):
         self._stop = threading.Event()
         self._phase = "idle"          # idle -> check -> exam
         self._source = None
-        self._analyzer: Optional[GazeAnalyzer] = None
+        self._streamer: Optional[LiveStreamer] = None
         # SERVER analysis mode: when the microphone heard a voice (ms of the session), sent with each segment
         self._speech_lock = threading.Lock()
         self._speech: list[list[float]] = []
@@ -408,10 +410,7 @@ class CandidateApp(tk.Tk):
         if server:
             # The Hub analyses the video: no face model here, the pre-exam check asks the Hub too
             threading.Thread(target=self._remote_checks, daemon=True, name="candidate-check").start()
-        elif not self.simulate:
-            self._analyzer = GazeAnalyzer()
-            self._analyzer.set_allowed_materials({"book"} if self.policy.get("allow_materials") else set())
-        detector = EventDetector()
+        detector = EventDetector()  # --sim only: its scripted results become signals here
         for name, seconds in (self.policy.get("thresholds") or {}).items():
             try:
                 detector.set_threshold(EventType(name), float(seconds))
@@ -433,12 +432,7 @@ class CandidateApp(tk.Tk):
                     self._ui_queue.put(("camera_lost", None))
                     break
                 self._last_frame = frame
-                if self.simulate:
-                    result = source.last_result
-                elif server:
-                    result = self._remote_result(frame, now)
-                else:
-                    result = self._analyzer.analyze(frame, now)
+                result = source.last_result if self.simulate else self._remote_result(frame, now)
                 if self._phase == "exam":
                     if self._clips is None and self.policy.get("video_clips", True) and not server:
                         session_id = self._session.session_id
@@ -452,12 +446,20 @@ class CandidateApp(tk.Tk):
                     if audio is None and self.policy.get("microphone", True) and not self.simulate:
                         audio = VoiceActivityDetector()
                         audio.start()
+                    voice = None
                     if audio is not None:
                         state = audio.snapshot()
+                        voice = bool(state.voice_active) if state.available else None
                         if server:
                             self._track_speech(state.voice_active, now)
                         else:
                             result = replace(result, is_talking=speech_is_confirmed(result.talking_score, result.is_talking, state))
+                    if server:
+                        if self._streamer is None:
+                            self._streamer = LiveStreamer(
+                                self.hub, self._session.session_id, fps=float(self.policy.get("analysis_fps") or 5),
+                                width=min(640, int(self.policy.get("video_width") or 640)), on_reply=self._on_live_reply)
+                        self._streamer.push(frame, (now - self._started_mono) * 1000.0, voice)
                     if not server:
                         for event in detector.update(result, self._session.session_id, now):
                             self._emit(event, frame)
@@ -485,6 +487,8 @@ class CandidateApp(tk.Tk):
         finally:
             if audio is not None:
                 audio.stop()
+            if self._streamer is not None:
+                self._streamer.close()
             if self._recorder is not None:
                 self._recorder.close()  # the last minute of video is queued before the session's stop
             if self._clips is not None:
@@ -508,8 +512,13 @@ class CandidateApp(tk.Tk):
 
     # ------------------------------------------------------------ SERVER analysis mode
     def _server_analysis(self) -> bool:
-        """The Hub analyses this candidate's video (exam policy); a simulation keeps its scripted analysis."""
-        return str(self.policy.get("analysis_mode") or "server") == "server" and not self.simulate
+        """The Hub analyses this candidate's video; only a --sim demo keeps its scripted signals."""
+        return not self.simulate
+
+    def _on_live_reply(self, reply: dict) -> None:
+        """The Hub's answer on the live stream (about once a second): what its analysis sees."""
+        if isinstance(reply.get("analysis"), dict):
+            self.hub.analysis_info = reply["analysis"]
 
     def _remote_checks(self) -> None:
         """Pre-exam: send a small camera picture to the Hub every ~1.5 s and show what it sees."""
@@ -591,7 +600,8 @@ class CandidateApp(tk.Tk):
     def _push_live(self, frame, result, frames: int, fps_started: float, now: float) -> None:
         settings = self.hub.live_settings
         jpeg = None
-        if settings.get("enabled", True):
+        streaming = self._streamer is not None and self._streamer.connected  # the Hub already has the picture
+        if settings.get("enabled", True) and not streaming:
             width = int(settings.get("width") or 320)
             h, w = frame.shape[:2]
             small = cv2.resize(frame, (width, max(1, int(h * width / max(1, w)))), interpolation=cv2.INTER_AREA) if w > width else frame
@@ -621,8 +631,6 @@ class CandidateApp(tk.Tk):
             "analysis": "server" if self._server_analysis() else "client",
         })
         self._started_mono = time.monotonic()
-        if self._analyzer is not None:
-            self._analyzer.begin_calibration()
         self._phase = "exam"
         if getattr(self, "_virtual_names", None):
             self._integrity("virtual_camera", "Máy có cài camera ảo: " + ", ".join(self._virtual_names))
@@ -777,6 +785,11 @@ class CandidateApp(tk.Tk):
         text = {SYNCED: "● Đã kết nối máy chủ thi", OFFLINE: f"● Mất kết nối — {status.pending} mục được giữ lại, sẽ tự gửi",
                 UNPAIRED: "● Máy chủ từ chối phiên này — báo giám thị"}.get(status.state, f"● Đang gửi {status.pending} mục…")
         color = {SYNCED: COLORS["good"], OFFLINE: COLORS["danger"], UNPAIRED: COLORS["danger"]}.get(status.state, COLORS["warning"])
+        if status.state == SYNCED and self._streamer is not None and not self._streamer.connected:
+            text, color = "● Đã kết nối — đang nối lại hình trực tiếp", COLORS["warning"]
+        if status.failed:  # the reason, so the proctor can act on it
+            text += f"\n{status.failed} mục bị máy chủ từ chối: {status.last_error}"[:160]
+            color = COLORS["danger"]
         self.sync_label.configure(text=text, fg=color)
 
     def _on_close(self) -> None:

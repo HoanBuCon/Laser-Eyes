@@ -94,6 +94,15 @@
                     <label class="on-check">Live picture every
                         <select class="vg-select on-mini" data-policy="live_interval"><option>2</option><option>3</option><option>5</option><option>10</option></select> s
                     </label>
+                    <div class="vg-label" style="margin-top:14px">A behaviour becomes a signal after (seconds; empty = default)</div>
+                    <div class="on-thresholds">
+                        <label>Eyes outside the screen <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="look_away" placeholder="1.6"></label>
+                        <label>Head turned away <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="head_turn" placeholder="1.4"></label>
+                        <label>Talking <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="talking" placeholder="1.0"></label>
+                        <label>No face <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="no_face" placeholder="3.0"></label>
+                        <label>Several people <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="multiple_faces" placeholder="0.8"></label>
+                        <label>Phone / book <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="suspicious_object" placeholder="1.0"></label>
+                    </div>
                 </div>
                 <div>
                     <div class="vg-label">Candidates (one per line: code, full name, PIN — PIN optional)</div>
@@ -128,7 +137,8 @@
                 <div class="vg-label">Signals in this session</div>
                 <div id="dSignals" class="on-signals"><div class="vg-empty">Loading…</div></div>
                 <div class="on-row">
-                    <a id="dReview" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/review">Review these signals</a>
+                    <a id="dMonitor" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/one-monitor">Live monitor</a>
+                    <a id="dReview" class="vigil-btn vigil-btn--sm" href="/review">Review these signals</a>
                     <a id="dVideo" class="vigil-btn vigil-btn--sm" href="/one-video">Whole exam video</a>
                     <a id="dReport" class="vigil-btn vigil-btn--sm" href="/reports">Session report</a>
                 </div>

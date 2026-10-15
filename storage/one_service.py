@@ -557,6 +557,12 @@ def update_live_analysis(db: Session, session: ExamSession, values: dict[str, An
     session.live_status_json = json.dumps(live, ensure_ascii=False)
 
 
+def set_live_thumbnail(session_id: str, jpeg: bytes) -> None:
+    """The newest picture of a candidate (from the heartbeat or the live stream)."""
+    with _LIVE_LOCK:
+        _LIVE_THUMBS[session_id] = (jpeg, time.time())
+
+
 def live_thumbnail(session_id: str) -> Optional[bytes]:
     with _LIVE_LOCK:
         item = _LIVE_THUMBS.get(session_id)
@@ -589,6 +595,10 @@ def serialize_live(session: ExamSession) -> dict[str, Any]:
         live = {}
     age = (_now() - session.last_heartbeat_at).total_seconds() if session.last_heartbeat_at else None
     connected = session.status == "RUNNING" and age is not None and age <= STALE_AFTER_SECONDS
+    if not connected and session.status in ("RUNNING", "INTERRUPTED"):
+        from storage import one_live
+
+        connected = bool(one_live.stats(session.id).get("live"))  # the live stream is a heartbeat too
     return {
         "session_id": session.id,
         "exam_id": session.exam_id,

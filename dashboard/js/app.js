@@ -368,7 +368,7 @@ async function loadOne() {
             analysisText = a.frames ? `Hub · ${a.calibration === 'READY' ? 'calibrated' : 'calibrating'}${lag}` : 'Hub · waiting for video';
         }
         const eyes = [info.eye, info.head].filter((v) => v && v !== '—').join(' · ') || '—';
-        const href = `/online?exam=${encodeURIComponent(s.exam_id || '')}&session=${encodeURIComponent(s.session_id)}`;
+        const href = `/one-monitor?session=${encodeURIComponent(s.session_id)}`;
         return `
         <tr data-href="${escapeHtml(href)}">
             <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(s.candidate_ref || '—')}${s.simulation ? ' <span class="vg-label">SIM</span>' : ''}<br><span class="vg-label">${escapeHtml(s.candidate_name || '')}</span></td>

@@ -300,7 +300,8 @@ def test_candidate_app_keeps_speech_intervals_per_segment():
     assert CandidateApp._speech_between(app, 0.0, 10000.0) == [[500.0, 1700.0], [9000.0, 10000.0]]
     assert CandidateApp._speech_between(app, 10000.0, 20000.0) == [[10000.0, 20000.0]]
     assert CandidateApp._server_analysis(SimpleNamespace(policy={"analysis_mode": "server"}, simulate=False))
-    assert not CandidateApp._server_analysis(SimpleNamespace(policy={"analysis_mode": "client"}, simulate=False))
+    # The app never analyses on the candidate's computer any more; only the scripted --sim demo does
+    assert CandidateApp._server_analysis(SimpleNamespace(policy={"analysis_mode": "client"}, simulate=False))
     assert not CandidateApp._server_analysis(SimpleNamespace(policy={}, simulate=True))
 
 

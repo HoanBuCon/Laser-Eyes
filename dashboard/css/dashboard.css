@@ -303,7 +303,8 @@ body {
 .ops-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: var(--vigil-space-4); align-items: stretch; }
 .ops-scroll { max-height: 320px; }
 .ops-scroll--tall { max-height: calc(100vh - 470px); min-height: 220px; }
-.ops-rooms tbody tr { cursor: pointer; }
+.ops-rooms tbody tr, .ops-one tbody tr[data-href] { cursor: pointer; }
+html[data-product="ONE"] .ops-grid { grid-template-columns: minmax(0, 1fr); }
 .ops-rooms .vg-bar { width: 100%; max-width: 160px; }
 .ops-pattern-body { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: var(--vigil-space-3); align-items: center; }
 .ops-donut { position: relative; height: 120px; }

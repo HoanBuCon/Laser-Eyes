@@ -1,6 +1,7 @@
 /**
- * 01 Operations: a read-only overview of rooms, incident volume and review
- * progress.  Decisions are taken in one place only, the review queue (/review):
+ * 01 Operations: a read-only overview of rooms, online candidates (VIGIL One),
+ * incident volume and review progress.  The sidebar's product switcher picks
+ * Classroom, One or both.  Decisions are taken in one place only, the review queue (/review):
  * every incident and room here links there.  Numbers come from the same
  * review-status data the queue uses.
  */
@@ -15,7 +16,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loadDashboardData();
     // Auto-refresh every 5 seconds as heartbeat fallback
     setInterval(loadDashboardData, 5000);
+    document.addEventListener('vigil:product', loadDashboardData);
 });
+
+function currentProduct() {
+    return (window.VIGIL_PRODUCT && window.VIGIL_PRODUCT.get()) || 'ALL';
+}
 
 // ==============================================================================
 // 1. WebSocket Real-time Ingestion & Heartbeat
@@ -140,12 +146,16 @@ function updateBehaviorChart(counts = {}) {
 async function loadDashboardData() {
     try {
         // Fetch Summary Stats
-        const statsRes = await fetch('/api/v1/statistics/summary');
+        const product = currentProduct();
+        const statsRes = await fetch(`/api/v1/statistics/summary?product=${product}`);
         if (statsRes.ok) {
             const stats = await statsRes.json();
             updateSummaryCounters(stats);
             updateBehaviorChart(stats.events_by_pattern || stats.events_by_behavior);
         }
+        const scope = document.getElementById('patternScope');
+        if (scope) scope.textContent = { ALL: 'all sessions', CLASSROOM: 'exam rooms', ONE: 'online exams' }[product];
+        if (product !== 'CLASSROOM') loadOne();
 
         // Fetch Room Rankings / Grid
         const roomsRes = await fetch('/api/v1/rooms');
@@ -216,7 +226,9 @@ function renderRoomGrid(rooms, rankings) {
     const empty = { risk_score: 0, total_events: 0, pending: 0, confirmed: 0, rejected: 0 };
     const rankMap = {};
     rankings.forEach((r) => { rankMap[r.room_id] = r; });
-    let displayRooms = (rooms || []).map((room) => ({ room, rank: rankMap[room.id] || empty }));
+    // VIGIL One sessions sit in a stand-in room; they have their own panel above
+    rooms = (rooms || []).filter((room) => room.room_code !== 'VIGIL-ONE');
+    let displayRooms = rooms.map((room) => ({ room, rank: rankMap[room.id] || empty }));
     if (currentRoomFilterType === 'NEEDS_REVIEW') displayRooms = displayRooms.filter(({ rank }) => rank.pending > 0);
     if (currentRoomFilterType === 'MONITORED') displayRooms = displayRooms.filter(({ rank }) => rank.total_events > 0);
     displayRooms.sort((a, b) => b.rank.pending - a.rank.pending || b.rank.risk_score - a.rank.risk_score || b.rank.total_events - a.rank.total_events);
@@ -258,7 +270,7 @@ function filterRooms(type) {
 // 4. Latest incidents (read-only; same data as the review queue)
 // ==============================================================================
 async function loadEvents() {
-    const params = new URLSearchParams({ status: document.getElementById('reviewFilter')?.value || 'ALL', source: 'AI', sort: 'newest', limit: '50' });
+    const params = new URLSearchParams({ status: document.getElementById('reviewFilter')?.value || 'ALL', source: 'AI', sort: 'newest', limit: '50', product: currentProduct() });
     const severity = document.getElementById('severityFilter')?.value || '';
     if (severity) params.set('severity', severity);
     try {
@@ -296,7 +308,7 @@ function renderEventFeed(items) {
         return `
         <tr data-href="${escapeHtml(href)}">
             <td style="font-family:var(--vigil-font-mono)">${escapeHtml(whenText)}</td>
-            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(item.room_code || '—')}</td>
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${item.source_product === 'VIGIL_ONE' ? `<span class="vg-label">ONE</span> ${escapeHtml(item.subject_ref || '—')}` : escapeHtml(item.room_code || '—')}</td>
             <td class="strong" title="${escapeHtml(pattern)}">${escapeHtml(prettyPattern(pattern))}</td>
             <td><span class="vg-chip" data-tone="${SEVERITY_TONE[item.severity] || ''}">${escapeHtml(item.severity)}</span></td>
             <td><span class="vg-chip" data-tone="${REVIEW_TONE[item.review_status] || ''}">${escapeHtml(item.review_status)}</span></td>
@@ -306,6 +318,69 @@ function renderEventFeed(items) {
         </tr>`;
     }).join('');
     feed.querySelectorAll('tr[data-href]').forEach((row) => {
+        row.addEventListener('click', (event) => {
+            if (!event.target.closest('a')) window.location.href = row.dataset.href;
+        });
+    });
+}
+
+// ==============================================================================
+// 5. VIGIL One: candidates connected now and the Hub's analysis of their video
+// ==============================================================================
+const CONNECTION_TONE = { LIVE: 'good', LOST: 'danger', ENDED: '' };
+
+async function loadOne() {
+    const [sessions, analysis] = await Promise.all([
+        fetch('/api/v1/one/sessions', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        fetch('/api/v1/one/analysis/status', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const live = sessions.filter((s) => s.connection === 'LIVE');
+    const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setEl('statOneLive', live.length);
+    const lost = sessions.length - live.length;
+    setEl('statOneLiveHint', lost ? `${lost} lost connection · open online exams →` : 'VIGIL One computers connected');
+    setEl('oneCount', `${live.length}/${sessions.length}`);
+
+    const chip = document.getElementById('oneAnalysis');
+    if (chip) {
+        if (analysis && analysis.running) {
+            const queued = analysis.queued || 0;
+            chip.textContent = `HUB ANALYSIS · ${analysis.workers} WORKER${analysis.workers === 1 ? '' : 'S'}${queued ? ` · ${queued} QUEUED` : ''}${analysis.segments_failed ? ` · ${analysis.segments_failed} FAILED` : ''}`;
+            chip.dataset.tone = analysis.segments_failed ? 'warning' : 'good';
+        } else {
+            chip.textContent = 'HUB ANALYSIS OFF';
+            chip.dataset.tone = 'warning';
+        }
+    }
+
+    const body = document.getElementById('oneRows');
+    if (!body) return;
+    if (!sessions.length) {
+        body.innerHTML = '<tr><td colspan="7" class="vg-empty">No online exam is running. Candidates appear here when they start the VIGIL One app.</td></tr>';
+        return;
+    }
+    body.innerHTML = sessions.map((s) => {
+        const info = s.live || {};
+        const a = info.analysis || {};
+        let analysisText = 'On the candidate computer';
+        if (s.analysis_mode === 'SERVER') {
+            const lag = a.lag_s == null ? '' : ` · ${a.lag_s < 30 ? 'up to date' : `${Math.round(a.lag_s)} s behind`}`;
+            analysisText = a.frames ? `Hub · ${a.calibration === 'READY' ? 'calibrated' : 'calibrating'}${lag}` : 'Hub · waiting for video';
+        }
+        const eyes = [info.eye, info.head].filter((v) => v && v !== '—').join(' · ') || '—';
+        const href = `/online?exam=${encodeURIComponent(s.exam_id || '')}&session=${encodeURIComponent(s.session_id)}`;
+        return `
+        <tr data-href="${escapeHtml(href)}">
+            <td class="strong" style="font-family:var(--vigil-font-mono)">${escapeHtml(s.candidate_ref || '—')}${s.simulation ? ' <span class="vg-label">SIM</span>' : ''}<br><span class="vg-label">${escapeHtml(s.candidate_name || '')}</span></td>
+            <td>${escapeHtml(s.exam_name || '—')}</td>
+            <td><span class="vg-chip" data-tone="${CONNECTION_TONE[s.connection] || ''}">${escapeHtml(s.connection)}</span></td>
+            <td>${escapeHtml(analysisText)}</td>
+            <td>${escapeHtml(eyes)}</td>
+            <td class="num">${s.total_events ? `<span class="vg-chip" data-tone="warning">${s.total_events}</span>` : 0}</td>
+            <td class="num"><a class="vigil-btn vigil-btn--sm vigil-btn--ghost" href="${escapeHtml(reviewLink({ product: 'ONE', session_id: s.session_id, status: 'ALL' }))}">Signals</a></td>
+        </tr>`;
+    }).join('');
+    body.querySelectorAll('tr[data-href]').forEach((row) => {
         row.addEventListener('click', (event) => {
             if (!event.target.closest('a')) window.location.href = row.dataset.href;
         });

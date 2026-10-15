@@ -37,9 +37,22 @@ async function loadExams() {
     if (!state.exams.length) {
         select.append(new Option('No active exam — create one in Exams & sessions', ''));
     }
-    state.examId = state.exams.some((e) => e.id === saved) ? saved : (state.exams[0]?.id || '');
+    // ?exam=…&session=… (from Operations) opens that candidate
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('exam') || saved;
+    state.examId = state.exams.some((e) => e.id === wanted) ? wanted : (state.exams[0]?.id || '');
     select.value = state.examId;
     await refresh();
+    const sessionId = params.get('session');
+    const row = sessionId && state.roster?.candidates.find((c) => c.session && c.session.session_id === sessionId);
+    if (row) openDetail(row.id);
+}
+
+function analysisText(session) {
+    if (!session || session.analysis_mode !== 'SERVER') return 'analysed on the candidate computer';
+    const a = (session.live || {}).analysis || {};
+    if (!a.frames) return 'analysed on the Hub · waiting for video';
+    return `analysed on the Hub · ${a.calibration === 'READY' ? 'calibrated' : 'calibrating'} · ${a.lag_s == null ? '' : (a.lag_s < 30 ? 'up to date' : `${Math.round(a.lag_s)} s behind`)}`;
 }
 
 function currentExam() {
@@ -217,7 +230,7 @@ async function renderDetail() {
     $('dTitle').textContent = `${row.candidate_code} · ${row.full_name || ''} · ${label}`;
     const live = session?.live || {};
     $('dReadings').textContent = session
-        ? `eyes ${live.eye || '—'} · head ${live.head || '—'} · people ${live.people ?? '—'} · ${live.fps ?? '—'} fps · last heartbeat ${session.seconds_since_heartbeat ?? '—'} s ago${session.simulation ? ' · SIMULATION' : ''}`
+        ? `eyes ${live.eye || '—'} · head ${live.head || '—'} · people ${live.people ?? '—'} · ${live.fps ?? '—'} fps · last heartbeat ${session.seconds_since_heartbeat ?? '—'} s ago · ${analysisText(session)}${session.simulation ? ' · SIMULATION' : ''}`
         : 'This candidate has not started yet.';
     if (session && stateOf(row) === 'LIVE') {
         if (Date.now() - state.detail.boostedAt > 50000) {

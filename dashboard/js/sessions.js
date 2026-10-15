@@ -48,7 +48,8 @@
         $('archiveBtn').textContent = exam && exam.status === 'ARCHIVED' ? 'Unarchive' : 'Archive';
         $('examReportLink').hidden = !exam;
         if (exam) $('examReportLink').href = `/reports?tab=exam&exam=${encodeURIComponent(exam.id)}`;
-        const data = await api(`/api/v1/exam-sessions?exam_id=${encodeURIComponent(state.exam)}&limit=150`);
+        const product = window.VIGIL_PRODUCT ? window.VIGIL_PRODUCT.get() : 'ALL';
+        const data = await api(`/api/v1/exam-sessions?exam_id=${encodeURIComponent(state.exam)}&limit=150&product=${product}`);
         state.sessions = data.items;
         if (!data.items.length) {
             $('sessionRows').innerHTML = `<tr><td colspan="8" class="vg-empty">${exam ? 'No sessions yet. Use “Schedule sessions”.' : 'No sessions.'}</td></tr>`;
@@ -62,7 +63,7 @@
             const report = s.report_version ? ` <span class="vg-label">report v${s.report_version}</span>` : '';
             return `<tr data-id="${esc(s.id)}">
                 <td class="strong">${esc(s.name)}</td>
-                <td style="font-family:var(--vigil-font-mono)">${esc(s.room_code || '—')}</td>
+                <td style="font-family:var(--vigil-font-mono)">${s.product === 'ONE' ? `<span class="vg-label" title="VIGIL One: the candidate's own computer">ONE</span> ${esc(s.subject_ref || '—')}` : esc(s.room_code || '—')}</td>
                 <td>${esc(when)}</td>
                 <td>${esc(s.proctor ? s.proctor.display_name : '—')}</td>
                 <td>${status}${report}</td>
@@ -211,5 +212,6 @@
             setError(err.message);
         }
     })();
+    document.addEventListener('vigil:product', () => loadSessions().catch(() => {}));
     setInterval(() => { if (!document.querySelector('dialog[open]')) loadSessions().catch(() => {}); }, 10000);
 })();

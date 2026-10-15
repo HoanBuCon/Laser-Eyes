@@ -107,6 +107,8 @@ function compactTiming(item) {
 // -----------------------------------------------------------------------------
 
 function readFiltersFromUrl() {
+    // The sidebar's product switcher (Classroom / One / both); a ?product= link wins
+    if (window.VIGIL_PRODUCT) state.filters.product = window.VIGIL_PRODUCT.get();
     const params = new URLSearchParams(window.location.search);
     for (const key of Object.keys(state.filters)) {
         if (params.has(key)) state.filters[key] = params.get(key);
@@ -141,7 +143,9 @@ function syncFilterControls() {
 }
 
 function setFilter(key, value) {
+    if (key === 'product' && state.filters.product === value) return;
     state.filters[key] = value;
+    if (key === 'product' && window.VIGIL_PRODUCT) window.VIGIL_PRODUCT.set(value);
     writeFiltersToUrl();
     syncFilterControls();
     loadQueue(true);
@@ -497,6 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     $('filterSeverity').addEventListener('change', (e) => setFilter('severity', e.target.value));
     $('filterSource').addEventListener('change', (e) => setFilter('source', e.target.value));
     $('filterProduct').addEventListener('change', (e) => setFilter('product', e.target.value));
+    document.addEventListener('vigil:product', (e) => setFilter('product', e.detail.product));
     $('sortOrder').addEventListener('change', (e) => setFilter('sort', e.target.value));
     $('btnMore').addEventListener('click', () => { state.offset = state.items.length; loadQueue(false); });
     $('chkFocus').addEventListener('change', () => { const item = currentItem(); if (item) renderFocus(item); });

@@ -22,8 +22,10 @@
     // --- Session report ----------------------------------------------------------------
     async function loadSessionList() {
         const data = await api('/api/v1/exam-sessions?limit=300');
-        state.sessions = data.items.filter((s) => s.total_events > 0 || s.exam_id || s.id === params.get('session'));
-        $('rpSession').innerHTML = state.sessions.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(s.room_code || '')} · ${esc(s.status)}</option>`).join('');
+        const shown = (s) => !window.VIGIL_PRODUCT || window.VIGIL_PRODUCT.includes(s.product) || s.id === params.get('session');
+        state.sessions = data.items.filter((s) => (s.total_events > 0 || s.exam_id || s.id === params.get('session')) && shown(s));
+        const where = (s) => (s.product === 'ONE' ? `ONE · ${s.subject_ref || ''}${s.subject_name ? ` ${s.subject_name}` : ''}` : (s.room_code || ''));
+        $('rpSession').innerHTML = state.sessions.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(where(s))} · ${esc(s.status)}</option>`).join('');
         if (params.get('session')) $('rpSession').value = params.get('session');
         if ($('rpSession').value) await loadReport();
         else $('rpConfirmed').innerHTML = '<div class="vg-empty">No sessions yet.</div>';
@@ -197,5 +199,9 @@
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
     P2.wireDialogs();
     loadSessionList().catch((err) => { $('rpConfirmed').innerHTML = `<div class="vg-empty">${esc(err.message)}</div>`; });
+    document.addEventListener('vigil:product', () => {
+        params.delete('session');  // the session picked before may belong to the other product
+        loadSessionList().catch(() => {});
+    });
     setTab(state.tab);
 })();

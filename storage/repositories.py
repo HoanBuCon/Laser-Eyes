@@ -675,12 +675,19 @@ class StatisticsRepository:
         self.db = db
 
     def get_overall_summary(
-        self, site_id: Optional[str] = None, room_id: Optional[str] = None
+        self, site_id: Optional[str] = None, room_id: Optional[str] = None, product: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Aggregate total events, behavior breakdown, and severity distribution."""
+        """Aggregate total events, behavior breakdown, and severity distribution.
+
+        ``product`` CLASSROOM or ONE limits the incident counts to one product (the room and
+        session counts are not split)."""
         q = self.db.query(DetectionEvent)
         if room_id:
             q = q.filter(DetectionEvent.room_id == room_id)
+        if product == "ONE":
+            q = q.filter(DetectionEvent.source_product == "VIGIL_ONE")
+        elif product == "CLASSROOM":
+            q = q.filter((DetectionEvent.source_product.is_(None)) | (DetectionEvent.source_product != "VIGIL_ONE"))
 
         total_events = q.count()
 

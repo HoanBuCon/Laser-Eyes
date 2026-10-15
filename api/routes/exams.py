@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from api.auth import actor_name, current_user, require_roles
@@ -103,6 +103,10 @@ def serialize_session(db: Session, s: ExamSession, counts: Optional[Dict[str, in
     return {
         "id": s.id,
         "name": s.exam_name,
+        "product": s.product or "CLASSROOM",
+        "subject_ref": s.subject_ref,
+        "subject_name": s.subject_name,
+        "analysis_mode": s.analysis_mode,
         "exam_id": s.exam_id,
         "exam_name": exam.name if exam else None,
         "room_id": s.room_id,
@@ -235,10 +239,15 @@ def list_sessions(
     exam_id: Optional[str] = Query(None, description="Exam id, or 'none' for sessions outside any exam"),
     status: Optional[str] = Query(None),
     room_id: Optional[str] = Query(None),
+    product: Optional[str] = Query(None, description="CLASSROOM or ONE; ALL or empty for both"),
     limit: int = Query(100, ge=1, le=500),
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
     query = db.query(ExamSession)
+    if product and product.upper() == "ONE":
+        query = query.filter(ExamSession.product == "ONE")
+    elif product and product.upper() == "CLASSROOM":
+        query = query.filter(or_(ExamSession.product.is_(None), ExamSession.product != "ONE"))
     if exam_id == "none":
         query = query.filter(ExamSession.exam_id.is_(None))
     elif exam_id:

@@ -103,11 +103,21 @@ async def lifespan(app: FastAPI):
                 logger.warning("VIGIL One connection watchdog: %s", exc)
 
     watchdog = asyncio.create_task(watch_one_connections())
+
+    # VIGIL One sessions in analysis_mode SERVER are analysed here, next to Classroom
+    from storage import one_analysis
+
+    one_analysis.start_service(
+        SessionLocal,
+        on_events=lambda session_id, count: realtime_manager.broadcast_threadsafe(
+            {"type": "ONE_EVENTS", "session_id": session_id, "created": count, "source": "server_analysis"}),
+    )
     logger.info("VIGIL AI Enterprise Proctoring Server is ready!")
     try:
         yield
     finally:
         watchdog.cancel()
+        one_analysis.stop_service()
         runtime.unregister_event_callback(publish_event)
         runtime.unregister_status_callback(publish_status)
         realtime_manager.clear_event_loop(loop)

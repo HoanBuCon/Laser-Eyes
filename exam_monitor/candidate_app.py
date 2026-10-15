@@ -39,7 +39,7 @@ from .engine import GazeAnalyzer
 from .events import EventDetector, SessionStore
 from .paths import app_data_dir, resource
 from .hub_client import OFFLINE, SYNCED, UNPAIRED, HubClient, HubError
-from .models import EventType, MonitoringEvent, SessionInfo, Severity
+from .models import AnalysisResult, EventType, MonitoringEvent, SessionInfo, Severity
 from .sources import CameraSource, DemoSource
 from .theme import COLORS, FONTS, brand_font, set_theme
 
@@ -146,6 +146,10 @@ class CandidateApp(tk.Tk):
         self._phase = "idle"          # idle -> check -> exam
         self._source = None
         self._analyzer: Optional[GazeAnalyzer] = None
+        # SERVER analysis mode: when the microphone heard a voice (ms of the session), sent with each segment
+        self._speech_lock = threading.Lock()
+        self._speech: list[list[float]] = []
+        self._speech_open: Optional[float] = None
         self._session: Optional[SessionInfo] = None
         self._started_mono = 0.0
         self._checks: dict[str, tuple[str, str]] = {}
@@ -400,7 +404,11 @@ class CandidateApp(tk.Tk):
             return
         self._source = source
         self._set_check("camera", "ok", "mô phỏng" if self.simulate else "")
-        if not self.simulate:
+        server = self._server_analysis()
+        if server:
+            # The Hub analyses the video: no face model here, the pre-exam check asks the Hub too
+            threading.Thread(target=self._remote_checks, daemon=True, name="candidate-check").start()
+        elif not self.simulate:
             self._analyzer = GazeAnalyzer()
             self._analyzer.set_allowed_materials({"book"} if self.policy.get("allow_materials") else set())
         detector = EventDetector()
@@ -424,9 +432,15 @@ class CandidateApp(tk.Tk):
                                                    0.0, "Camera bị gián đoạn.", 1.0), frame=None)
                     self._ui_queue.put(("camera_lost", None))
                     break
-                result = source.last_result if self.simulate else self._analyzer.analyze(frame, now)
+                self._last_frame = frame
+                if self.simulate:
+                    result = source.last_result
+                elif server:
+                    result = self._remote_result(frame, now)
+                else:
+                    result = self._analyzer.analyze(frame, now)
                 if self._phase == "exam":
-                    if self._clips is None and self.policy.get("video_clips", True):
+                    if self._clips is None and self.policy.get("video_clips", True) and not server:
                         session_id = self._session.session_id
                         self._clips = ClipRecorder(lambda event_id, path: self.hub.add_clip(session_id, event_id, path))
                     if self._clips is not None:
@@ -440,9 +454,13 @@ class CandidateApp(tk.Tk):
                         audio.start()
                     if audio is not None:
                         state = audio.snapshot()
-                        result = replace(result, is_talking=speech_is_confirmed(result.talking_score, result.is_talking, state))
-                    for event in detector.update(result, self._session.session_id, now):
-                        self._emit(event, frame)
+                        if server:
+                            self._track_speech(state.voice_active, now)
+                        else:
+                            result = replace(result, is_talking=speech_is_confirmed(result.talking_score, result.is_talking, state))
+                    if not server:
+                        for event in detector.update(result, self._session.session_id, now):
+                            self._emit(event, frame)
                     frames += 1
                     if now - last_live >= float(self.hub.live_settings.get("interval") or 5):
                         last_live = now
@@ -454,7 +472,7 @@ class CandidateApp(tk.Tk):
                             self._integrity("multiple_displays", f"Máy đang nối {display_count()} màn hình.")
                     self._session.frame_count = frames
                     self._session.average_fps = frames / max(0.001, now - fps_started)
-                elif now - last_check >= 0.4:
+                elif now - last_check >= 0.4 and not server:
                     last_check = now
                     faces = int(result.face_count)
                     self._set_check("face", "ok" if faces == 1 else "fail",
@@ -475,11 +493,69 @@ class CandidateApp(tk.Tk):
 
     def _start_recording(self) -> SessionRecorder:
         session_id = self._session.session_id
+        server = self._server_analysis()
+
+        def on_segment(seq, path, start_ms, duration_s):
+            speech = self._speech_between(start_ms, start_ms + duration_s * 1000.0) if server else None
+            self.hub.add_video_segment(session_id, seq, start_ms, duration_s, path, speech=speech)
+
+        # In SERVER mode the segments are what the Hub analyses: short ones keep its delay short
+        seconds = float(self.policy.get("segment_seconds") or 10) if server else 60.0
         return SessionRecorder(
-            self.dir / "recordings" / session_id,
-            lambda seq, path, start_ms, duration_s: self.hub.add_video_segment(session_id, seq, start_ms, duration_s, path),
+            self.dir / "recordings" / session_id, on_segment,
             fps=float(self.policy.get("video_fps") or 10), width=int(self.policy.get("video_width") or 640),
-            started=self._started_mono)
+            segment_seconds=seconds, started=self._started_mono)
+
+    # ------------------------------------------------------------ SERVER analysis mode
+    def _server_analysis(self) -> bool:
+        """The Hub analyses this candidate's video (exam policy); a simulation keeps its scripted analysis."""
+        return str(self.policy.get("analysis_mode") or "server") == "server" and not self.simulate
+
+    def _remote_checks(self) -> None:
+        """Pre-exam: send a small camera picture to the Hub every ~1.5 s and show what it sees."""
+        while not self._stop.is_set() and self._phase == "check":
+            frame = getattr(self, "_last_frame", None)
+            if frame is not None:
+                h, w = frame.shape[:2]
+                small = cv2.resize(frame, (480, max(1, int(h * 480 / max(1, w))))) if w > 480 else frame
+                ok, enc = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
+                try:
+                    seen = self.hub.check_frame(enc.tobytes()) if ok else None
+                except HubError as exc:
+                    self._set_check("face", "fail", f"máy chủ chưa kiểm tra được ({exc})")
+                    seen = None
+                if seen is not None:
+                    self._remote_seen = seen
+                    faces = int(seen.get("face_count") or 0)
+                    self._set_check("face", "ok" if faces == 1 else "fail",
+                                    "" if faces == 1 else ("không thấy khuôn mặt" if faces == 0 else f"{faces} khuôn mặt"))
+                    self._set_check("light", "fail" if seen.get("too_dark") else "ok", "quá tối" if seen.get("too_dark") else "")
+            self._stop.wait(1.5)
+
+    def _remote_result(self, frame, now: float):
+        """What the UI shows when the Hub does the analysis: its last answer, plus brightness measured here."""
+        info = self.hub.analysis_info or {}
+        seen = getattr(self, "_remote_seen", None) or {}
+        faces = info.get("faces", seen.get("face_count", 1))
+        return AnalysisResult(timestamp=now, face_count=int(faces if faces is not None else 1),
+                              brightness=float(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).mean()),
+                              calibrated=str(info.get("calibration") or "") == "READY",
+                              status_text="Máy chủ đang phân tích")
+
+    def _track_speech(self, voice: bool, now: float) -> None:
+        t_ms = (now - self._started_mono) * 1000.0
+        with self._speech_lock:
+            if voice and self._speech_open is None:
+                self._speech_open = t_ms
+            elif not voice and self._speech_open is not None:
+                self._speech.append([self._speech_open, t_ms])
+                self._speech_open = None
+            self._speech = self._speech[-400:]
+
+    def _speech_between(self, start_ms: float, end_ms: float) -> list[list[float]]:
+        with self._speech_lock:
+            items = list(self._speech) + ([[self._speech_open, end_ms]] if self._speech_open is not None else [])
+        return [[max(a, start_ms), min(b, end_ms)] for a, b in items if b > start_ms and a < end_ms]
 
     def _emit(self, event: MonitoringEvent, frame) -> None:
         """Record a signal locally, then queue it (and its snapshot) for VIGIL Hub."""
@@ -542,6 +618,7 @@ class CandidateApp(tk.Tk):
             "candidate_ref": self.candidate.get("code", ""), "exam_id": self.exam.get("id"), "source_kind": "SIMULATION" if self.simulate else "CAMERA",
             "simulation": self.simulate, "started_at": _with_offset(self._session.started_at),
             "client_time": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+            "analysis": "server" if self._server_analysis() else "client",
         })
         self._started_mono = time.monotonic()
         if self._analyzer is not None:

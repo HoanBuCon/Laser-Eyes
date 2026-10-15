@@ -225,6 +225,10 @@ class ExamSession(Base):
     video_duration_s = Column(Float, nullable=True)
     video_gaps_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] of the exam with no video
     video_error = Column(Text, nullable=True)
+    # VIGIL One: where the perception runs.  SERVER = the candidate's computer only records and
+    # uploads video, the Hub analyses it (storage.one_analysis); CLIENT = the app analyses locally.
+    analysis_mode = Column(String(10), nullable=True)
+    analysis_state_json = Column(Text, nullable=True)   # calibration, next segment, pending clips
 
     # Relationships
     room = relationship("ExamRoom", back_populates="sessions")
@@ -718,6 +722,12 @@ class SessionVideoSegment(Base):
     sha256 = Column(String(64), nullable=False)
     file_size_bytes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    # Server-side analysis (sessions in analysis_mode SERVER): PENDING -> DONE | FAILED | SKIPPED
+    analysis_status = Column(String(20), nullable=True, index=True)
+    analysis_error = Column(Text, nullable=True)
+    analyzed_at = Column(DateTime, nullable=True)
+    frames_analyzed = Column(Integer, default=0)
+    speech_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] the candidate's microphone heard a voice
 
 
 class Candidate(Base):

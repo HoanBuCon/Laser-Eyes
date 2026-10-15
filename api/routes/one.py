@@ -26,7 +26,7 @@ from storage.database import get_db
 from storage.db_models import ClientDevice, ExamSession
 from storage import one_service as one
 from storage import online_exam_service as online
-from storage import one_video
+from storage import one_analysis, one_video
 from storage.db_models import Exam
 from storage.proctor_service import serialize_bookmark
 
@@ -114,6 +114,13 @@ def list_one_sessions(
         query = query.filter(ExamSession.exam_id == exam_id)
     rows = query.order_by(ExamSession.started_at.desc()).limit(200).all()
     return [one.serialize_live(s) for s in rows]
+
+
+@router.get("/analysis/status")
+def analysis_status() -> dict[str, Any]:
+    """Workers analysing VIGIL One video on this Hub (for the operations page)."""
+    service = one_analysis.get_service()
+    return service.status() if service is not None else {"running": False, "workers": 0}
 
 
 @router.get("/sessions/{session_id}/thumbnail")
@@ -212,6 +219,8 @@ class SessionOpenRequest(BaseModel):
     simulation: bool = False
     started_at: Optional[str] = None
     client_time: Optional[str] = None
+    # "server": this client only records and uploads video; the Hub analyses it (storage.one_analysis)
+    analysis: str = Field("", max_length=10)
 
 
 @router.post("/client/sessions")
@@ -293,19 +302,31 @@ async def post_video_segment(
     start_ms: float = Form(...),
     duration_s: float = Form(...),
     sha256: str = Form(""),
+    speech: str = Form(""),
     device: ClientDevice = Depends(device_auth),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    """One segment of the full-session recording (accepted after the end too: the queue may still be catching up)."""
+    """One segment of the full-session recording (accepted after the end too: the queue may still be catching up).
+
+    In a SERVER-analysis session it is also the input of the Hub's analysis; ``speech`` (JSON
+    [[start_ms, end_ms], ...]) says when the candidate's microphone heard a voice."""
     session = _owned(db, device, session_id)
     data = await video.read(one_video.MAX_SEGMENT_BYTES + 1)
     if len(data) > one_video.MAX_SEGMENT_BYTES:
         raise HTTPException(status_code=413, detail="Đoạn video vượt quá giới hạn.")
     try:
+        speech_items = json.loads(speech) if speech else None
+        if speech_items is not None and not isinstance(speech_items, list):
+            raise ValueError
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="speech phải là JSON [[start_ms, end_ms], ...].") from exc
+    try:
         segment, created = one_video.add_segment(db, session, seq=seq, start_ms=start_ms, duration_s=duration_s,
-                                                 data=data, sha256=sha256 or None)
+                                                 data=data, sha256=sha256 or None, speech=speech_items)
     except one_video.VideoError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if created and session.analysis_mode == "SERVER":
+        one_analysis.notify(session.id)
     if created and session.status in ("COMPLETED", "CLOSED"):
         _queue_merge(request, background, session.id)
     return {"seq": segment.seq, "sha256": segment.sha256, "bytes": segment.file_size_bytes, "created": created}
@@ -366,8 +387,10 @@ async def post_heartbeat(
     online.connection_back(db, session)
     live = one.serialize_live(session)
     realtime_manager.broadcast_threadsafe({"type": "ONE_HEARTBEAT", "session": live})
-    # The client adapts its live picture to this (smaller and rarer unless a proctor is watching)
-    return {"ok": True, "session_status": session.status, "live": online.live_settings(db, session)}
+    # The client adapts its live picture to this (smaller and rarer unless a proctor is watching);
+    # in SERVER mode it also learns how far the Hub's analysis is (calibration, delay)
+    return {"ok": True, "session_status": session.status, "live": online.live_settings(db, session),
+            "analysis": (live.get("live") or {}).get("analysis")}
 
 
 class StopRequest(BaseModel):
@@ -383,6 +406,8 @@ def stop(session_id: str, payload: StopRequest, request: Request, background: Ba
     session = _owned(db, device, session_id)
     already_ended = session.status in ("COMPLETED", "CLOSED")
     session = one.stop_session(db, session, payload.model_dump())
+    if session.analysis_mode == "SERVER":
+        one_analysis.notify(session.id)  # last clips once the remaining video is analysed
     if not already_ended:
         online.on_stop(db, session, payload.reason)
         if one_video.needs_merge(db, session):
@@ -437,6 +462,16 @@ def client_policy(device: ClientDevice = Depends(device_auth), db: Session = Dep
     candidate = online.candidate_of(db, device)
     exam = db.get(Exam, candidate.exam_id) if candidate else None
     return online.policy_for(exam) if exam else dict(online.DEFAULT_POLICY)
+
+
+@router.post("/client/check")
+async def client_check(image: UploadFile = File(...), device: ClientDevice = Depends(device_auth)) -> dict[str, Any]:
+    """Pre-exam device check done by the Hub, so the candidate's computer needs no face model."""
+    data = await _read_image(image)
+    try:
+        return one_analysis.check_frame(data)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------- online exams: web (chief / proctors)

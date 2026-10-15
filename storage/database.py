@@ -136,6 +136,8 @@ def init_db(custom_engine=None) -> None:
                     ("video_duration_s", "FLOAT"),
                     ("video_gaps_json", "TEXT"),
                     ("video_error", "TEXT"),
+                    ("analysis_mode", "VARCHAR(10)"),
+                    ("analysis_state_json", "TEXT"),
                 ):
                     if name not in session_cols:
                         conn.execute(text(f"ALTER TABLE exam_sessions ADD COLUMN {name} {ddl}"))
@@ -149,6 +151,9 @@ def init_db(custom_engine=None) -> None:
             for table, columns in (
                 ("exams", (("join_code", "VARCHAR(12)"), ("join_open", "BOOLEAN DEFAULT 0"), ("one_policy_json", "TEXT"))),
                 ("client_devices", (("kind", "VARCHAR(20) DEFAULT 'PAIRED'"), ("candidate_id", "VARCHAR(36)"), ("expires_at", "DATETIME"))),
+                ("session_video_segments", (("analysis_status", "VARCHAR(20)"), ("analysis_error", "TEXT"),
+                                            ("analyzed_at", "DATETIME"), ("frames_analyzed", "INTEGER DEFAULT 0"),
+                                            ("speech_json", "TEXT"))),
             ):
                 if table in tables:
                     existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}

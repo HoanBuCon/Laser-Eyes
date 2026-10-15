@@ -66,8 +66,12 @@ def _check_mp4(data: bytes, sha256: Optional[str]) -> str:
 
 
 def add_segment(db: Session, session: ExamSession, *, seq: int, start_ms: float, duration_s: float,
-                data: bytes, sha256: Optional[str]) -> tuple[SessionVideoSegment, bool]:
-    """Store one uploaded segment.  Resending the same segment is a no-op; returns (segment, created)."""
+                data: bytes, sha256: Optional[str], speech: Optional[list] = None) -> tuple[SessionVideoSegment, bool]:
+    """Store one uploaded segment.  Resending the same segment is a no-op; returns (segment, created).
+
+    In a SERVER-analysis session every new segment is queued for the Hub's analysis
+    (``storage.one_analysis``); ``speech`` are the stretches, in ms of the session, in which the
+    candidate's microphone heard a voice (fused with lip movement there)."""
     if seq < 0 or seq > 100_000:
         raise VideoError("Số thứ tự đoạn video không hợp lệ.")
     if start_ms < 0 or not (0 < duration_s <= 3600):
@@ -86,7 +90,9 @@ def add_segment(db: Session, session: ExamSession, *, seq: int, start_ms: float,
     temp_path.write_bytes(data)
     os.replace(temp_path, final_path)
     segment = SessionVideoSegment(session_id=session.id, seq=seq, start_ms=float(start_ms), duration_s=float(duration_s),
-                                  file_path=str(final_path), sha256=digest, file_size_bytes=len(data))
+                                  file_path=str(final_path), sha256=digest, file_size_bytes=len(data),
+                                  speech_json=json.dumps(_clean_speech(speech)) if speech is not None else None,
+                                  analysis_status="PENDING" if session.analysis_mode == "SERVER" else None)
     db.add(segment)
     if session.status in ("COMPLETED", "CLOSED"):
         session.video_status = "MERGING"  # a late segment: join again
@@ -95,6 +101,18 @@ def add_segment(db: Session, session: ExamSession, *, seq: int, start_ms: float,
     db.commit()
     db.refresh(segment)
     return segment, True
+
+
+def _clean_speech(items: Optional[list]) -> list[list[float]]:
+    clean = []
+    for item in (items or [])[:500]:
+        try:
+            start, end = float(item[0]), float(item[1])
+        except (TypeError, ValueError, IndexError):
+            continue
+        if end > start >= 0:
+            clean.append([round(start, 1), round(end, 1)])
+    return clean
 
 
 def segments(db: Session, session_id: str) -> list[SessionVideoSegment]:

@@ -29,10 +29,18 @@ class GazeAnalyzer:
         max_faces: int = 5,
         object_model_path: Path | None = None,
         allowed_materials: set[str] | None = None,
+        frame_clock: bool = False,
+        object_every: int = 8,
     ):
         self.model_path = Path(model_path or MODEL_PATH)
         self.object_model_path = Path(object_model_path or OBJECT_MODEL_PATH)
         self.max_faces = max_faces
+        # On the server frames come from recorded video faster than real time: the model clock must
+        # then follow the video timestamps, not the wall clock (frame_clock=True).
+        self.frame_clock = bool(frame_clock)
+        # Object detection runs on every n-th analysed frame (a desktop camera gives ~25 fps; the
+        # server analyses ~5 fps, so it asks for every 2nd frame to keep the same ~0.3 s cadence).
+        self.object_every = max(1, int(object_every))
         self.backend_name = "OpenCV fallback"
         self.init_error = ""  # why MediaPipe could not start (shown by --selftest)
         self._landmarker = None
@@ -165,6 +173,26 @@ class GazeAnalyzer:
         self._last_objects_at = -1e9
         self._frame_index = 0
 
+    def calibration_snapshot(self) -> dict:
+        """What a restarted server needs to resume this candidate without calibrating again."""
+        return {
+            "calibrated": self._calibrated,
+            "baseline_x": round(float(self._baseline_x), 5),
+            "baseline_y": round(float(self._baseline_y), 5),
+            "quality": self._calibration_quality,
+            "state": self._calibration_state,
+        }
+
+    def restore_calibration(self, snapshot: dict) -> None:
+        if not snapshot or not snapshot.get("calibrated"):
+            return
+        self._baseline_x = float(snapshot.get("baseline_x") or 0.0)
+        self._baseline_y = float(snapshot.get("baseline_y") or 0.0)
+        self._calibration_quality = float(snapshot.get("quality") or 0.0)
+        self._calibrated = True
+        self._calibration_state = "READY"
+        self._calibration_message = "Calibration ready."
+
     def reset_calibration(self) -> None:
         self._calibration_samples.clear()
         self._baseline_x = 0.0
@@ -187,10 +215,13 @@ class GazeAnalyzer:
         object_detections = self._detect_objects(mp_image, timestamp)
         person_count = sum(label == "person" for label, _, _ in object_detections)
         suspicious_objects = self.prohibited_objects(object_detections)
-        now = time.monotonic()
-        delta_ms = max(1, int((now - self._last_wall_time) * 1000))
-        self._timestamp_ms += delta_ms
-        self._last_wall_time = now
+        if self.frame_clock:
+            self._timestamp_ms = max(self._timestamp_ms + 1, int(timestamp * 1000))
+        else:
+            now = time.monotonic()
+            delta_ms = max(1, int((now - self._last_wall_time) * 1000))
+            self._timestamp_ms += delta_ms
+            self._last_wall_time = now
         detection = self._landmarker.detect_for_video(mp_image, self._timestamp_ms)
         faces = detection.face_landmarks
         if not faces:
@@ -561,7 +592,7 @@ class GazeAnalyzer:
         self._frame_index += 1
         if self._object_detector is None:
             return []
-        if self._frame_index % 8 == 1:
+        if self._frame_index % self.object_every == 1 or self.object_every == 1:
             try:
                 detected = self._object_detector.detect(mp_image)
                 objects: list[tuple[str, float, tuple[int, int, int, int]]] = []

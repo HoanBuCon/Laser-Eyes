@@ -126,6 +126,7 @@ class HubClient:
         self._live: dict[str, tuple[dict[str, Any], Optional[bytes]]] = {}
         self._last_live_sent = 0.0
         # What the Hub asked for in its last heartbeat reply (online exams adapt the live picture)
+        self.analysis_info: dict[str, Any] = {}  # SERVER mode: how far the Hub's analysis is (heartbeat answer)
         self.live_settings: dict[str, Any] = {"enabled": True, "width": 640, "interval": LIVE_INTERVAL}
         self._state = DISABLED if not self.configured else PENDING
         self._last_error = ""
@@ -243,6 +244,17 @@ class HubClient:
         if res.status_code != 200:
             raise HubError(self._detail(res))
 
+    def check_frame(self, jpeg: bytes) -> dict[str, Any]:
+        """Pre-exam check done by the Hub (SERVER mode): faces and light in one camera picture."""
+        try:
+            res = self.http.post(self._url("/client/check"), headers=self._headers(),
+                                 files={"image": ("check.jpg", jpeg, "image/jpeg")}, timeout=HTTP_TIMEOUT)
+        except requests.RequestException as exc:
+            raise HubError(f"không kết nối được ({exc.__class__.__name__})") from exc
+        if res.status_code != 200:
+            raise HubError(self._detail(res))
+        return res.json()
+
     def list_exams(self) -> list[dict[str, Any]]:
         if not self.configured:
             return []
@@ -273,9 +285,13 @@ class HubClient:
         """The short MP4 around a signal (sent after the signal and its snapshot)."""
         self._enqueue("clip", session_key, {"event_id": event_id}, clip_path)
 
-    def add_video_segment(self, session_key: str, seq: int, start_ms: float, duration_s: float, path: str) -> None:
-        """One segment of the full-session recording."""
-        self._enqueue("video", session_key, {"seq": seq, "start_ms": round(start_ms, 1), "duration_s": round(duration_s, 3)}, path)
+    def add_video_segment(self, session_key: str, seq: int, start_ms: float, duration_s: float, path: str,
+                          speech: Optional[list] = None) -> None:
+        """One segment of the full-session recording (and, in SERVER mode, of the Hub's analysis input)."""
+        payload = {"seq": seq, "start_ms": round(start_ms, 1), "duration_s": round(duration_s, 3)}
+        if speech is not None:
+            payload["speech"] = json.dumps([[round(a, 1), round(b, 1)] for a, b in speech])
+        self._enqueue("video", session_key, payload, path)
 
     def add_bookmark(self, session_key: str, form: dict[str, Any], image_path: Optional[str]) -> None:
         self._enqueue("bookmark", session_key, form, image_path)
@@ -489,6 +505,12 @@ class HubClient:
                 live = None
             if isinstance(live, dict):
                 self.live_settings = {**self.live_settings, **live}
+            try:
+                analysis = res.json().get("analysis")
+            except ValueError:
+                analysis = None
+            if isinstance(analysis, dict):
+                self.analysis_info = analysis
 
 
 class _Retry(Exception):

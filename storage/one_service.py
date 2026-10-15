@@ -1,8 +1,10 @@
 """VIGIL One on the shared server: paired desktops, their sessions and signals.
 
-VIGIL One keeps its own perception on the candidate's computer and pushes what
-it records here, so proctors review One and Classroom in the same queue,
-reports and video wall.  Everything a client sends is idempotent: a session by
+A session runs in one of two analysis modes.  SERVER (current clients): the
+candidate's computer only records and uploads video, and the Hub analyses it
+(``storage.one_analysis``) next to VIGIL Classroom.  CLIENT (older clients,
+simulation): the app analyses locally and pushes its signals here.  Either way
+proctors review One and Classroom in the same queue, reports and video wall.  Everything a client sends is idempotent: a session by
 ``client_session_id``, an event by ``event_id``, a bookmark by ``request_id``.
 The client may resend after a network drop without creating duplicates.
 
@@ -64,6 +66,9 @@ EVENT_SIGNALS: dict[str, tuple[str, str]] = {
     "virtual_camera": ("ONE_VIRTUAL_CAMERA", "INTEGRITY"),
     "multiple_displays": ("ONE_MULTIPLE_DISPLAYS", "INTEGRITY"),
 }
+# In SERVER mode the Hub raises the perception signals itself; the computer only reports facts about
+# its own set-up and camera, which the video cannot show.
+CLIENT_FACTS = {"camera_interrupted", "virtual_camera", "multiple_displays"}
 SEVERITY_MAP = {"info": "LOW", "low": "LOW", "medium": "MEDIUM", "high": "HIGH"}
 # Review priority (0-100) by severity: an ordering for the queue, not a probability
 PRIORITY_BY_SEVERITY = {"info": 10, "low": 25, "medium": 50, "high": 80}
@@ -256,6 +261,9 @@ def open_session(db: Session, device: ClientDevice, payload: dict[str, Any]) -> 
         client_session_id=client_session_id,
         simulation=bool(payload.get("simulation")),
         last_heartbeat_at=_now(),
+        # The client says what it does; a simulated session is always analysed by its client (scripted)
+        analysis_mode="SERVER" if (str(payload.get("analysis") or "").lower() == "server"
+                                   and not payload.get("simulation")) else "CLIENT",
     )
     db.add(session)
     _audit(db, f"device:{device.name}", "OPEN_ONE_SESSION", "EXAM_SESSION", client_session_id,
@@ -283,6 +291,8 @@ def ingest_events(db: Session, session: ExamSession, events: list[dict[str, Any]
         event_type = str(item.get("event_type") or "").strip().lower()
         if not event_id or event_type not in EVENT_SIGNALS:
             raise OneError(f"Sự kiện không hợp lệ: {event_id or '(thiếu event_id)'} / {event_type or '(thiếu loại)'}")
+        if session.analysis_mode == "SERVER" and event_type not in CLIENT_FACTS and not item.get("_server"):
+            raise OneError(f"Phiên phân tích trên máy chủ: máy thí sinh không gửi tín hiệu {event_type}.")
         if db.query(DetectionEvent.id).filter(DetectionEvent.event_id == event_id).first() is not None:
             duplicate += 1
             continue
@@ -322,7 +332,7 @@ def ingest_events(db: Session, session: ExamSession, events: list[dict[str, Any]
                 duration_seconds=duration,
                 status="FLAGGED_FOR_HUMAN_REVIEW",
                 review_status="PENDING",
-                model_version="vigil-one-mediapipe",
+                model_version="vigil-one-server" if item.get("_server") else "vigil-one-mediapipe",
                 config_version=str(item.get("config_version") or "vigil-one-v2")[:50],
                 incident_metadata_json=json.dumps(meta, ensure_ascii=False),
                 source_product=SOURCE_PRODUCT,
@@ -350,12 +360,21 @@ def _check_jpeg(data: bytes, sha256: Optional[str]) -> str:
     return digest
 
 
-def attach_evidence(db: Session, device: ClientDevice, event_id: str, data: bytes, sha256: Optional[str]) -> EvidenceFile:
-    """The JPEG snapshot of a One signal. Resending the same image is a no-op."""
+def _one_event(db: Session, event_id: str) -> DetectionEvent:
     event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
     if event is None or event.source_product != SOURCE_PRODUCT:
         raise OneNotFound("Sự kiện không tồn tại.")
+    return event
+
+
+def attach_evidence(db: Session, device: ClientDevice, event_id: str, data: bytes, sha256: Optional[str]) -> EvidenceFile:
+    """The JPEG snapshot of a One signal. Resending the same image is a no-op."""
+    event = _one_event(db, event_id)
     owned_session(db, device, event.session_id)
+    return store_snapshot(db, event, data, sha256)
+
+
+def store_snapshot(db: Session, event: DetectionEvent, data: bytes, sha256: Optional[str] = None) -> EvidenceFile:
     digest = _check_jpeg(data, sha256)
     existing = db.query(EvidenceFile).filter(EvidenceFile.event_id == event.id).first()
     if existing is not None and existing.snapshot_path and Path(existing.snapshot_path).is_file():
@@ -398,10 +417,12 @@ def _check_mp4(data: bytes, sha256: Optional[str]) -> str:
 
 def attach_clip(db: Session, device: ClientDevice, event_id: str, data: bytes, sha256: Optional[str]) -> EvidenceFile:
     """The short MP4 around a One signal.  It becomes the evidence's primary file (and digest)."""
-    event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
-    if event is None or event.source_product != SOURCE_PRODUCT:
-        raise OneNotFound("Sự kiện không tồn tại.")
+    event = _one_event(db, event_id)
     owned_session(db, device, event.session_id)
+    return store_clip(db, event, data, sha256)
+
+
+def store_clip(db: Session, event: DetectionEvent, data: bytes, sha256: Optional[str] = None) -> EvidenceFile:
     digest = _check_mp4(data, sha256)
     existing = db.query(EvidenceFile).filter(EvidenceFile.event_id == event.id).first()
     if existing is not None and existing.video_path:
@@ -498,6 +519,15 @@ def heartbeat(db: Session, session: ExamSession, status: dict[str, Any], thumbna
         if key in status
     }
     session.last_heartbeat_at = _now()
+    if session.analysis_mode == "SERVER":
+        try:
+            previous = json.loads(session.live_status_json or "{}")
+        except (TypeError, json.JSONDecodeError):
+            previous = {}
+        for key in SERVER_LIVE_KEYS:
+            clean.pop(key, None)
+            if key in previous:
+                clean[key] = previous[key]
     session.live_status_json = json.dumps(clean, ensure_ascii=False)
     if session.status in ("INTERRUPTED",):
         session.status = "RUNNING"  # the client is back
@@ -511,6 +541,20 @@ def heartbeat(db: Session, session: ExamSession, status: dict[str, Any], thumbna
         with _LIVE_LOCK:
             _LIVE_THUMBS[session.id] = (thumbnail, time.time())
     return clean
+
+
+# Live fields the Hub's analysis owns for SERVER sessions (written by storage.one_analysis)
+SERVER_LIVE_KEYS = ("eye", "head", "people", "calibrated", "analysis")
+
+
+def update_live_analysis(db: Session, session: ExamSession, values: dict[str, Any]) -> None:
+    """Merge the server analysis' view of the candidate into the live status the grid shows."""
+    try:
+        live = json.loads(session.live_status_json or "{}")
+    except (TypeError, json.JSONDecodeError):
+        live = {}
+    live.update({k: v for k, v in values.items() if k in SERVER_LIVE_KEYS})
+    session.live_status_json = json.dumps(live, ensure_ascii=False)
 
 
 def live_thumbnail(session_id: str) -> Optional[bytes]:
@@ -555,6 +599,7 @@ def serialize_live(session: ExamSession) -> dict[str, Any]:
         "status": session.status,
         "connection": "LIVE" if connected else ("ENDED" if session.status not in ("RUNNING", "STOPPING") else "LOST"),
         "simulation": bool(session.simulation),
+        "analysis_mode": session.analysis_mode or "CLIENT",
         "last_heartbeat_at": session.last_heartbeat_at.isoformat() if session.last_heartbeat_at else None,
         "seconds_since_heartbeat": round(age, 1) if age is not None else None,
         "total_events": session.total_events or 0,

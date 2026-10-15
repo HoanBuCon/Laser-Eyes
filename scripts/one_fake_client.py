@@ -5,6 +5,12 @@ sends a synthetic live frame every 2 s and a signal with a snapshot now and
 then, through the same HubClient and outbox the desktop app uses.
 
     venv\\Scripts\\python.exe scripts\\one_fake_client.py --hub http://127.0.0.1:8000 --code ABC123 --candidate SV-02 --seconds 120
+
+With ``--video FILE`` it plays a recorded webcam video instead, exactly as the
+candidate app does in SERVER analysis mode: the session is a real (not simulated)
+one, the video goes up in short segments and the Hub analyses it.
+
+    venv\\Scripts\\python.exe scripts\\one_fake_client.py --join ABC1234 --candidate HS01 --pin 1234 --video webcam.mp4
 """
 
 from __future__ import annotations
@@ -58,6 +64,9 @@ def main() -> int:
     parser.add_argument("--exam", default="Kỳ thi trình diễn VIGIL")
     parser.add_argument("--seconds", type=float, default=90)
     parser.add_argument("--signal-every", type=float, default=15)
+    parser.add_argument("--video", help="Recorded webcam video: upload it for the Hub's analysis (SERVER mode)")
+    parser.add_argument("--speed", type=float, default=1.0, help="--video playback speed (1 = real time)")
+    parser.add_argument("--segment-seconds", type=float, default=0, help="--video segment length (default: exam policy)")
     args = parser.parse_args()
 
     work = Path(tempfile.mkdtemp(prefix="vigil-one-sim-"))
@@ -75,6 +84,8 @@ def main() -> int:
     else:
         parser.error("--join, --code or --token is required")
     exam_id = next((e["id"] for e in hub.list_exams() if e.get("name") == args.exam), None)
+    if args.video:
+        return play_video(hub, args, exam_id, work)
     key = datetime.now().strftime("%Y%m%d-%H%M%S") + "-SIM" + uuid.uuid4().hex[:3].upper()
     hub.open_session(key, {"candidate_ref": args.candidate, "exam_id": exam_id, "exam_name": args.exam,
                            "source_kind": "SIMULATION", "simulation": True,
@@ -108,6 +119,60 @@ def main() -> int:
     hub.stop_session(key, {"frame_count": int((time.monotonic() - started) * 30), "average_fps": 30.0, "reason": "SUBMITTED"})
     hub.drain(timeout=5)
     print(f"Session {key}: {sent} signal(s); sync {hub.status().state}, {hub.status().pending} left")
+    return 0
+
+
+def play_video(hub: HubClient, args, exam_id, work: Path) -> int:
+    """SERVER analysis mode with a recorded video standing in for the webcam."""
+    from exam_monitor.session_recorder import SessionRecorder
+
+    cap = cv2.VideoCapture(args.video)
+    if not cap.isOpened():
+        print(f"Cannot open {args.video}")
+        return 2
+    try:
+        policy = hub.http.get(hub._url("/client/policy"), headers=hub._headers(), timeout=5).json()
+    except Exception:
+        policy = {}
+    src_fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    seconds = args.segment_seconds or float(policy.get("segment_seconds") or 10)
+    key = datetime.now().strftime("%Y%m%d-%H%M%S") + "-VID" + uuid.uuid4().hex[:3].upper()
+    hub.open_session(key, {"candidate_ref": args.candidate, "exam_id": exam_id, "exam_name": args.exam,
+                           "source_kind": "VIDEO_FILE", "simulation": False, "analysis": "server",
+                           "started_at": datetime.now().astimezone().isoformat(timespec="milliseconds"),
+                           "client_time": datetime.now().astimezone().isoformat(timespec="milliseconds")})
+    hub.start()
+    started = time.monotonic()
+    recorder = SessionRecorder(work / "recordings" / key,
+                               lambda seq, path, start_ms, dur: hub.add_video_segment(key, seq, start_ms, dur, path, speech=[]),
+                               fps=float(policy.get("video_fps") or 10), width=int(policy.get("video_width") or 640),
+                               segment_seconds=seconds, started=started)
+    index, last_live = 0, 0.0
+    try:
+        while True:
+            ok, img = cap.read()
+            if not ok:
+                break
+            video_t = index / src_fps
+            index += 1
+            if video_t > args.seconds:
+                break
+            # Pace on the video's clock (scaled by --speed), as a camera would deliver it
+            wait = started + video_t / max(0.1, args.speed) - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            recorder.push(img, started + video_t / max(0.1, args.speed))
+            if time.monotonic() - last_live >= 2.0:
+                last_live = time.monotonic()
+                small = cv2.resize(img, (320, max(1, int(img.shape[0] * 320 / img.shape[1]))))
+                ok2, enc = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+                hub.update_live(key, {"fps": round(src_fps, 1), "source_kind": "VIDEO_FILE"}, enc.tobytes() if ok2 else None)
+    except KeyboardInterrupt:
+        pass
+    recorder.close()
+    hub.stop_session(key, {"frame_count": index, "average_fps": round(src_fps, 2), "reason": "SUBMITTED"})
+    hub.drain(timeout=60)
+    print(f"Session {key}: {index} frames uploaded for server analysis; sync {hub.status().state}, {hub.status().pending} left")
     return 0
 
 

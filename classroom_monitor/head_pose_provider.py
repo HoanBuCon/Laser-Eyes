@@ -468,11 +468,12 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
 
                 batch = sixdrepnet_input(valid_crops)
                 on_gpu = hasattr(model_obj, "gpu") and model_obj.gpu != -1 and torch.cuda.is_available()
-                if on_gpu:
-                    # A few fixed batch sizes let cuDNN keep its fastest kernels instead of re-planning
-                    # for every number of heads (1..30 changes from frame to frame)
+                if on_gpu and os.getenv("VIGIL_CUDNN_BENCHMARK", "0") == "1":
+                    # Opt-in: a few fixed batch sizes so cuDNN can keep tuned kernels per size.
+                    # Measured on an RTX 4060 laptop it gained nothing (forward 14.7 vs 14.9 ms)
+                    # and padding adds work, so it is off by default.
                     batch = _pad_batch(batch)
-                    if not torch.backends.cudnn.benchmark and os.getenv("VIGIL_CUDNN_BENCHMARK", "1") != "0":
+                    if not torch.backends.cudnn.benchmark:
                         torch.backends.cudnn.benchmark = True
                 batch_tensor = torch.from_numpy(batch)
                 if on_gpu:

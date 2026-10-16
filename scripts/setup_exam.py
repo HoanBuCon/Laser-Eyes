@@ -1,11 +1,12 @@
 """Prepare an online exam on the Hub's database: a proctor account, the exam, its join code, candidates.
 
-    python scripts/setup_exam.py --proctor hoanbucon --password "<mật khẩu>" \\
+    python scripts/setup_exam.py --demo --proctor hoanbucon --password "<mật khẩu>" \\
         --exam "Kỳ thi cuối học kỳ" --join-code DTC --candidate "HS01,Nguyễn Văn A,1111"
 
+The database follows the same rule as vigil.py: with ``--demo`` the demo database
+(``python vigil.py --demo``), without it the working database (``python vigil.py``).
 Safe to run again: an existing account gets the new password, an existing exam (same name) keeps its
 candidates and gets the join code.  Works while the Hub is running (SQLite, same file).
---database defaults to the demo database that ``python vigil.py --demo`` uses.
 """
 
 from __future__ import annotations
@@ -20,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Prepare an online exam: proctor account, exam, join code, candidates.")
-    parser.add_argument("--database", default="data/vigil_demo.db", help="SQLite file of the Hub (default: the demo database)")
+    parser.add_argument("--demo", action="store_true", help="The demo database, as python vigil.py --demo (default: the working one)")
+    parser.add_argument("--database", help="Another SQLite file of the Hub")
     parser.add_argument("--proctor", help="Username of the proctor account to create or update")
     parser.add_argument("--proctor-name", help="Display name (default: the username)")
     parser.add_argument("--role", default="PROCTOR", choices=("PROCTOR", "CHIEF", "ADMIN"),
@@ -39,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-    db_path = Path(args.database)
+    db_path = Path(args.database or ("data/vigil_demo.db" if args.demo else "data/vigil_proctoring.db"))
     if not db_path.is_absolute():
         db_path = ROOT / db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -106,6 +108,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
     finally:
         db.close()
+    if not args.database:
+        print(f"Start     : python vigil.py{' --demo' if args.demo else ''}   (the Hub must use this same database)")
     return 0
 
 

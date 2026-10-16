@@ -726,14 +726,34 @@ class CandidateApp(tk.Tk):
         self._wait_sent()
 
     def _wait_sent(self) -> None:
+        """Done only when the Hub took everything: nothing waiting and nothing refused."""
         status = self.hub.status()
-        if status.pending == 0:
+        retry = getattr(self, "retry_button", None)
+        if status.pending == 0 and status.failed == 0:
             self.done_label.configure(text="✓ Máy chủ thi đã nhận đủ dữ liệu. Bạn có thể đóng cửa sổ này.", fg=COLORS["good"])
+            if retry is not None:
+                retry.pack_forget()
             self._clear_token()
             return
-        note = "Đang chờ mạng…" if status.state == OFFLINE else "Đang gửi…"
-        self.done_label.configure(text=f"{note} Còn {status.pending} mục. Đừng tắt máy cho tới khi xong.", fg=COLORS["text"])
+        if status.pending == 0:  # everything was tried; some items were refused
+            self.done_label.configure(
+                text=(f"✗ {status.failed} mục bị máy chủ thi từ chối: {status.last_error or 'không rõ lý do'}\n"
+                      "Đừng xóa phần mềm hay dữ liệu. Báo giám thị, rồi bấm GỬI LẠI khi được yêu cầu."),
+                fg=COLORS["danger"])
+            if retry is None:
+                self.retry_button = retry = Button(self.done_label.master, "GỬI LẠI", self._retry_failed, primary=False)
+            if not retry.winfo_ismapped():
+                retry.pack(anchor="w", pady=(12, 0))
+        else:
+            note = "Đang chờ mạng…" if status.state == OFFLINE else "Đang gửi…"
+            refused = f" {status.failed} mục bị từ chối." if status.failed else ""
+            self.done_label.configure(text=f"{note} Còn {status.pending} mục.{refused} Đừng tắt máy cho tới khi xong.",
+                                      fg=COLORS["text"])
         self.after(1000, self._wait_sent)
+
+    def _retry_failed(self) -> None:
+        self.hub.retry_failed()
+        self.done_label.configure(text="Đang gửi lại…", fg=COLORS["text"])
 
     def _clear_token(self) -> None:
         self._state_path.unlink(missing_ok=True)

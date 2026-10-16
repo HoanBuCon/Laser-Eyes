@@ -179,6 +179,15 @@ class HubClient:
             failed = conn.execute("SELECT COUNT(*) FROM outbox WHERE dead = 1").fetchone()[0]
         return int(pending), int(failed)
 
+    def retry_failed(self) -> int:
+        """Queue again the items the Hub refused (e.g. after the cause was fixed). Returns how many."""
+        with self._lock, self._conn() as conn:
+            count = conn.execute("UPDATE outbox SET dead = 0, last_error = NULL WHERE dead = 1").rowcount
+        self._last_error = ""
+        self._wake.set()
+        self._notify()
+        return int(count or 0)
+
     # ------------------------------------------------------------ configuration
     @property
     def configured(self) -> bool:

@@ -39,6 +39,7 @@ import threading
 import time
 import zlib
 from dataclasses import dataclass, field, replace
+from types import SimpleNamespace
 from pathlib import Path
 from typing import Any, Callable, Optional
 
@@ -49,13 +50,15 @@ from exam_monitor.audio import AudioSpeechState, speech_is_confirmed
 from exam_monitor.events import EventDetector
 from exam_monitor.models import AnalysisResult, EventType
 from storage import one_service as one
-from storage.db_models import DetectionEvent, Exam, ExamSession, SessionVideoSegment
+from storage.db_models import DetectionEvent, EvidenceFile, Exam, ExamSession, SessionVideoSegment
 
 logger = logging.getLogger(__name__)
 
 CLIP_BEFORE_MS = 5000
 CLIP_AFTER_MS = 4000
 GAP_WAIT_SECONDS = 45.0
+CLIP_GIVE_UP_SECONDS = 600.0   # after the session ended: a clip whose video never came is reported missing
+CLIP_MAX_ATTEMPTS = 5          # cutting failed this many times: reported, not retried forever
 CONFIG_VERSION = "vigil-one-server-v2"
 LIVE_JOIN_MS = 1500        # live frames closer than this belong to one covered stretch
 LIVE_COVER_PAD_MS = 250    # a segment frame this close to a covered stretch counts as covered
@@ -258,9 +261,20 @@ class OneAnalysisService:
         session = db.get(ExamSession, session_id)
         if session is None or session.analysis_mode != "SERVER":
             return done
+        pending_q = db.query(SessionVideoSegment).filter(SessionVideoSegment.session_id == session.id,
+                                                         SessionVideoSegment.analysis_status == "PENDING")
+        if session.status == "CLOSED":  # the report was approved: nothing more can become a signal
+            for seg in pending_q.all():
+                seg.analysis_status, seg.analysis_error = "SKIPPED", "Ca thi đã đóng trước khi phân tích đoạn này."
+            db.commit()
+            return done
+        ended = session.status not in ("RUNNING", "STOPPING")
+        with self._states_lock:
+            loaded = session.id in self._states
+        if ended and not loaded and pending_q.first() is None:
+            return self._flush_saved_clips(db, session, done)  # only clips left: no analyser needed
         policy = policy_for_session(db, session)
         state = self._state(db, session, policy)
-        ended = session.status not in ("RUNNING", "STOPPING")
         while True:
             seg = (db.query(SessionVideoSegment)
                    .filter(SessionVideoSegment.session_id == session.id, SessionVideoSegment.analysis_status == "PENDING")
@@ -303,7 +317,7 @@ class OneAnalysisService:
                          .filter(SessionVideoSegment.session_id == session.id,
                                  SessionVideoSegment.analysis_status == "PENDING").first() is not None)
         if session.status not in ("RUNNING", "STOPPING") and not still_pending:
-            self._flush_clips(db, session, state, float("inf"))  # no more video will come
+            self._flush_clips(db, session, state, float("inf"), final=True)  # the video that will come is in
             session.analysis_state_json = state.to_json()
             db.commit()
             with self._states_lock:
@@ -548,32 +562,118 @@ class OneAnalysisService:
         one.update_live_analysis(db, session, values)
 
     # ------------------------------------------------------------ clips
-    def _flush_clips(self, db: Session, session: ExamSession, state: _SessionState, until_ms: float) -> None:
+    def _flush_saved_clips(self, db: Session, session: ExamSession, done: dict[str, int]) -> dict[str, int]:
+        """An ended session whose analyser is gone still owes clips: work on its saved list."""
+        try:
+            saved = json.loads(session.analysis_state_json or "{}")
+        except (TypeError, json.JSONDecodeError):
+            saved = {}
+        clips = list(saved.get("pending_clips") or [])
+        if clips:
+            holder = SimpleNamespace(pending_clips=clips)
+            self._flush_clips(db, session, holder, float("inf"), final=True)
+            saved["pending_clips"] = holder.pending_clips
+            session.analysis_state_json = json.dumps(saved, ensure_ascii=False)
+            db.commit()
+        return done
+
+    def _flush_clips(self, db: Session, session: ExamSession, state, until_ms: float, final: bool = False) -> None:
+        """Cut the clips whose seconds of video are in.  A clip stays queued until it is cut; one that
+        cannot be (no video arrived, cutting keeps failing) is reported on its evidence, never dropped."""
         keep = []
         for clip in state.pending_clips:
             if clip["to_ms"] > until_ms:
                 keep.append(clip)
                 continue
             try:
-                self._write_clip(db, session, clip)
-            except Exception:
+                outcome = self._write_clip(db, session, clip, final=final)
+            except Exception as exc:
                 logger.exception("VIGIL One %s: clip for %s failed", session.id, clip.get("event_id"))
+                outcome, clip["error"] = "error", f"{exc.__class__.__name__}: {exc}"[:200]
+            if outcome in ("ready", "gone"):
+                continue
+            clip["attempts"] = int(clip.get("attempts") or 0) + 1
+            gave_up = self._clip_overdue(session) or (outcome == "error" and clip["attempts"] >= CLIP_MAX_ATTEMPTS)
+            if not gave_up:
+                keep.append(clip)
+                continue
+            reason = (f"Không cắt được clip: {clip.get('error', '')}" if outcome == "error"
+                      else "Không có clip: video của đoạn này không về máy chủ.")
+            self._clip_unavailable(db, clip, reason)
         state.pending_clips = keep
 
-    def _write_clip(self, db: Session, session: ExamSession, clip: dict) -> None:
+    @staticmethod
+    def _clip_overdue(session: ExamSession) -> bool:
+        if session.status in ("RUNNING", "STOPPING"):
+            return False
+        ended = session.ended_at or datetime.datetime.utcnow()
+        return (datetime.datetime.utcnow() - ended).total_seconds() >= CLIP_GIVE_UP_SECONDS
+
+    @staticmethod
+    def _clip_unavailable(db: Session, clip: dict, reason: str) -> None:
         row = db.query(DetectionEvent).filter(DetectionEvent.event_id == clip["event_id"]).first()
         if row is None:
             return
+        evidence = db.query(EvidenceFile).filter(EvidenceFile.event_id == row.id).first()
+        if evidence is not None and not evidence.video_path:
+            evidence.error_message = reason[:500]
+        logger.warning("VIGIL One: %s (%s)", reason, clip.get("event_id"))
+
+    def _write_clip(self, db: Session, session: ExamSession, clip: dict, final: bool = False) -> str:
+        """ready | gone (no such signal) | wait (its video is not all in yet) | error."""
+        row = db.query(DetectionEvent).filter(DetectionEvent.event_id == clip["event_id"]).first()
+        if row is None:
+            return "gone"
         from_ms, to_ms = float(clip["from_ms"]), float(clip["to_ms"])
         segs = (db.query(SessionVideoSegment)
                 .filter(SessionVideoSegment.session_id == session.id)
                 .order_by(SessionVideoSegment.start_ms).all())
         segs = [s for s in segs if s.start_ms < to_ms and s.start_ms + s.duration_s * 1000.0 > from_ms]
         if not segs:
-            return
+            return "wait"
+        if not final and not _covers(segs, from_ms, to_ms):
+            return "wait"  # a piece in the middle or at the end is still on its way
         data = cut_clip([(s.file_path, s.start_ms, s.duration_s) for s in segs], from_ms, to_ms)
-        if data:
-            one.store_clip(db, row, data)
+        if not data:
+            clip["error"] = "the recording could not be cut"
+            return "error"
+        one.store_clip(db, row, data)
+        return "ready"
+
+
+def _covers(segs: list, from_ms: float, to_ms: float, slack_ms: float = 1500.0) -> bool:
+    """The segments run without a hole from from_ms to to_ms (the session's start and end may cut it short)."""
+    position = max(0.0, from_ms)
+    for seg in segs:
+        if seg.start_ms > position + slack_ms:
+            return False
+        position = max(position, seg.start_ms + seg.duration_s * 1000.0)
+    return position >= to_ms - slack_ms
+
+
+def analysis_backlog(db: Session, session: ExamSession) -> list[str]:
+    """What the Hub still owes a session before its report tells the whole story (empty: complete)."""
+    if session.product != "ONE" or session.analysis_mode != "SERVER":
+        return []
+    from storage import one_live
+
+    owed = []
+    if session.status in ("RUNNING", "STOPPING"):
+        owed.append("thí sinh chưa nộp bài")
+    pending = (db.query(SessionVideoSegment.id)
+               .filter(SessionVideoSegment.session_id == session.id, SessionVideoSegment.analysis_status == "PENDING")
+               .count())
+    if pending:
+        owed.append(f"{pending} đoạn video chưa được phân tích")
+    try:
+        clips = len(json.loads(session.analysis_state_json or "{}").get("pending_clips") or [])
+    except (TypeError, json.JSONDecodeError):
+        clips = 0
+    if clips:
+        owed.append(f"{clips} clip bằng chứng chưa cắt xong")
+    if one_live.stats(session.id).get("live"):
+        owed.append("luồng hình trực tiếp vẫn đang gửi")
+    return owed
 
 
 def _detector(policy: dict) -> EventDetector:

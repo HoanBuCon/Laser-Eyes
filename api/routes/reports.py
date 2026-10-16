@@ -149,11 +149,17 @@ def approve_session_report(session_id: str, payload: ApproveIn, db: Session = De
     report = build_session_report(db, session, _serialize_ai_event)
     pending = report["incidents"]["by_review_status"].get("PENDING", 0)
     note = (payload.note or "").strip()
+    from storage.one_analysis import analysis_backlog
+
+    backlog = analysis_backlog(db, session)  # VIGIL One: the Hub may still be analysing the video
+    if backlog and not note:
+        raise HTTPException(status_code=409, detail="The Hub has not finished analysing this candidate ("
+                            + "; ".join(backlog) + "). Wait, or write why the report is approved anyway.")
     if pending and not note:
         raise HTTPException(status_code=409, detail=f"{pending} incidents are still pending. Review them or write why the session is closed anyway.")
     now = datetime.datetime.utcnow()
     report["approval"] = {"approved_by": actor_name(user), "approved_at": now.isoformat(), "note": note,
-                          "pending_at_approval": pending}
+                          "pending_at_approval": pending, "analysis_incomplete": backlog}
     previous = latest_version(db, session.id)
     sha = canonical_sha256(report)
     record = SessionReportVersion(session_id=session.id, version=(previous.version + 1) if previous else 1,

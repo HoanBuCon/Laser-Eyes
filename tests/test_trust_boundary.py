@@ -103,3 +103,63 @@ def test_csv_download_name_with_vietnamese():
     header.encode("latin-1")  # what the HTTP server does with headers
     assert 'filename="session-Ky_thi_cuoi_hoc_ky' in header
     assert "filename*=UTF-8''session-K%E1%BB%B3_thi" in header
+
+
+# ---------------------------------------------------------------- the candidate is told the truth at the end
+
+class _Label:
+    def __init__(self):
+        self.text, self.fg, self.master = "", "", None
+
+    def configure(self, text="", fg=""):
+        self.text, self.fg = text, fg
+
+
+class _FakeButton:
+    def __init__(self, *args, **kwargs):
+        self.mapped = False
+
+    def winfo_ismapped(self):
+        return self.mapped
+
+    def pack(self, **kwargs):
+        self.mapped = True
+
+    def pack_forget(self):
+        self.mapped = False
+
+
+def _app(status):
+    from types import SimpleNamespace
+
+    cleared = []
+    app = SimpleNamespace(hub=SimpleNamespace(status=lambda: status), done_label=_Label(), retry_button=None,
+                          after=lambda ms, fn: None, _clear_token=lambda: cleared.append(True), _retry_failed=lambda: None,
+                          _wait_sent=lambda: None)
+    return app, cleared
+
+
+def test_candidate_is_not_told_all_arrived_when_items_were_refused(monkeypatch):
+    from types import SimpleNamespace
+
+    from exam_monitor import candidate_app as ca
+
+    monkeypatch.setattr(ca, "Button", _FakeButton)
+    app, cleared = _app(SimpleNamespace(pending=0, failed=3, state="SYNCED", last_error="SHA-256 không khớp"))
+    ca.CandidateApp._wait_sent(app)
+    assert "từ chối" in app.done_label.text and "SHA-256" in app.done_label.text
+    assert not cleared and app.retry_button.mapped            # token kept, GỬI LẠI offered
+    app2, cleared2 = _app(SimpleNamespace(pending=0, failed=0, state="SYNCED", last_error=""))
+    ca.CandidateApp._wait_sent(app2)
+    assert "nhận đủ" in app2.done_label.text and cleared2
+
+
+def test_refused_items_can_be_sent_again(tmp_path):
+    from exam_monitor.hub_client import HubClient
+
+    hub = HubClient(tmp_path, "http://127.0.0.1:9", "token")  # never started: nothing is sent
+    hub.open_session("k", {"client_session_id": "k"})
+    with hub._conn() as conn:
+        conn.execute("UPDATE outbox SET dead = 1, last_error = 'x'")
+    assert hub.counts() == (0, 1)
+    assert hub.retry_failed() == 1 and hub.counts() == (1, 0)

@@ -250,3 +250,76 @@ def test_live_frames_with_invented_times_cannot_hide_the_recording(client, db, s
     for seg in _segments(tmp_path / "rec", scene, 10.0):
         _upload(client, headers, sid, seg)
     assert service.process_session(db, sid)["events"] == 1  # the absence was found in the recording
+
+
+# ---------------------------------------------------------------- nothing is lost or closed too early
+
+def _stop(client, headers, sid):  # noqa: F811
+    res = client.post(f"/api/v1/one/client/sessions/{sid}/stop", headers=headers, json={"reason": "SUBMITTED"})
+    assert res.status_code == 200, res.text
+
+
+def _clips(db, sid):  # noqa: F811
+    db.expire_all()
+    return json.loads(db.get(ExamSession, sid).analysis_state_json or "{}").get("pending_clips") or []
+
+
+def test_a_clip_waits_for_video_that_arrives_late(client, db, service, tmp_path):  # noqa: F811
+    headers, sid = _server_session(client, db)
+    scene = lambda t: BRIGHT if 2.4 <= t < 6.0 else NORMAL  # noqa: E731
+    _stream(service, db, sid, scene, 0.0, 10.0)
+    segs = _segments(tmp_path / "rec", scene, 10.0)
+    _upload(client, headers, sid, segs[0])                    # only the first seconds so far
+    service.process_session(db, sid)
+    assert len(_clips(db, sid)) == 1                          # still waiting, not dropped
+    for seg in segs[1:]:                                      # the rest arrives after a network drop
+        _upload(client, headers, sid, seg)
+    service.process_session(db, sid)
+    assert _clips(db, sid) == []
+    evidence = db.query(EvidenceFile).one()
+    assert evidence.video_path and evidence.error_message is None
+
+
+def test_a_clip_whose_video_never_comes_is_reported_not_dropped(client, db, service, monkeypatch):  # noqa: F811
+    headers, sid = _server_session(client, db)
+    _stream(service, db, sid, lambda t: BRIGHT if 2.4 <= t < 6.0 else NORMAL, 0.0, 10.0)
+    _stop(client, headers, sid)
+    service.process_session(db, sid)
+    assert len(_clips(db, sid)) == 1                          # within the grace period: still owed
+    monkeypatch.setattr(one_analysis, "CLIP_GIVE_UP_SECONDS", 0.0)
+    analysers = len(service.created)
+    service.process_session(db, sid)
+    assert _clips(db, sid) == []
+    assert "video" in db.query(EvidenceFile).one().error_message
+    assert len(service.created) == analysers                  # no face model loaded again for that
+
+
+def test_report_waits_for_the_hub_or_a_written_reason(client, db, service, tmp_path):  # noqa: F811
+    from test_one_hub import _sign_in
+
+    headers, sid = _server_session(client, db)
+    for seg in _segments(tmp_path / "rec", lambda t: NORMAL, 4.0):
+        _upload(client, headers, sid, seg)                    # uploaded, not analysed yet
+    _stop(client, headers, sid)
+    _sign_in(client, db)
+    res = client.post(f"/api/v1/reports/sessions/{sid}/approve", json={})
+    assert res.status_code == 409 and "chưa được phân tích" in res.json()["detail"]
+    res = client.post(f"/api/v1/reports/sessions/{sid}/approve", json={"note": "Hội đồng chốt theo biên bản"})
+    assert res.status_code == 200, res.text
+    report = client.get(f"/api/v1/reports/sessions/{sid}", params={"version": 1}).json()["report"]
+    assert report["approval"]["analysis_incomplete"]          # the reason and what was missing are on record
+    service.process_session(db, sid)                          # closed: the rest is skipped, not turned into signals
+    assert {s.analysis_status for s in db.query(SessionVideoSegment).filter_by(session_id=sid)} == {"SKIPPED"}
+
+
+def test_report_of_a_fully_analysed_session_needs_no_reason(client, db, service, tmp_path):  # noqa: F811
+    from test_one_hub import _sign_in
+
+    headers, sid = _server_session(client, db)
+    for seg in _segments(tmp_path / "rec", lambda t: NORMAL, 4.0):
+        _upload(client, headers, sid, seg)
+    _stop(client, headers, sid)
+    service.process_session(db, sid)
+    _sign_in(client, db)
+    assert one_analysis.analysis_backlog(db, db.get(ExamSession, sid)) == []
+    assert client.post(f"/api/v1/reports/sessions/{sid}/approve", json={}).status_code == 200

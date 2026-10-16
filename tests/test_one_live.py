@@ -50,9 +50,14 @@ def service(db, monkeypatch):  # noqa: F811
     monkeypatch.setattr(one_analysis, "_service", None)
 
 
+CLOCK = {"base": 1_000_000.0, "t": 0.0}
+
+
 @pytest.fixture(autouse=True)
-def _fresh_slots():
+def _fresh_slots(monkeypatch):
     one_live._slots.clear()
+    monkeypatch.setattr(one_live, "_clock", lambda: CLOCK["base"] + CLOCK["t"])
+    CLOCK["t"] = 0.0
     yield
     one_live._slots.clear()
 
@@ -68,6 +73,7 @@ def _stream(svc, db, sid, brightness, start_s: float, end_s: float, fps: int = 5
     """Frames as the WebSocket would deliver them, analysed one by one."""
     t = start_s
     while t < end_s:
+        CLOCK["t"] = t + 0.05  # the Hub receives each frame just after the app took it
         one_live.put_frame(sid, _jpeg(brightness(t)), t * 1000.0)
         svc.process_live(db, sid)
         t += 1 / fps
@@ -211,3 +217,36 @@ def test_mjpeg_stream_sends_the_newest_picture(client, db, service, monkeypatch)
             if b"\xff\xd9" in chunk:
                 break
     assert chunk.startswith(b"--frame\r\nContent-Type: image/jpeg") and b"\xff\xd8" in chunk
+
+
+
+# ---------------------------------------------------------------- the frame clock is held to the Hub's
+
+def test_frame_times_must_move_forward_and_not_outrun_the_hub_clock():
+    jpeg = _jpeg(NORMAL)
+    CLOCK["t"] = 10.0
+    one_live.put_frame("s", jpeg, 5000.0, elapsed_ms=10_000)
+    with pytest.raises(ValueError):
+        one_live.put_frame("s", jpeg, 5000.0)                 # not forward
+    CLOCK["t"] = 11.0
+    with pytest.raises(ValueError):
+        one_live.put_frame("s", jpeg, 3_605_000.0)            # claims an hour went by in one second
+    one_live.put_frame("s", jpeg, 6000.0)                     # real time: accepted
+    assert one_live.stats("s")["refused"] == 2
+    with pytest.raises(ValueError):                           # a first frame far in the future of the session
+        one_live.put_frame("other", jpeg, 7_200_000.0, elapsed_ms=30_000)
+
+
+def test_live_frames_with_invented_times_cannot_hide_the_recording(client, db, service, tmp_path):  # noqa: F811
+    """A stream claiming to cover the whole exam is refused, so the recording is still analysed."""
+    headers, sid = _server_session(client, db)
+    with client.websocket_connect(f"/api/v1/one/client/sessions/{sid}/live", headers=headers) as ws:
+        ws.send_bytes(one_live.build_message({"t": 1000.0, "voice": None}, _jpeg(NORMAL)))
+        ws.receive_text()
+        ws.send_bytes(one_live.build_message({"t": 3_600_000.0, "voice": None}, _jpeg(NORMAL)))
+        assert "error" in json.loads(ws.receive_text())
+    service.process_live(db, sid)
+    scene = lambda t: BRIGHT if 2.4 <= t < 6.0 else NORMAL  # noqa: E731
+    for seg in _segments(tmp_path / "rec", scene, 10.0):
+        _upload(client, headers, sid, seg)
+    assert service.process_session(db, sid)["events"] == 1  # the absence was found in the recording

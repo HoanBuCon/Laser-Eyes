@@ -23,6 +23,8 @@ from typing import Any, Optional
 MAX_FRAME_BYTES = 1024 * 1024
 VIEWER_TTL_SECONDS = 6.0     # a viewer that stopped asking for frames no longer costs an overlay
 STALE_SECONDS = 5.0          # no frame for this long = the stream is down
+AHEAD_TOLERANCE_S = 2.0      # the app's clock may not run ahead of the Hub's by more than this
+START_TOLERANCE_MS = 60_000  # first frame: at most this far past the time elapsed since the session began
 
 
 @dataclass
@@ -44,8 +46,12 @@ class _Slot:
     received: list[float] = field(default_factory=list)   # arrival times over the last seconds (fps)
     analysed: list[float] = field(default_factory=list)
     connected: bool = False
+    clock_offset: Optional[float] = None   # Hub time - frame time, from the first frame accepted
+    last_t_ms: float = -1.0
+    refused: int = 0
 
 
+_clock = time.time   # the Hub's clock (tests drive it)
 _lock = threading.Lock()
 _slots: dict[str, _Slot] = {}
 _seq = 0
@@ -62,16 +68,38 @@ def _recent(times: list[float], now: float, window: float = 5.0) -> list[float]:
     return [t for t in times if now - t <= window]
 
 
-def put_frame(session_id: str, jpeg: bytes, t_ms: float, voice: Optional[bool] = None) -> Frame:
-    """A frame from the candidate app.  Also becomes the session's live thumbnail."""
+def put_frame(session_id: str, jpeg: bytes, t_ms: float, voice: Optional[bool] = None,
+              elapsed_ms: Optional[float] = None) -> Frame:
+    """A frame from the candidate app.  Also becomes the session's live thumbnail.
+
+    The frame's time comes from the app, so the Hub holds it to its own clock: it must move
+    forward, never faster than real time, and (``elapsed_ms``: time since the session began on the
+    Hub) not start in the future.  Otherwise a stream could claim to have covered stretches of the
+    exam it never showed, and the recording of them would not be analysed."""
     global _seq
     if not jpeg or len(jpeg) > MAX_FRAME_BYTES or jpeg[:2] != b"\xff\xd8":
         raise ValueError("Khung hình phải là JPEG nhỏ hơn 1 MB.")
-    now = time.time()
+    t_ms = float(t_ms)
+    now = _clock()
     with _lock:
-        _seq += 1
-        frame = Frame(jpeg=jpeg, t_ms=float(t_ms), voice=voice, received=now, seq=_seq)
         slot = _slot(session_id)
+        reason = None
+        if not (t_ms >= 0) or t_ms <= slot.last_t_ms:
+            reason = "Thời điểm khung hình phải tăng dần."
+        elif slot.clock_offset is not None and (now - t_ms / 1000.0) - slot.clock_offset < -AHEAD_TOLERANCE_S:
+            reason = "Thời điểm khung hình chạy nhanh hơn đồng hồ máy chủ."
+        elif slot.clock_offset is None and elapsed_ms is not None and t_ms > elapsed_ms + START_TOLERANCE_MS:
+            reason = "Thời điểm khung hình vượt quá thời gian của phiên."
+        if reason:
+            slot.refused += 1
+            raise ValueError(reason)
+        if slot.clock_offset is None:
+            slot.clock_offset = now - t_ms / 1000.0
+        else:  # follow network delay that shrinks, never let the frame clock run ahead
+            slot.clock_offset = min(slot.clock_offset, now - t_ms / 1000.0)
+        slot.last_t_ms = t_ms
+        _seq += 1
+        frame = Frame(jpeg=jpeg, t_ms=t_ms, voice=voice, received=now, seq=_seq)
         slot.latest = frame
         slot.connected = True
         slot.received = _recent(slot.received, now) + [now]
@@ -92,7 +120,7 @@ def take(session_id: str) -> Optional[Frame]:
 
 
 def analysed(session_id: str, frame: Frame, annotated: Optional[bytes]) -> None:
-    now = time.time()
+    now = _clock()
     with _lock:
         slot = _slot(session_id)
         slot.analysed = _recent(slot.analysed, now) + [now]
@@ -116,12 +144,12 @@ def watched(session_id: str) -> bool:
     """Someone is watching: worth drawing the analysis on the frames."""
     with _lock:
         slot = _slots.get(session_id)
-        return slot is not None and slot.viewers_until > time.time()
+        return slot is not None and slot.viewers_until > _clock()
 
 
 def view(session_id: str, after_seq: int = 0, annotated: bool = True) -> Optional[tuple[int, bytes]]:
     """For a viewer: the newest picture (annotated when the analysis has drawn it), if newer than after_seq."""
-    now = time.time()
+    now = _clock()
     with _lock:
         slot = _slot(session_id)
         if annotated:
@@ -138,7 +166,7 @@ def view(session_id: str, after_seq: int = 0, annotated: bool = True) -> Optiona
 
 
 def stats(session_id: str) -> dict[str, Any]:
-    now = time.time()
+    now = _clock()
     with _lock:
         slot = _slots.get(session_id)
         if slot is None or slot.latest is None:
@@ -146,7 +174,7 @@ def stats(session_id: str) -> dict[str, Any]:
         received = _recent(slot.received, now)
         done = _recent(slot.analysed, now)
         age = now - slot.latest.received
-        return {"live": slot.connected and age <= STALE_SECONDS, "age_s": round(age, 1),
+        return {"live": slot.connected and age <= STALE_SECONDS, "age_s": round(age, 1), "refused": slot.refused,
                 "fps_in": round(len(received) / 5.0, 1), "fps_analysed": round(len(done) / 5.0, 1)}
 
 
@@ -155,7 +183,7 @@ def latest(session_id: str) -> Optional[Frame]:
     with _lock:
         slot = _slots.get(session_id)
         frame = slot.latest if slot is not None else None
-    if frame is None or time.time() - frame.received > STALE_SECONDS:
+    if frame is None or _clock() - frame.received > STALE_SECONDS:
         return None
     return frame
 

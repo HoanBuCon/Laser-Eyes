@@ -116,11 +116,10 @@ def test_policy_defaults_and_validation(db):  # noqa: F811
     db.add(exam)
     db.commit()
     policy = online.policy_for(exam)
-    assert policy["analysis_mode"] == "server" and policy["segment_seconds"] == 10 and policy["analysis_fps"] == 5
-    with pytest.raises(online.OnlineExamError):
-        online.update_policy(db, exam, {"analysis_mode": "cloud"})
-    changed = online.update_policy(db, exam, {"analysis_mode": "client", "segment_seconds": 1, "analysis_fps": 99})
-    assert changed["analysis_mode"] == "client"
+    assert "analysis_mode" not in policy and policy["segment_seconds"] == 10
+    with pytest.raises(online.OnlineExamError):  # the Hub always analyses a candidate: no policy switch for it
+        online.update_policy(db, exam, {"analysis_mode": "client"})
+    changed = online.update_policy(db, exam, {"segment_seconds": 1, "analysis_fps": 99})
     assert changed["segment_seconds"] == 4 and changed["analysis_fps"] == changed["video_fps"]
 
 

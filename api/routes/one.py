@@ -12,6 +12,7 @@ Two audiences:
 from __future__ import annotations
 
 import asyncio
+import datetime
 import json
 import time
 import uuid
@@ -228,11 +229,20 @@ class SessionOpenRequest(BaseModel):
     analysis: str = Field("", max_length=10)
 
 
+def _from_this_computer(request: Request) -> bool:
+    host = request.client.host if request.client else ""
+    return host in ("127.0.0.1", "::1", "localhost", "testclient")
+
+
 @router.post("/client/sessions")
-def open_session(payload: SessionOpenRequest, device: ClientDevice = Depends(device_auth), db: Session = Depends(get_db)) -> dict[str, Any]:
+def open_session(payload: SessionOpenRequest, request: Request, device: ClientDevice = Depends(device_auth),
+                 db: Session = Depends(get_db)) -> dict[str, Any]:
     try:
         data = online.apply_candidate_identity(db, device, payload.model_dump())
-        session, created = one.open_session(db, device, data)
+        # The Hub decides: a candidate is analysed here; a simulation only from the Hub computer itself
+        session, created = one.open_session(db, device, data,
+                                            candidate_device=online.candidate_of(db, device) is not None,
+                                            allow_simulation=_from_this_computer(request))
         if created:
             online.after_session_opened(db, device, session, data)
     except one.OneError as exc:
@@ -560,23 +570,23 @@ LIVE_STATUS_SECONDS = 1.0
 MJPEG_IDLE_SECONDS = 60.0   # no new picture for this long: end the stream (the page reconnects)
 
 
-def _live_session(provider, token: Optional[str], session_id: str) -> tuple[Optional[str], Optional[str]]:
-    """(error, None) or (None, session id) for a candidate app opening its live stream."""
+def _live_session(provider, token: Optional[str], session_id: str) -> tuple[Optional[str], Optional[str], Any]:
+    """(error, None, None) or (None, session id, start time) for a candidate app opening its live stream."""
     gen = provider()
     db = next(gen)
     try:
         device = one.device_for_token(db, token)
         if device is None:
-            return "Thiết bị chưa được ghép nối hoặc đã bị thu hồi.", None
+            return "Thiết bị chưa được ghép nối hoặc đã bị thu hồi.", None, None
         try:
             session = one.owned_session(db, device, session_id)
         except one.OneError as exc:
-            return str(exc), None
+            return str(exc), None, None
         if session.analysis_mode != "SERVER":
-            return "Phiên này không phân tích trên Hub.", None
+            return "Phiên này không phân tích trên Hub.", None, None
         if session.status not in ("RUNNING", "STOPPING", "INTERRUPTED"):
-            return "Phiên đã kết thúc.", None
-        return None, session.id
+            return "Phiên đã kết thúc.", None, None
+        return None, session.id, session.started_at
     finally:
         gen.close()
 
@@ -604,7 +614,7 @@ async def live_stream(websocket: WebSocket, session_id: str):
     auth = websocket.headers.get("authorization") or ""
     token = auth[7:].strip() if auth.lower().startswith("bearer ") else websocket.query_params.get("token")
     provider = websocket.app.dependency_overrides.get(get_db, get_db)
-    error, sid = await run_in_threadpool(_live_session, provider, token, session_id)
+    error, sid, started = await run_in_threadpool(_live_session, provider, token, session_id)
     if error:
         await websocket.close(code=1008, reason=error[:120])
         return
@@ -620,7 +630,9 @@ async def live_stream(websocket: WebSocket, session_id: str):
                 try:
                     header, jpeg = one_live.parse_message(data)
                     voice = header.get("voice")
-                    one_live.put_frame(sid, jpeg, float(header.get("t") or 0.0), None if voice is None else bool(voice))
+                    elapsed = (datetime.datetime.utcnow() - started).total_seconds() * 1000.0 if started else None
+                    one_live.put_frame(sid, jpeg, float(header.get("t") or 0.0), None if voice is None else bool(voice),
+                                       elapsed_ms=elapsed)
                 except (ValueError, TypeError) as exc:
                     await websocket.send_text(json.dumps({"error": str(exc)}))
                     continue

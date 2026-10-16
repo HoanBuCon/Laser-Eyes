@@ -53,7 +53,6 @@ DEFAULT_POLICY: dict[str, Any] = {
     # Where VIGIL One's perception runs.  "server": the candidate's computer only records and uploads
     # video, the Hub analyses it (no MediaPipe on the candidate's computer); "client": the old way,
     # kept as a fallback for a Hub that cannot keep up.
-    "analysis_mode": "server",
     "segment_seconds": 10,       # length of the uploaded video pieces (= delay before the Hub sees them)
     "analysis_fps": 5,           # frames per second the Hub analyses
 }
@@ -97,8 +96,6 @@ def update_policy(db: Session, exam: Exam, changes: dict[str, Any]) -> dict[str,
     current["live_interval"] = max(1, min(60, int(current["live_interval"])))
     current["video_width"] = max(320, min(1280, int(current["video_width"])))
     current["video_fps"] = max(2, min(30, int(current["video_fps"])))
-    if current["analysis_mode"] not in ("server", "client"):
-        raise OnlineExamError("analysis_mode must be 'server' or 'client'")
     current["segment_seconds"] = max(4, min(60, int(current["segment_seconds"])))
     current["analysis_fps"] = max(1, min(int(current["video_fps"]), int(current["analysis_fps"])))
     current["thresholds"] = _clean_thresholds(current.get("thresholds"))

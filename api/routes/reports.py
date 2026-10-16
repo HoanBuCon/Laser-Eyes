@@ -221,9 +221,19 @@ def session_incidents_csv(session_id: str, db: Session = Depends(get_db)) -> Res
             item["review_status"], item["reviewer_id"] or "", item["reason_code"] or "", item["review_note"] or "",
             item["reviewed_at"] or "", item["sha256"] or "",
         ])
-    name = f"session-{(session.exam_name or session.id)[:40]}".replace(" ", "_").replace("/", "-")
-    return Response(content="﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
+    return Response(content="\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": attachment_header(f"session-{(session.exam_name or session.id)[:40]}", ".csv")})
+
+
+def attachment_header(name: str, suffix: str) -> str:
+    """Content-Disposition for any name (Vietnamese included): an ASCII fallback plus RFC 5987 UTF-8."""
+    import unicodedata
+    from urllib.parse import quote
+
+    clean = "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "export"
+    ascii_name = unicodedata.normalize("NFKD", clean).replace("đ", "d").replace("Đ", "D")
+    ascii_name = ascii_name.encode("ascii", "ignore").decode() or "export"
+    return f'attachment; filename="{ascii_name}{suffix}"; filename*=UTF-8\'\'{quote(clean + suffix)}'
 
 
 @router.get("/reports/incidents/{incident_id}/record")

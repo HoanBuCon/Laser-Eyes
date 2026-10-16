@@ -18,6 +18,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import secrets
 import threading
 import time
@@ -228,8 +229,18 @@ def owned_session(db: Session, device: ClientDevice, session_id: str) -> ExamSes
     return session
 
 
-def open_session(db: Session, device: ClientDevice, payload: dict[str, Any]) -> tuple[ExamSession, bool]:
-    """Create the session for one candidate, or return it if the client resends."""
+EVENT_ID_RE = re.compile(r"^[A-Za-z0-9_-]{1,36}$")
+CLOCK_TOLERANCE = datetime.timedelta(minutes=5)
+
+
+def open_session(db: Session, device: ClientDevice, payload: dict[str, Any], *, candidate_device: bool = False,
+                 allow_simulation: bool = True) -> tuple[ExamSession, bool]:
+    """Create the session for one candidate, or return it if the client resends.
+
+    The Hub decides how a session is analysed, never the client: a candidate's session (joined
+    with a code + PIN) is always analysed on the Hub; a scripted simulation is accepted only when
+    ``allow_simulation`` (the app runs on the Hub computer itself).  A paired desktop of the earlier
+    kind keeps its own on-device analysis (CLIENT)."""
     client_session_id = str(payload.get("client_session_id") or "").strip()[:64]
     if not client_session_id:
         raise OneError("Thiếu client_session_id.")
@@ -243,6 +254,17 @@ def open_session(db: Session, device: ClientDevice, payload: dict[str, Any]) -> 
         exam = db.get(Exam, payload["exam_id"])
         if exam is None:
             raise OneNotFound("Kỳ thi không tồn tại.")
+    simulation = bool(payload.get("simulation"))
+    if simulation and not allow_simulation:
+        raise OneError("Phiên mô phỏng chỉ được mở từ chính máy chủ thi.")
+    if candidate_device and not simulation:
+        mode = "SERVER"
+    else:
+        mode = "SERVER" if (str(payload.get("analysis") or "").lower() == "server" and not simulation) else "CLIENT"
+    now = _now()
+    started = _parse_time(payload.get("started_at"))
+    if started is None or abs(started - now) > CLOCK_TOLERANCE:
+        started = now  # a wrong clock on the candidate's computer must not move the session in time
     candidate = str(payload.get("candidate_ref") or "").strip()[:100] or "UNKNOWN"
     exam_name = str(payload.get("exam_name") or "").strip() or (exam.name if exam else "Phiên VIGIL One")
     session = ExamSession(
@@ -250,7 +272,7 @@ def open_session(db: Session, device: ClientDevice, payload: dict[str, Any]) -> 
         exam_name=f"{exam_name} — {candidate}"[:255],
         subject_code=exam.subject_code if exam else None,
         exam_id=exam.id if exam else None,
-        started_at=_parse_time(payload.get("started_at")) or _now(),
+        started_at=started,
         status="RUNNING",
         run_id=f"ONE-{client_session_id}"[:100],
         source_preset=str(payload.get("source_kind") or "CAMERA")[:50],
@@ -259,11 +281,9 @@ def open_session(db: Session, device: ClientDevice, payload: dict[str, Any]) -> 
         subject_name=(str(payload.get("candidate_name") or "").strip()[:255] or None),
         device_id=device.id,
         client_session_id=client_session_id,
-        simulation=bool(payload.get("simulation")),
-        last_heartbeat_at=_now(),
-        # The client says what it does; a simulated session is always analysed by its client (scripted)
-        analysis_mode="SERVER" if (str(payload.get("analysis") or "").lower() == "server"
-                                   and not payload.get("simulation")) else "CLIENT",
+        simulation=simulation,
+        last_heartbeat_at=now,
+        analysis_mode=mode,
     )
     db.add(session)
     _audit(db, f"device:{device.name}", "OPEN_ONE_SESSION", "EXAM_SESSION", client_session_id,
@@ -280,18 +300,23 @@ def _require_open(session: ExamSession) -> None:
 
 # ---------------------------------------------------------------- events and evidence
 
-def ingest_events(db: Session, session: ExamSession, events: list[dict[str, Any]]) -> dict[str, int]:
-    """Store a batch of One signals as review incidents. Duplicates are skipped."""
+def ingest_events(db: Session, session: ExamSession, events: list[dict[str, Any]], *,
+                  from_hub: bool = False) -> dict[str, int]:
+    """Store a batch of One signals as review incidents. Duplicates are skipped.
+
+    ``from_hub`` is set only by the Hub's own analysis (``storage.one_analysis``), never from a
+    request: it is what makes a signal "analysed on the Hub".  From a client, a SERVER session
+    accepts only facts the Hub cannot see (virtual camera, several screens, camera stopped)."""
     _require_open(session)
     if len(events) > MAX_EVENTS_PER_BATCH:
         raise OneError(f"Tối đa {MAX_EVENTS_PER_BATCH} sự kiện mỗi lần gửi.")
     created = duplicate = 0
     for item in events:
-        event_id = str(item.get("event_id") or "").strip()[:36]
+        event_id = str(item.get("event_id") or "").strip()
         event_type = str(item.get("event_type") or "").strip().lower()
-        if not event_id or event_type not in EVENT_SIGNALS:
-            raise OneError(f"Sự kiện không hợp lệ: {event_id or '(thiếu event_id)'} / {event_type or '(thiếu loại)'}")
-        if session.analysis_mode == "SERVER" and event_type not in CLIENT_FACTS and not item.get("_server"):
+        if not EVENT_ID_RE.match(event_id) or event_type not in EVENT_SIGNALS:
+            raise OneError(f"Sự kiện không hợp lệ: {event_id[:40] or '(thiếu event_id)'} / {event_type or '(thiếu loại)'}")
+        if session.analysis_mode == "SERVER" and event_type not in CLIENT_FACTS and not from_hub:
             raise OneError(f"Phiên phân tích trên máy chủ: máy thí sinh không gửi tín hiệu {event_type}.")
         if db.query(DetectionEvent.id).filter(DetectionEvent.event_id == event_id).first() is not None:
             duplicate += 1
@@ -332,8 +357,8 @@ def ingest_events(db: Session, session: ExamSession, events: list[dict[str, Any]
                 duration_seconds=duration,
                 status="FLAGGED_FOR_HUMAN_REVIEW",
                 review_status="PENDING",
-                model_version="vigil-one-server" if item.get("_server") else "vigil-one-mediapipe",
-                config_version=str(item.get("config_version") or "vigil-one-v2")[:50],
+                model_version="vigil-one-server" if from_hub else "vigil-one-mediapipe",
+                config_version=str(item.get("config_version") or "vigil-one-v2")[:50] if from_hub else "vigil-one-client",
                 incident_metadata_json=json.dumps(meta, ensure_ascii=False),
                 source_product=SOURCE_PRODUCT,
                 subject_ref=session.subject_ref,
@@ -374,6 +399,18 @@ def attach_evidence(db: Session, device: ClientDevice, event_id: str, data: byte
     return store_snapshot(db, event, data, sha256)
 
 
+def _evidence_path(event: DetectionEvent, suffix: str) -> tuple[Path, Path]:
+    """Folder and file for an event's evidence: names the Hub made (database ids), checked to stay
+    inside the evidence root whatever a client sent as its event id."""
+    root = one_evidence_root().resolve()
+    folder = (root / str(event.session_id)).resolve()
+    final_path = (folder / f"{event.id}{suffix}").resolve()
+    if root not in final_path.parents or folder not in final_path.parents:
+        raise OneError("Đường dẫn bằng chứng không hợp lệ.")
+    folder.mkdir(parents=True, exist_ok=True)
+    return folder, final_path
+
+
 def store_snapshot(db: Session, event: DetectionEvent, data: bytes, sha256: Optional[str] = None) -> EvidenceFile:
     digest = _check_jpeg(data, sha256)
     existing = db.query(EvidenceFile).filter(EvidenceFile.event_id == event.id).first()
@@ -381,10 +418,8 @@ def store_snapshot(db: Session, event: DetectionEvent, data: bytes, sha256: Opti
         if hashlib.sha256(Path(existing.snapshot_path).read_bytes()).hexdigest() != digest:
             raise OneError("Sự kiện này đã có ảnh bằng chứng khác.")
         return existing
-    folder = one_evidence_root() / event.session_id
-    folder.mkdir(parents=True, exist_ok=True)
-    final_path = folder / f"{event.event_id}.jpg"
-    temp_path = folder / f".{event.event_id}.{uuid.uuid4().hex}.tmp"
+    folder, final_path = _evidence_path(event, ".jpg")
+    temp_path = folder / f".{event.id}.{uuid.uuid4().hex}.tmp"
     temp_path.write_bytes(data)
     os.replace(temp_path, final_path)
     evidence = existing or EvidenceFile(event_id=event.id, file_path=str(final_path))
@@ -429,10 +464,8 @@ def store_clip(db: Session, event: DetectionEvent, data: bytes, sha256: Optional
         if existing.video_sha256 != digest:
             raise OneError("Sự kiện này đã có clip bằng chứng khác.")
         return existing
-    folder = one_evidence_root() / event.session_id
-    folder.mkdir(parents=True, exist_ok=True)
-    final_path = folder / f"{event.event_id}.mp4"
-    temp_path = folder / f".{event.event_id}.{uuid.uuid4().hex}.tmp"
+    folder, final_path = _evidence_path(event, ".mp4")
+    temp_path = folder / f".{event.id}.{uuid.uuid4().hex}.tmp"
     temp_path.write_bytes(data)
     os.replace(temp_path, final_path)
     evidence = existing or EvidenceFile(event_id=event.id, file_path=str(final_path))

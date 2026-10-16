@@ -512,9 +512,9 @@ class OneAnalysisService:
             "ended_at": (start + datetime.timedelta(milliseconds=t_ms)).isoformat() + "+00:00",
             "duration_seconds": round(float(event.duration_seconds), 2), "session_elapsed_ms": round(elapsed_ms, 1),
             "confidence": round(float(event.confidence), 3), "label": event.label, "reason": event.reason,
-            "config_version": CONFIG_VERSION, "_server": True,
+            "config_version": CONFIG_VERSION,
         }
-        counts = one.ingest_events(db, session, [item])
+        counts = one.ingest_events(db, session, [item], from_hub=True)
         if not counts["created"]:
             return 0
         row = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()

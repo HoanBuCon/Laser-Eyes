@@ -58,7 +58,7 @@ from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from classroom_monitor.pipeline import SRSv2Pipeline
-from classroom_monitor.video_io import AsyncVideoWriter, FrameReader
+from classroom_monitor.video_io import AsyncVideoWriter, FrameReader, RealtimePacer
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, ExamRoom, ExamSite, SeatROI
 
@@ -184,7 +184,14 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     # Video Writer for annotated result.mp4
     result_video_path = out_p / "result.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h)))
+    # --stride 0: like LIVE on the web, as many frames as this machine can while staying real time
+    auto_rate = config.stride == 0
+    step = 1 if auto_rate else config.stride
+    out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / step, (orig_w, orig_h)))
+    pacer = RealtimePacer(fps)
+    last_written_idx = 0
+    last_read_idx = 0
+    last_annotated = None
 
     all_episodes: List[TemporalEpisode] = []
     all_events: List[ClassroomEvent] = []
@@ -214,17 +221,21 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
             frame_idx += 1
             if config.max_frames and frame_idx > config.max_frames:
                 break
+            last_read_idx = frame_idx
 
             timestamp_ms = (frame_idx - 1) * (1000.0 / fps)
             # Every frame goes into the evidence buffer, analysed or not (clips keep the real frame rate)
             evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=timestamp_ms)
 
-            if config.stride > 1 and (frame_idx % config.stride != 0):
+            if step > 1 and (frame_idx % step != 0):
+                continue
+            if auto_rate and not pacer.should_analyse(timestamp_ms):
                 continue
 
             processed_count += 1
 
             frame_result = pipeline.process_frame(frame, frame_idx, timestamp_ms)
+            pacer.analysed_frame(timestamp_ms)
             detections = frame_result.detections
             unmapped_dets = frame_result.roaming_detections
             seat_observations = frame_result.observations
@@ -295,7 +306,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
             # Stage 9: Video Writer Output & Display Window
             t0 = time.perf_counter()
-            out_writer.write(annotated_frame)
+            for _ in range(max(1, frame_idx - last_written_idx) if auto_rate else 1):
+                out_writer.write(annotated_frame)  # skipped frames show the last analysed one
+            last_written_idx = frame_idx
+            last_annotated = annotated_frame
             t_write = (time.perf_counter() - t0) * 1000.0
             t_write_list.append(t_write)
 
@@ -335,6 +349,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     finally:
         reader.stop()
         cap.release()
+        if auto_rate and last_annotated is not None:  # frames after the last analysed one
+            for _ in range(last_read_idx - last_written_idx):
+                out_writer.write(last_annotated)
         out_writer.release()
         if config.show_window:
             cv2.destroyAllWindows()
@@ -469,7 +486,8 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "realtime_factor": realtime_factor,
         "head_pose_runtime": hpe_telemetry,
         "yolo_breakdown_ms": {k[5:]: round(float(np.mean(v)), 2) for k, v in yolo_parts.items() if v},
-        "stride": config.stride,
+        "stride": "auto" if auto_rate else config.stride,
+        "skipped_frames": pacer.skipped,
         "lat_perception_avg_ms": float(np.mean(t_det_list)) if t_det_list else 0.0,
         "lat_6drepnet_avg_ms": float(np.mean(t_hpe_list)) if t_hpe_list else 0.0,
         "lat_temporal_avg_ms": float(np.mean(t_temp_list)) if t_temp_list else 0.0,

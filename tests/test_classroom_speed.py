@@ -135,14 +135,65 @@ def test_live_status_carries_stage_times():
 
 # ---------------------------------------------------------------- LIVE keeps up with the camera
 
-def test_live_analyses_about_15_frames_a_second_by_default(monkeypatch):
-    from classroom_monitor.demo.runtime import live_stride
+class _Clock:
+    def __init__(self):
+        self.now = 0.0
 
-    monkeypatch.delenv("VIGIL_CLASSROOM_ANALYSIS_FPS", raising=False)
-    assert live_stride(30.0) == 2 and live_stride(25.0) == 2 and live_stride(15.0) == 1 and live_stride(60.0) == 4
-    monkeypatch.setenv("VIGIL_CLASSROOM_ANALYSIS_FPS", "30")
-    assert live_stride(30.0) == 1  # every frame, as before
-    assert live_stride(0.0) == 1
+    def __call__(self):
+        return self.now
+
+
+def _run(pacer, clock, frames, cost_s, fps=30.0):
+    """Feed ``frames`` frames; each analysed one takes ``cost_s`` seconds. Returns analysed indexes."""
+    analysed = []
+    for i in range(frames):
+        ts = i * 1000.0 / fps
+        clock.now = max(clock.now, i / fps)  # a camera cannot deliver a frame before its time
+        if pacer.should_analyse(ts):
+            clock.now += cost_s
+            pacer.analysed_frame(ts)
+            analysed.append(i)
+    return analysed
+
+
+def test_live_analyses_every_frame_when_the_machine_keeps_up():
+    from classroom_monitor.video_io import RealtimePacer
+
+    clock = _Clock()
+    pacer = RealtimePacer(30.0, clock=clock)
+    assert _run(pacer, clock, 300, cost_s=0.02) == list(range(300)) and pacer.skipped == 0
+
+
+def test_live_rate_settles_at_what_the_machine_can_do_and_stays_live():
+    from classroom_monitor.video_io import RealtimePacer
+
+    clock = _Clock()
+    pacer = RealtimePacer(30.0, clock=clock)
+    analysed = _run(pacer, clock, 300, cost_s=0.05)  # 20 frames/s at most
+    assert 190 <= len(analysed) <= 205  # no fixed rate: as many as 20 fps allows over 10 s
+    assert clock.now - 299 / 30.0 < 0.1  # finished with the video, not behind it
+    assert 0.95 < pacer.realtime_factor() < 1.1
+
+
+def test_a_very_slow_machine_still_analyses_every_second_of_video():
+    from classroom_monitor.video_io import RealtimePacer
+
+    clock = _Clock()
+    pacer = RealtimePacer(30.0, clock=clock)
+    analysed = _run(pacer, clock, 300, cost_s=3.0)
+    assert all(b - a <= 31 for a, b in zip(analysed, analysed[1:]))
+
+
+def test_pause_does_not_count_as_falling_behind():
+    from classroom_monitor.video_io import RealtimePacer
+
+    clock = _Clock()
+    pacer = RealtimePacer(30.0, clock=clock)
+    pacer.analysed_frame(0.0)
+    pacer.pause()
+    clock.now += 60.0
+    pacer.resume()
+    assert pacer.should_analyse(1000.0 / 30.0)
 
 
 def test_start_request_stride_is_automatic_unless_given():

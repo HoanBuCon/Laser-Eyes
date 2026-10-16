@@ -48,8 +48,8 @@ class DemoStartRequest(BaseModel):
     behavior_labels: Optional[bool] = Field(None, description="Show display-only behaviour tags on the stream")
     show_window: bool = Field(False, description="Open local OpenCV GUI window")
     max_frames: Optional[int] = Field(None, description="Max frames to process (for quick validation)")
-    stride: Optional[int] = Field(None, ge=1, description="Analyse every n-th frame; empty = keep up with real time "
-                                                         "(about VIGIL_CLASSROOM_ANALYSIS_FPS, default 15, per second)")
+    stride: Optional[int] = Field(None, ge=1, description="Analyse every n-th frame; empty = as many frames as this "
+                                                         "machine can while staying live (no fixed rate)")
     allow_mock: bool = Field(False, description="Explicitly allow visibly-labelled synthetic pose inference")
 
 

@@ -239,6 +239,7 @@ def export_demo_artifacts(
         "head_pose_runtime": runtime_stats.get("head_pose_runtime", {}),
         "yolo_breakdown_ms": runtime_stats.get("yolo_breakdown_ms", {}),
         "stride": runtime_stats.get("stride", 1),
+        "skipped_frames": runtime_stats.get("skipped_frames", 0),
         "stage_latency_averages_ms": {
             "perception_yolo_pose": round(float(runtime_stats.get("lat_perception_avg_ms", 0.0)), 2),
             "observation_6drepnet": round(float(runtime_stats.get("lat_6drepnet_avg_ms", 0.0)), 2),

@@ -192,6 +192,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     # Timing metrics accumulators
     t_det_list: List[float] = []
+    yolo_parts: Dict[str, List[float]] = {}  # Ultralytics' preprocess / inference / postprocess
     t_hpe_list: List[float] = []
     t_temp_list: List[float] = []
     t_pat_list: List[float] = []
@@ -214,14 +215,14 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
             if config.max_frames and frame_idx > config.max_frames:
                 break
 
+            timestamp_ms = (frame_idx - 1) * (1000.0 / fps)
+            # Every frame goes into the evidence buffer, analysed or not (clips keep the real frame rate)
+            evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=timestamp_ms)
+
             if config.stride > 1 and (frame_idx % config.stride != 0):
                 continue
 
             processed_count += 1
-            timestamp_ms = (frame_idx - 1) * (1000.0 / fps)
-
-            # Buffer raw frame
-            evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=timestamp_ms)
 
             frame_result = pipeline.process_frame(frame, frame_idx, timestamp_ms)
             detections = frame_result.detections
@@ -230,6 +231,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
             active_this_frame = frame_result.active_episodes
             new_patterns = frame_result.patterns
             all_patterns.extend(new_patterns)
+            for part, ms in frame_result.timings_ms.items():
+                if part.startswith("yolo_"):
+                    yolo_parts.setdefault(part, []).append(ms)
             t_det = frame_result.timings_ms["perception"]
             t_hpe = frame_result.timings_ms["head_observation"]
             t_temp = frame_result.timings_ms["temporal"]
@@ -464,6 +468,8 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,
         "head_pose_runtime": hpe_telemetry,
+        "yolo_breakdown_ms": {k[5:]: round(float(np.mean(v)), 2) for k, v in yolo_parts.items() if v},
+        "stride": config.stride,
         "lat_perception_avg_ms": float(np.mean(t_det_list)) if t_det_list else 0.0,
         "lat_6drepnet_avg_ms": float(np.mean(t_hpe_list)) if t_hpe_list else 0.0,
         "lat_temporal_avg_ms": float(np.mean(t_temp_list)) if t_temp_list else 0.0,

@@ -86,6 +86,20 @@ def sixdrepnet_input(crops: List[np.ndarray], size: int = SIXDREPNET_INPUT) -> n
     return batch
 
 
+_BATCH_BUCKETS = (4, 8, 16, 24, 32, 48, 64)
+
+
+def _pad_batch(batch: np.ndarray) -> np.ndarray:
+    """Zero-pad the batch to the next fixed size (the extra rows are dropped after the model)."""
+    n = len(batch)
+    size = next((b for b in _BATCH_BUCKETS if b >= n), n)
+    if size == n:
+        return batch
+    padded = np.zeros((size,) + batch.shape[1:], dtype=batch.dtype)
+    padded[:n] = batch
+    return padded
+
+
 class HeadOrientationProvider(ABC):
     """Abstract base class for all head orientation estimation providers."""
 
@@ -452,8 +466,15 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
                 import torch
                 from sixdrepnet import utils
 
-                batch_tensor = torch.from_numpy(sixdrepnet_input(valid_crops))
+                batch = sixdrepnet_input(valid_crops)
                 on_gpu = hasattr(model_obj, "gpu") and model_obj.gpu != -1 and torch.cuda.is_available()
+                if on_gpu:
+                    # A few fixed batch sizes let cuDNN keep its fastest kernels instead of re-planning
+                    # for every number of heads (1..30 changes from frame to frame)
+                    batch = _pad_batch(batch)
+                    if not torch.backends.cudnn.benchmark and os.getenv("VIGIL_CUDNN_BENCHMARK", "1") != "0":
+                        torch.backends.cudnn.benchmark = True
+                batch_tensor = torch.from_numpy(batch)
                 if on_gpu:
                     batch_tensor = batch_tensor.cuda(model_obj.gpu, non_blocking=True)
                     if self._fp16(model_obj):
@@ -463,7 +484,7 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
                 t0 = time.perf_counter()
 
                 with torch.inference_mode():
-                    preds = model_obj.model(batch_tensor).float()
+                    preds = model_obj.model(batch_tensor).float()[: len(valid_crops)]
                     euler = utils.compute_euler_angles_from_rotation_matrices(preds) * 180.0 / np.pi
                     p_arr = euler[:, 0].cpu().numpy()
                     y_arr = euler[:, 1].cpu().numpy()

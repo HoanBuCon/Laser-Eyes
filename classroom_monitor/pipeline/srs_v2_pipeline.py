@@ -152,6 +152,8 @@ class SRSv2Pipeline:
         started = time.perf_counter()
         detections = self.detector.detect(frame, frame_index=frame_idx)
         timings["perception"] = (time.perf_counter() - started) * 1000.0
+        for part, ms in (getattr(self.detector, "last_speed", None) or {}).items():
+            timings[f"yolo_{part}"] = float(ms)
 
         _mapped, roaming = self.seat_manager.map_detections_to_seats(
             detections=detections,

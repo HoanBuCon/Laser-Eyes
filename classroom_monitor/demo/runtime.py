@@ -88,6 +88,17 @@ class DemoState(str, Enum):
     ERROR = "ERROR"
 
 
+LIVE_ANALYSIS_FPS = 15.0
+
+
+def live_stride(source_fps: float, analysis_fps: Optional[float] = None) -> int:
+    """Every n-th frame to analyse so a LIVE run keeps up with the camera (VIGIL_CLASSROOM_ANALYSIS_FPS)."""
+    target = analysis_fps or float(os.getenv("VIGIL_CLASSROOM_ANALYSIS_FPS", LIVE_ANALYSIS_FPS) or LIVE_ANALYSIS_FPS)
+    if target <= 0 or source_fps <= 0:
+        return 1
+    return max(1, int(round(source_fps / target)))
+
+
 @dataclass
 class DemoStatus:
     state: str = DemoState.IDLE.value
@@ -113,10 +124,12 @@ class DemoStatus:
     persistence_health: str = "UNKNOWN"
     last_error: Optional[str] = None
     stage_ms: Dict[str, float] = field(default_factory=dict)  # rolling average per stage of the loop
+    stride: int = 1                                            # analyse every n-th frame (LIVE real time)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "stage_ms": dict(self.stage_ms),
+            "stride": self.stride,
             "state": self.state,
             "run_id": self.run_id,
             "preset": self.preset,
@@ -329,7 +342,7 @@ class DemoRuntime:
         debug_overlay: bool = False,
         show_window: bool = False,
         max_frames: Optional[int] = None,
-        stride: int = 1,
+        stride: Optional[int] = None,
         allow_mock: bool = False,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -357,7 +370,7 @@ class DemoRuntime:
         debug_overlay: bool = False,
         show_window: bool = False,
         max_frames: Optional[int] = None,
-        stride: int = 1,
+        stride: Optional[int] = None,
         allow_mock: bool = False,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -719,7 +732,7 @@ class DemoRuntime:
         debug_overlay: bool,
         show_window: bool,
         max_frames: Optional[int],
-        stride: int,
+        stride: Optional[int],
         allow_mock: bool,
     ) -> None:
         """Executes full live SRS v2 inference pipeline."""
@@ -729,7 +742,6 @@ class DemoRuntime:
         config.show_window = show_window
         if max_frames is not None:
             config.max_frames = max_frames
-        config.stride = stride
 
         # Output isolation directory
         out_p = demo_runs_root() / run_id
@@ -751,7 +763,12 @@ class DemoRuntime:
         if config.max_frames and config.max_frames < total_frames:
             total_frames = config.max_frames
 
+        # Real time: analyse about ANALYSIS_FPS frames per second of video (behaviour is measured in
+        # seconds, so 15 fps loses nothing) and keep up with the camera, instead of analysing all
+        # 30 and falling behind.  An explicit stride (1 = every frame) is used as given.
+        config.stride = int(stride) if stride else live_stride(fps)
         with self._lock:
+            self.status.stride = config.stride
             self.status.total_frames = total_frames
             self.status.source_fps = fps
             self.status.video_duration_ms = (total_frames / fps) * 1000.0 if fps > 0 else 0.0
@@ -904,6 +921,13 @@ class DemoRuntime:
                 frame_idx += 1
                 if config.max_frames and frame_idx > config.max_frames:
                     break
+                # Same clock as the CLI runner: the first frame is t=0.
+                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
+                # Every frame goes into the evidence buffer, analysed or not: clips keep the
+                # camera's frame rate (they used to play fast when frames were skipped)
+                t_stage = time.perf_counter()
+                evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
+                stages.add("evidence_buffer", t_stage)
 
                 if config.stride > 1 and (frame_idx % config.stride) != 0:
                     continue
@@ -914,12 +938,7 @@ class DemoRuntime:
                 last_frame_time = now
                 rolling_fps_deque.append(1.0 / dt)
                 curr_fps = float(np.mean(rolling_fps_deque))
-                # Same clock as the CLI runner: the first frame is t=0.
-                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
 
-                t_stage = time.perf_counter()
-                evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
-                stages.add("evidence_buffer", t_stage)
                 frame_result = pipeline.process_frame(frame, frame_idx, source_ts_ms)
                 for stage_name, stage_ms in frame_result.timings_ms.items():
                     stages.put(stage_name, stage_ms)
@@ -980,7 +999,7 @@ class DemoRuntime:
                 metrics_telemetry = {
                     "source_fps": fps,
                     "processing_fps": curr_fps,
-                    "realtime_factor": curr_fps / fps if fps > 0 else 1.0,
+                    "realtime_factor": curr_fps * config.stride / fps if fps > 0 else 1.0,
                     "total_frames": total_frames,
                     "active_episodes_count": len(active_episodes_frame),
                     "active_patterns_count": len(patterns_frame),
@@ -1037,7 +1056,7 @@ class DemoRuntime:
                     self.status.frame_index = frame_idx
                     self.status.source_timestamp_ms = source_ts_ms
                     self.status.processing_fps = curr_fps
-                    self.status.realtime_factor = curr_fps / fps if fps > 0 else 1.0
+                    self.status.realtime_factor = curr_fps * config.stride / fps if fps > 0 else 1.0
                     self.status.occupied_seats = len(occupied_seats)
                     self.status.suspicious_seats = sum(
                         1 for p in risk_tracker.profiles.values() if p.current_state in (RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value)

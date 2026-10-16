@@ -385,6 +385,7 @@ class PoseClassroomDetector:
         self.allow_mock = bool(allow_mock)
         self.model_error: Optional[str] = None
         self.half = _cuda_half("VIGIL_YOLO_FP16")
+        self.last_speed: Dict[str, float] = {}
 
         self._initialize_model()
 
@@ -456,6 +457,8 @@ class PoseClassroomDetector:
             logger.error("%s", self.model_error)
             raise ModelUnavailableError(self.model_error) from exc
 
+        # Ultralytics' own split (ms): CPU letterbox / GPU model / NMS + keypoints
+        self.last_speed = dict(getattr(results, "speed", None) or {})
         if results.boxes is None or len(results.boxes) == 0:
             return []
 

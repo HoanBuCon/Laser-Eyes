@@ -131,3 +131,31 @@ def test_live_status_carries_stage_times():
 
     status = DemoStatus(stage_ms={"perception": 12.5})
     assert status.to_dict()["stage_ms"] == {"perception": 12.5}
+
+
+# ---------------------------------------------------------------- LIVE keeps up with the camera
+
+def test_live_analyses_about_15_frames_a_second_by_default(monkeypatch):
+    from classroom_monitor.demo.runtime import live_stride
+
+    monkeypatch.delenv("VIGIL_CLASSROOM_ANALYSIS_FPS", raising=False)
+    assert live_stride(30.0) == 2 and live_stride(25.0) == 2 and live_stride(15.0) == 1 and live_stride(60.0) == 4
+    monkeypatch.setenv("VIGIL_CLASSROOM_ANALYSIS_FPS", "30")
+    assert live_stride(30.0) == 1  # every frame, as before
+    assert live_stride(0.0) == 1
+
+
+def test_start_request_stride_is_automatic_unless_given():
+    from api.routes.demo import DemoStartRequest
+
+    assert DemoStartRequest(preset="classroom-01").stride is None
+    assert DemoStartRequest(preset="classroom-01", stride=1).stride == 1
+
+
+def test_head_pose_batches_are_padded_to_a_few_fixed_sizes():
+    from classroom_monitor.head_pose_provider import _pad_batch
+
+    for n, size in ((1, 4), (4, 4), (5, 8), (17, 24), (70, 70)):
+        batch = np.ones((n, 3, 2, 2), dtype=np.float32)
+        padded = _pad_batch(batch)
+        assert padded.shape[0] == size and padded[:n].sum() == batch.sum() and padded[n:].sum() == 0

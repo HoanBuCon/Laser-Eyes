@@ -135,6 +135,20 @@ def _new_join_code(db: Session) -> str:
     raise OnlineExamError("Could not allocate a join code")
 
 
+def set_join_code(db: Session, exam: Exam, code: str) -> Exam:
+    """A join code chosen by the organiser (e.g. the course code): 3-12 letters or digits, unique."""
+    clean = (code or "").strip().upper().replace(" ", "").replace("-", "")
+    if not (3 <= len(clean) <= 12) or not clean.isalnum() or not clean.isascii():
+        raise OnlineExamError("Join code: 3 to 12 letters or digits")
+    other = db.query(Exam).filter(Exam.join_code == clean, Exam.id != exam.id).first()
+    if other is not None:
+        raise OnlineExamError(f"Join code {clean} is already used by the exam “{other.name}”")
+    exam.join_code = clean
+    db.commit()
+    db.refresh(exam)
+    return exam
+
+
 def set_joining(db: Session, exam: Exam, open_: bool, rotate: bool = False) -> Exam:
     if exam.join_code is None or rotate:
         exam.join_code = _new_join_code(db)

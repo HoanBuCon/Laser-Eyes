@@ -15,6 +15,7 @@ import vigil
 from exam_monitor.live_stream import LiveStreamer, build_message, ws_url
 from storage import one_live
 from vigil_build import fingerprint
+from test_one_hub import client, db  # noqa: F401  (fixtures)
 
 
 # ---------------------------------------------------------------- vigil.py
@@ -182,3 +183,46 @@ def test_new_thresholds_reach_a_running_session():
     state.thresholds = json.dumps({}, sort_keys=True)
     one_analysis._apply_thresholds(state, {"thresholds": {"look_away": 4.0}})
     assert state.detector.rules[EventType.LOOK_AWAY].threshold_seconds == 4.0
+
+
+# ---------------------------------------------------------------- organiser-chosen join code, setup script
+
+def test_setup_script_creates_proctor_exam_join_code_and_candidates(tmp_path):
+    import subprocess
+
+    db_file = tmp_path / "hub.db"
+    cmd = [sys.executable, "scripts/setup_exam.py", "--database", str(db_file), "--proctor", "giamthi01",
+           "--password", "Mat-khau-2026", "--exam", "Kỳ thi cuối học kỳ", "--join-code", "dtc",
+           "--candidate", "HS01,Nguyễn Văn A,1111", "--candidate", "HS02"]
+    out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "Join code : DTC" in out.stdout and "HS02" in out.stdout
+
+    import sqlite3
+
+    con = sqlite3.connect(db_file)
+    assert con.execute("select role from users where username='giamthi01'").fetchone() == ("PROCTOR",)
+    assert con.execute("select join_code, join_open from exams where name='Kỳ thi cuối học kỳ'").fetchone() == ("DTC", 1)
+    assert con.execute("select count(*) from candidates").fetchone()[0] == 2
+    again = subprocess.run(cmd[:10], capture_output=True, text=True, timeout=120)  # account + exam only, again
+    assert again.returncode == 0 and "already existed" in again.stdout
+
+
+def test_join_code_rules(client, db):  # noqa: F811
+    from storage import online_exam_service as online
+    from storage.db_models import Exam
+
+    first, second = Exam(name="A"), Exam(name="B")
+    db.add_all([first, second])
+    db.commit()
+    assert online.set_join_code(db, first, " dt-c ").join_code == "DTC"
+    for bad in ("AB", "QUÁ", "TOOLONGCODE13", ""):
+        with pytest.raises(online.OnlineExamError):
+            online.set_join_code(db, second, bad)
+    with pytest.raises(online.OnlineExamError):
+        online.set_join_code(db, second, "dtc")  # taken by the other exam
+    online.set_joining(db, first, True)
+    online.import_candidates(db, first, [{"candidate_code": "HS01", "pin": "1111"}])
+    res = client.post("/api/v1/one/client/join", json={"join_code": "dtc", "candidate_code": "HS01", "pin": "1111",
+                                                        "device": {}})
+    assert res.status_code == 200, res.text

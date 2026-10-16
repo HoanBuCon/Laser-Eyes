@@ -428,7 +428,7 @@ def stop(session_id: str, payload: StopRequest, request: Request, background: Ba
 # ---------------------------------------------------------------- online exams: candidate side
 
 class JoinRequest(BaseModel):
-    join_code: str = Field(..., min_length=4, max_length=16)
+    join_code: str = Field(..., min_length=3, max_length=16)
     candidate_code: str = Field(..., min_length=1, max_length=50)
     pin: str = Field(..., min_length=1, max_length=64)
     hostname: str = Field("", max_length=255)

@@ -591,13 +591,16 @@ def _live_session(provider, token: Optional[str], session_id: str) -> tuple[Opti
         gen.close()
 
 
-def _live_reply(provider, session_id: str) -> dict[str, Any]:
+def _live_reply(provider, session_id: str, token: Optional[str] = None) -> dict[str, Any]:
     gen = provider()
     db = next(gen)
     try:
         session = db.get(ExamSession, session_id)
         if session is None:
             return {"ended": True}
+        device = one.device_for_token(db, token) if token is not None else None
+        if token is not None and (device is None or device.id != session.device_id):
+            return {"ended": True, "revoked": True}  # the device was revoked (or its token expired) meanwhile
         live = one.serialize_live(session)
         return {"session_status": session.status, "ended": session.status not in ("RUNNING", "STOPPING", "INTERRUPTED"),
                 "analysis": (live.get("live") or {}).get("analysis"), "stream": one_live.stats(session_id)}
@@ -640,10 +643,10 @@ async def live_stream(websocket: WebSocket, session_id: str):
             now = time.monotonic()
             if now - last_reply >= LIVE_STATUS_SECONDS:
                 last_reply = now
-                reply = await run_in_threadpool(_live_reply, provider, sid)
+                reply = await run_in_threadpool(_live_reply, provider, sid, token or "")
                 await websocket.send_text(json.dumps(reply, ensure_ascii=False))
                 if reply.get("ended"):
-                    await websocket.close(code=1000)
+                    await websocket.close(code=1008 if reply.get("revoked") else 1000)
                     break
     except WebSocketDisconnect:
         pass

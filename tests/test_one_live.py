@@ -323,3 +323,44 @@ def test_report_of_a_fully_analysed_session_needs_no_reason(client, db, service,
     _sign_in(client, db)
     assert one_analysis.analysis_backlog(db, db.get(ExamSession, sid)) == []
     assert client.post(f"/api/v1/reports/sessions/{sid}/approve", json={}).status_code == 200
+
+
+# ---------------------------------------------------------------- who may listen
+
+def test_revoking_a_device_closes_its_live_stream(client, db, service, monkeypatch):  # noqa: F811
+    from api.routes import one as one_routes
+    from storage import one_service
+    from storage.db_models import ClientDevice
+
+    monkeypatch.setattr(one_routes, "LIVE_STATUS_SECONDS", 0.0)  # answer after every frame
+    headers, sid = _server_session(client, db)
+    with client.websocket_connect(f"/api/v1/one/client/sessions/{sid}/live", headers=headers) as ws:
+        ws.send_bytes(one_live.build_message({"t": 100.0, "voice": None}, _jpeg(NORMAL)))
+        assert json.loads(ws.receive_text())["ended"] is False
+        device = db.query(ClientDevice).one()
+        one_service.revoke_device(db, device.id, "chief")
+        CLOCK["t"] = 1.0
+        ws.send_bytes(one_live.build_message({"t": 200.0, "voice": None}, _jpeg(NORMAL)))
+        reply = json.loads(ws.receive_text())
+        assert reply.get("revoked") is True
+        from starlette.websockets import WebSocketDisconnect
+
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_text()
+
+
+def test_live_incidents_need_a_signed_in_user_when_sign_in_is_required(client, db, monkeypatch):  # noqa: F811
+    from starlette.websockets import WebSocketDisconnect
+
+    from test_one_hub import _sign_in
+
+    monkeypatch.setenv("VIGIL_AUTH_MODE", "required")
+    assert client.get("/api/v1/one/sessions").status_code == 401
+    with pytest.raises(WebSocketDisconnect):
+        with client.websocket_connect("/ws/events") as ws:
+            ws.send_text("ping")
+            ws.receive_text()
+    _sign_in(client, db)
+    with client.websocket_connect("/ws/events") as ws:
+        ws.send_text("ping")
+        assert ws.receive_text() == "pong"

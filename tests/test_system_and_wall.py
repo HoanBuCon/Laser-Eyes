@@ -48,6 +48,19 @@ def client(db):
     app.dependency_overrides.clear()
 
 
+def _sign_in(client, db, role="ADMIN", username="sysadmin"):
+    from storage.auth_service import create_user
+
+    create_user(db, username, "Demo Operator" if role == "ADMIN" else "Chief", role, "correct-horse-1")
+    assert client.post("/api/v1/auth/login", json={"username": username, "password": "correct-horse-1"}).status_code == 200
+
+
+@pytest.fixture
+def admin(client, db):
+    _sign_in(client, db)
+    return client
+
+
 def _seed(db, run_dir: str):
     room = ExamRoom(room_code="CLASSROOM-01", name="Classroom 01")
     db.add(room)
@@ -67,7 +80,34 @@ def _seed(db, run_dir: str):
 
 # --- System maintenance ----------------------------------------------------------
 
-def test_destructive_actions_need_the_typed_phrase(client, db):
+def test_destructive_actions_need_an_administrator(client, db):
+    _seed(db, "DEMO-1-classroom-01")
+    urls = ("/api/v1/admin/reset/incidents", "/api/v1/admin/cleanup/test-rooms",
+            "/api/v1/admin/cleanup/orphan-runs", "/api/v1/admin/cleanup/playback-cache")
+    for url in urls:  # nobody signed in (even in the open demo mode)
+        assert client.post(url, json={"confirm": "RESET ALL"}).status_code == 401, url
+    _sign_in(client, db, role="CHIEF", username="chief")
+    for url in urls:  # signed in, but not an administrator
+        assert client.post(url, json={"confirm": "RESET ALL"}).status_code == 403, url
+    assert db.query(DetectionEvent).count() == 1
+
+
+def test_maintenance_waits_for_vigil_one_work(admin, db):
+    from storage.db_models import SessionVideoSegment
+
+    room = _seed(db, "DEMO-1-classroom-01")
+    one = ExamSession(room_id=room.id, exam_name="online", status="COMPLETED", product="ONE", analysis_mode="SERVER")
+    db.add(one)
+    db.flush()
+    db.add(SessionVideoSegment(session_id=one.id, seq=0, start_ms=0, duration_s=10, file_path="x", sha256="0" * 64,
+                               file_size_bytes=1, analysis_status="PENDING"))
+    db.commit()
+    res = admin.post("/api/v1/admin/reset/incidents", json={"confirm": "RESET ALL"})
+    assert res.status_code == 409 and "analysing" in res.json()["detail"]
+
+
+def test_destructive_actions_need_the_typed_phrase(admin, db):
+    client = admin
     _seed(db, "DEMO-1-classroom-01")
     for url in ("/api/v1/admin/reset/incidents", "/api/v1/admin/cleanup/test-rooms",
                 "/api/v1/admin/cleanup/orphan-runs", "/api/v1/admin/cleanup/playback-cache"):
@@ -75,7 +115,8 @@ def test_destructive_actions_need_the_typed_phrase(client, db):
     assert db.query(DetectionEvent).count() == 1
 
 
-def test_maintenance_is_refused_while_an_analysis_runs(client, db, monkeypatch):
+def test_maintenance_is_refused_while_an_analysis_runs(admin, db, monkeypatch):
+    client = admin
     _seed(db, "DEMO-1-classroom-01")
     monkeypatch.setattr(admin_routes, "_active_run", lambda: {"busy": True, "run_id": "DEMO-9", "state": "RUNNING"})
     res = client.post("/api/v1/admin/reset/incidents", json={"confirm": "RESET ALL"})
@@ -83,7 +124,8 @@ def test_maintenance_is_refused_while_an_analysis_runs(client, db, monkeypatch):
     assert db.query(DetectionEvent).count() == 1
 
 
-def test_reset_keeps_rooms_seats_and_audit_and_records_who_did_it(client, db):
+def test_reset_keeps_rooms_seats_and_audit_and_records_who_did_it(admin, db):
+    client = admin
     _seed(db, "DEMO-1-classroom-01")
     res = client.post("/api/v1/admin/reset/incidents", json={"confirm": "reset all", "actor": "Demo Operator"})
     assert res.status_code == 200, res.text
@@ -94,11 +136,12 @@ def test_reset_keeps_rooms_seats_and_audit_and_records_who_did_it(client, db):
     assert db.query(ExamSession).count() == 0
     assert db.query(ExamRoom).count() == 1
     assert db.query(SeatROI).count() == 1
-    audit = db.query(AuditLog).one()
-    assert (audit.actor_id, audit.action) == ("Demo Operator", "ADMIN_RESET_INCIDENTS")
+    audit = db.query(AuditLog).filter(AuditLog.action == "ADMIN_RESET_INCIDENTS").one()
+    assert audit.actor_id == "Demo Operator"  # the signed-in administrator, not a name the request typed
 
 
-def test_orphan_run_purge_keeps_runs_with_incidents_or_replay_clips(client, db):
+def test_orphan_run_purge_keeps_runs_with_incidents_or_replay_clips(admin, db):
+    client = admin
     runs = Path(os.environ["VIGIL_DEMO_RUNS_ROOT"])
     final = Path(os.environ["VIGIL_DEMO_FINAL_ROOT"])
     for name in ("DEMO-1-classroom-01", "DEMO-2-classroom-03", "DEMO-3-old"):

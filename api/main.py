@@ -21,6 +21,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from starlette.concurrency import run_in_threadpool
 from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 
@@ -279,6 +280,16 @@ def readiness_check():
     return {"status": "ready", "database": "connected"}
 
 
+def _signed_in(websocket: WebSocket) -> bool:
+    provider = websocket.app.dependency_overrides.get(get_db, get_db)
+    gen = provider()
+    db = next(gen)
+    try:
+        return user_for_token(db, websocket.cookies.get(COOKIE_NAME)) is not None
+    finally:
+        gen.close()
+
+
 @app.websocket("/ws/events")
 @app.websocket("/ws/demo")
 async def websocket_events_endpoint(websocket: WebSocket):
@@ -289,6 +300,10 @@ async def websocket_events_endpoint(websocket: WebSocket):
     local = _is_loopback(websocket.client.host if websocket.client else None)
     if token and not local and (not supplied or not secrets.compare_digest(supplied, token)):
         await websocket.close(code=1008, reason="Valid demo token required")
+        return
+    if auth_mode() == "required" and not await run_in_threadpool(_signed_in, websocket):
+        # The same rule as every page and API: live incidents are not for anonymous viewers
+        await websocket.close(code=1008, reason="Sign in to continue")
         return
     await realtime_manager.connect(websocket)
     try:

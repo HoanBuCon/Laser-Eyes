@@ -1,6 +1,11 @@
 # VIGIL AI Prototype — Current Status
 
-**Status:** CURRENT implementation record for human acceptance
+> **Historical snapshot.** The commit, branch, test count and India/Student benchmarks below describe that validation
+> run. For the current system (VIGIL One analysed on the Hub, `classroom-01..03` presets, seat calibration from the
+> database, `python vigil.py`) see `README.md` and `docs/DEMO_RUNBOOK_VIGIL_HUB.md`. Accuracy figures still apply only
+> to the code they were measured on.
+
+**Status:** historical implementation record (see the note above)
 
 **Validated source commit:** `96f04da` on branch `fix/ictu-2026-prototype-remediation`
 

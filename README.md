@@ -99,10 +99,11 @@ See [the acceptance checklist](docs/PROCTOR_SUPPORT_ACCEPTANCE.md) for the manua
 venv\Scripts\python.exe -m pytest
 ```
 
-The suite runs against a temporary database and temporary demo folders; it passed 299 tests on 2026-10-07. Passing tests do not establish model accuracy; see the strict India benchmark in the current-status document.
+The suite runs against a temporary database and temporary demo folders; it passed 502 tests on 2026-10-16 (branch `feat/one-server-analysis`). Passing tests do not establish model accuracy; the strict India benchmark in `docs/PROTOTYPE_CURRENT_STATUS.md` was measured on older code. The VIGIL One tests drive the pipeline with a scripted analyser, plus the real lip-motion algorithm at the Hub's frame rates (`tests/test_talking_sampling.py`); a real webcam session is still a manual check.
 
 ## Documentation status
 
-- **CURRENT:** `README.md`, `docs/PROTOTYPE_CURRENT_STATUS.md`, `docs/PROTOTYPE_REMEDIATION_PLAN.md`.
+- **CURRENT:** `README.md`, `docs/DEMO_RUNBOOK_VIGIL_HUB.md`.
+- **HISTORICAL SNAPSHOTS:** `docs/PROTOTYPE_CURRENT_STATUS.md`, `docs/BAO_CAO_BAN_GIAO_VIGIL.md`, `docs/PROTOTYPE_REMEDIATION_PLAN.md` (commit, test count and presets of their date).
 - **AUDIT BASELINE / SUPERSEDED FOR CURRENT BEHAVIOR:** the four architecture/debt audit documents remain valuable history and issue provenance.
 - **HISTORICAL:** older reports and optimization claims are not current performance or accuracy evidence unless explicitly revalidated at the current implementation commit.

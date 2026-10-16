@@ -364,3 +364,45 @@ def test_live_incidents_need_a_signed_in_user_when_sign_in_is_required(client, d
     with client.websocket_connect("/ws/events") as ws:
         ws.send_text("ping")
         assert ws.receive_text() == "pong"
+
+
+# ---------------------------------------------------------------- operations
+
+def test_status_tells_when_the_face_model_is_missing(client, db):  # noqa: F811
+    class Fallback(CalibratingAnalyzer):
+        backend_name = "OpenCV fallback"
+        init_error = "mediapipe not installed"
+        _landmarker = None
+        _object_detector = None
+
+    svc = one_analysis.OneAnalysisService(lambda: db, workers=1, analyzer_factory=lambda policy: Fallback())
+    headers, sid = _server_session(client, db)
+    _stream(svc, db, sid, lambda t: NORMAL, 0.0, 0.4)
+    backend = svc.status()["backend"]
+    assert backend["degraded"] and backend["face"] is False and "mediapipe" in backend["error"]
+
+
+def test_stopping_leaves_unfinished_segments_for_the_next_start(client, db, service, tmp_path):  # noqa: F811
+    headers, sid = _server_session(client, db)
+    service.start()
+    assert service.stop(timeout=5) is True and service.status()["threads_alive"] == 0
+    for seg in _segments(tmp_path / "rec", lambda t: NORMAL, 4.0):  # arriving while the Hub shuts down
+        _upload(client, headers, sid, seg)
+    assert service.process_session(db, sid) == {"segments": 0, "events": 0}  # stopped: nothing taken
+    assert {s.analysis_status for s in db.query(SessionVideoSegment).filter_by(session_id=sid)} == {"PENDING"}
+
+
+def test_pre_exam_check_asks_to_retry_when_the_hub_is_busy(client, db, monkeypatch):  # noqa: F811
+    from api.routes import one as one_routes
+    from test_one_hub import _jpeg as small_jpeg
+
+    headers, _ = _server_session(client, db)
+    monkeypatch.setattr(one_routes, "_CHECKS", type("Busy", (), {"locked": lambda self: True})())
+    res = client.post("/api/v1/one/client/check", headers=headers, files={"image": ("c.jpg", small_jpeg(), "image/jpeg")})
+    assert res.status_code == 503
+
+
+def test_docker_compose_gives_the_server_its_lan_token():
+    from pathlib import Path
+
+    assert "VIGIL_DEMO_TOKEN" in Path("docker-compose.yml").read_text(encoding="utf-8")

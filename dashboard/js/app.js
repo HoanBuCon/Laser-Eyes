@@ -345,8 +345,10 @@ async function loadOne() {
     if (chip) {
         if (analysis && analysis.running) {
             const queued = analysis.queued || 0;
-            chip.textContent = `HUB ANALYSIS · ${analysis.workers} WORKER${analysis.workers === 1 ? '' : 'S'}${queued ? ` · ${queued} QUEUED` : ''}${analysis.segments_failed ? ` · ${analysis.segments_failed} FAILED` : ''}`;
-            chip.dataset.tone = analysis.segments_failed ? 'warning' : 'good';
+            const backend = analysis.backend || {};
+            chip.textContent = `HUB ANALYSIS · ${analysis.workers} WORKER${analysis.workers === 1 ? '' : 'S'}${queued ? ` · ${queued} QUEUED` : ''}${analysis.segments_failed ? ` · ${analysis.segments_failed} FAILED` : ''}${backend.degraded ? ' · FACE MODEL MISSING' : ''}`;
+            if (backend.name) chip.title = `${backend.name}${backend.objects === false ? ' (no object detector)' : ''}${backend.error ? ` — ${backend.error}` : ''}`;
+            chip.dataset.tone = backend.degraded ? 'danger' : (analysis.segments_failed || backend.objects === false ? 'warning' : 'good');
         } else {
             chip.textContent = 'HUB ANALYSIS OFF';
             chip.dataset.tone = 'warning';

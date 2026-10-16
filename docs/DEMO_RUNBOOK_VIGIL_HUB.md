@@ -10,7 +10,7 @@ mã kỳ thi + mã thí sinh + PIN, rồi app gửi hình camera về Hub — kh
 
 | Luồng | Từ app VIGIL One lên Hub | Hub dùng để |
 |---|---|---|
-| Trực tiếp | WebSocket, ảnh JPEG ~5 khung/giây (640 px) | Phân tích ngay (trễ ~1 giây), giám thị xem trực tiếp trên `/one-monitor` |
+| Trực tiếp | WebSocket, ảnh JPEG ~10 khung/giây (640 px) | Phân tích ngay (trễ ~1 giây), giám thị xem trực tiếp trên `/one-monitor` |
 | Lưu trữ | Đoạn video H.264 10 giây qua hàng đợi (mất mạng thì giữ lại, gửi sau) | Video cả buổi, cắt clip bằng chứng, phân tích bù những quãng luồng trực tiếp bị đứt |
 
 ## Khởi động — một lệnh, tại thư mục gốc
@@ -101,7 +101,7 @@ venv\Scripts\python.exe -m pytest -q
   (`storage/one_analysis.py`), cùng máy với Classroom. Biến môi trường của Hub: `VIGIL_ONE_ANALYSIS=0` tắt phân tích
   One; `VIGIL_ONE_ANALYSIS_WORKERS=<n>` số luồng (mỗi luồng nhận luồng trực tiếp lẫn video lưu trữ, mỗi thí sinh luôn
   do một luồng xử lý). Trạng thái: `GET /api/v1/one/analysis/status`, bảng VIGIL One ở Operations.
-- Băng thông mỗi thí sinh khoảng 1,5–2 Mbps (hình trực tiếp) + 0,3 Mbps (video lưu trữ). 30 thí sinh ≈ 60 Mbps: dùng
+- Băng thông mỗi thí sinh khoảng 2–3 Mbps (hình trực tiếp 10 khung/giây) + 0,3 Mbps (video lưu trữ). 30 thí sinh ≈ 100 Mbps: dùng
   mạng có dây hoặc Wi-Fi 5 GHz tốt. Thi qua Internet: Hub cần `https://`, khi đó luồng trực tiếp đi qua `wss://`.
 - Địa chỉ `http://` chỉ được chấp nhận với localhost, dải IP riêng (10.x, 172.16–31.x, 192.168.x) và cùng mạng /16 với
   máy thí sinh. Lần đầu chạy `--lan`, Windows hỏi tường lửa: cho phép mạng **Private**.
@@ -109,6 +109,23 @@ venv\Scripts\python.exe -m pytest -q
   (SHA-256 cho từng file); video cả buổi được ghép bằng FFmpeg (`-c copy`, không nén lại).
 - Khởi động lại Hub giữa buổi **không** đóng phiên One đang chạy: app tự nối lại luồng trực tiếp, Hub phân tích bù
   phần bị đứt từ video lưu trữ và tiếp tục với hiệu chỉnh đã lưu.
-- `/admin` › **Remove test rooms** không bao giờ xóa phòng ảo `VIGIL-ONE`.
+- `/admin` › **Remove test rooms** không bao giờ xóa phòng ảo `VIGIL-ONE`. Mọi thao tác xóa/reset ở `/admin` cần đăng nhập
+  tài khoản **ADMIN**, và bị từ chối khi còn thí sinh One đang kết nối hoặc Hub chưa phân tích xong video.
+
+## 7. Hub quyết định, không phải máy thí sinh
+
+- Phiên của thí sinh (vào bằng mã kỳ thi + PIN) luôn được phân tích trên Hub; chính sách kỳ thi không còn chế độ phân
+  tích trên máy thí sinh. Phiên mô phỏng (`--sim`) chỉ được mở từ chính máy Hub.
+- Tín hiệu hành vi của phiên phân tích trên Hub chỉ do Hub tạo; máy thí sinh chỉ báo được các sự kiện thiết bị (camera ảo,
+  nhiều màn hình, camera dừng). Tên file bằng chứng do Hub đặt. Thời điểm khung hình trực tiếp phải khớp đồng hồ của Hub.
+- **Phát hiện nói chuyện** dùng micro + chuyển động môi. Hub phân tích 10 khung/giây (chuyển động môi cần từ 8 khung/giây);
+  khi Hub quá tải hoặc mạng yếu làm tốc độ thực tế thấp hơn, trang `/one-monitor` ghi rõ "lips too slow".
+- **Nộp bài:** app chỉ báo "đã nhận đủ dữ liệu" khi không còn mục chờ gửi và không mục nào bị từ chối. Có mục bị từ chối
+  thì app hiện lý do và nút **GỬI LẠI**; thí sinh báo giám thị, không tắt máy.
+- **Duyệt báo cáo One:** nếu Hub còn đoạn video chưa phân tích, clip chưa cắt, hoặc luồng trực tiếp còn mở, trưởng ban phải
+  ghi lý do mới duyệt được; danh sách phần còn thiếu được lưu trong bản báo cáo đã duyệt. Sau khi đóng, phần còn lại không
+  thành tín hiệu nữa. Clip không thể cắt (video không về sau 10 phút) được ghi lý do trên bằng chứng.
+- **Bảng VIGIL One ở Operations** báo `FACE MODEL MISSING` (đỏ) khi Hub chạy bản dự phòng OpenCV vì MediaPipe lỗi.
+- Bật `VIGIL_AUTH_MODE=required` khi thi thật: mọi trang, API và WebSocket sự kiện đều cần đăng nhập.
 - Thêm class Tailwind vào trang web thì build lại CSS theo lệnh ở đầu `dashboard/tailwind.config.js` (website chạy
   không cần Internet).

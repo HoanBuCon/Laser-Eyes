@@ -479,14 +479,23 @@ def client_policy(device: ClientDevice = Depends(device_auth), db: Session = Dep
     return online.policy_for(exam) if exam else dict(online.DEFAULT_POLICY)
 
 
+_CHECKS = asyncio.Semaphore(2)  # pre-exam checks analysed at once; the rest are asked to retry
+
+
 @router.post("/client/check")
 async def client_check(image: UploadFile = File(...), device: ClientDevice = Depends(device_auth)) -> dict[str, Any]:
-    """Pre-exam device check done by the Hub, so the candidate's computer needs no face model."""
+    """Pre-exam device check done by the Hub, so the candidate's computer needs no face model.
+
+    The face model runs in a worker thread (never on the event loop that serves every page and
+    stream); when many candidates check at once the extra ones get 503 and their app retries."""
     data = await _read_image(image)
-    try:
-        return one_analysis.check_frame(data)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if _CHECKS.locked():
+        raise HTTPException(status_code=503, detail="Máy chủ đang kiểm tra cho thí sinh khác, thử lại sau giây lát.")
+    async with _CHECKS:
+        try:
+            return await run_in_threadpool(one_analysis.check_frame, data)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 # ---------------------------------------------------------------- online exams: web (chief / proctors)

@@ -31,6 +31,9 @@ services:
     environment:
       DATABASE_URL: postgresql://vigil_user:vigil_secure_password_2026@vigil-db:5432/vigil_proctoring
       PORT: 8000
+      # The container listens on 0.0.0.0, which server.py allows only with a demo token:
+      #   VIGIL_DEMO_TOKEN=choose-a-secret docker compose up
+      VIGIL_DEMO_TOKEN: ${VIGIL_DEMO_TOKEN:?set VIGIL_DEMO_TOKEN (the token other computers must send)}
     ports:
       - "8000:8000"
     volumes:

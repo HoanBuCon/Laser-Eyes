@@ -157,6 +157,7 @@ class OneAnalysisService:
         self._live_waiting: set[str] = set()
         self._live_lock = threading.Lock()
         self._live_frames = 0
+        self.backend = {"name": "not started", "face": None, "objects": None, "error": ""}
 
     # ------------------------------------------------------------ lifecycle
     def start(self) -> None:
@@ -172,13 +173,21 @@ class OneAnalysisService:
             self._threads.append(live)
         logger.info("VIGIL One server analysis: %d worker(s), live + recorded video", self.workers)
 
-    def stop(self, timeout: float = 5.0) -> None:
+    def stop(self, timeout: float = 15.0) -> bool:
+        """Stop the workers; a worker finishes the segment it is on (state and clips are saved after
+        each one).  Returns False when one is still running after ``timeout`` (it is a daemon thread)."""
         self._stop.set()
         for q in (*self._queues, *self._live_queues):
             q.put(None)
+        deadline = time.monotonic() + timeout
         for thread in self._threads:
-            thread.join(timeout=timeout)
-        self._threads.clear()
+            thread.join(timeout=max(0.1, deadline - time.monotonic()))
+        stuck = [t.name for t in self._threads if t.is_alive()]
+        if stuck:
+            logger.warning("VIGIL One analysis: %s still busy at shutdown; its segment is analysed again on restart",
+                           ", ".join(stuck))
+        self._threads = [t for t in self._threads if t.is_alive()]
+        return not stuck
 
     def notify(self, session_id: str) -> None:
         """A segment arrived or the session ended: let its worker look at it now."""
@@ -192,12 +201,27 @@ class OneAnalysisService:
             self._live_waiting.add(session_id)
         self._live_queues[self._shard(session_id)].put(session_id)
 
+    def _note_backend(self, analyzer: Any) -> None:
+        """What the face analysis really runs on: MediaPipe, or the OpenCV fallback when it failed."""
+        name = str(getattr(analyzer, "backend_name", type(analyzer).__name__))
+        self.backend = {
+            "name": name,
+            "face": getattr(analyzer, "_landmarker", None) is not None if hasattr(analyzer, "_landmarker") else None,
+            "objects": (getattr(analyzer, "_object_detector", None) is not None
+                        if hasattr(analyzer, "_object_detector") else None),
+            "error": str(getattr(analyzer, "init_error", "") or "")[:300],
+            "degraded": "fallback" in name.lower(),
+        }
+        if self.backend["degraded"]:
+            logger.warning("VIGIL One analysis runs on %s: %s", name, self.backend["error"] or "MediaPipe unavailable")
+
     def status(self) -> dict[str, Any]:
         with self._states_lock:
             active = len(self._states)
-        return {"workers": self.workers, "running": bool(self._threads), "active_sessions": active,
+        alive = sum(1 for t in self._threads if t.is_alive())
+        return {"workers": self.workers, "running": alive > 0, "threads_alive": alive, "active_sessions": active,
                 "queued": sum(q.qsize() for q in self._queues), "segments_done": self._processed_segments,
-                "segments_failed": self._failed_segments, "live_frames": self._live_frames}
+                "segments_failed": self._failed_segments, "live_frames": self._live_frames, "backend": self.backend}
 
     def _shard(self, session_id: str) -> int:
         return zlib.crc32(session_id.encode()) % self.workers
@@ -278,7 +302,7 @@ class OneAnalysisService:
             return self._flush_saved_clips(db, session, done)  # only clips left: no analyser needed
         policy = policy_for_session(db, session)
         state = self._state(db, session, policy)
-        while True:
+        while not self._stop.is_set():  # shutting down: what is left stays PENDING for the next start
             seg = (db.query(SessionVideoSegment)
                    .filter(SessionVideoSegment.session_id == session.id, SessionVideoSegment.analysis_status == "PENDING")
                    .order_by(SessionVideoSegment.seq).first())
@@ -344,6 +368,7 @@ class OneAnalysisService:
         state = _SessionState(analyzer=self.analyzer_factory(policy), detector=_detector(policy))
         state.thresholds = json.dumps(policy.get("thresholds") or {}, sort_keys=True)
         analyzer = state.analyzer
+        self._note_backend(analyzer)
         try:
             saved = json.loads(session.analysis_state_json or "{}")
         except (TypeError, json.JSONDecodeError):

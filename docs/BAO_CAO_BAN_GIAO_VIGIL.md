@@ -1,5 +1,9 @@
 # Báo cáo bàn giao dự án VIGIL AI
 
+> **Tài liệu lịch sử (2026-10-06).** Số test, nhánh, commit và preset (India/Student) dưới đây là của lần bàn giao đó.
+> Trạng thái hiện tại: `README.md` và `docs/DEMO_RUNBOOK_VIGIL_HUB.md` trên nhánh `feat/one-server-analysis`
+> (preset `classroom-01..03`, hiệu chỉnh ghế từ database, khởi động bằng `python vigil.py`).
+
 **Mục đích:** giúp một nhóm/đơn vị mới tiếp quản codebase, dựng lại môi trường, hiểu ranh giới sản phẩm, kiểm chứng trạng thái hiện có và tiếp tục phát triển an toàn.
 
 **Mốc ghi nhận:** 2026-10-06. Tài liệu này phân biệt trạng thái đã xác minh tại lần bàn giao với mô tả lịch sử/định hướng. Trước khi triển khai, hãy fetch remote và xác nhận lại commit vì nhánh có thể đã tiến lên.

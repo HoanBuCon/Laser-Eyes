@@ -58,6 +58,7 @@ from classroom_monitor.head_pose_provider import (
 )
 from classroom_monitor.models import ClassroomEvent, Detection, EventStatus, SeverityLevel
 from classroom_monitor.observation_extractor import ObservationExtractor, RawObservation
+from classroom_monitor.video_io import AsyncVideoWriter, FrameReader, StageTimer
 from classroom_monitor.pipeline import SRSv2Pipeline
 from classroom_monitor.scene_context import CapabilityStatus, DeskGeometry, SceneProfile, SeatContext, SeatGraph
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatState
@@ -111,9 +112,11 @@ class DemoStatus:
     capability_health: Dict[str, str] = field(default_factory=dict)
     persistence_health: str = "UNKNOWN"
     last_error: Optional[str] = None
+    stage_ms: Dict[str, float] = field(default_factory=dict)  # rolling average per stage of the loop
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "stage_ms": dict(self.stage_ms),
             "state": self.state,
             "run_id": self.run_id,
             "preset": self.preset,
@@ -852,7 +855,8 @@ class DemoRuntime:
         # Video writer for result.mp4
         result_video_path = out_p / "result.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out_writer = cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h))
+        # Encoded on its own thread: the loop only queues the annotated frame
+        out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h)))
 
         all_episodes: List[TemporalEpisode] = []
         all_events: List[ClassroomEvent] = []
@@ -882,6 +886,8 @@ class DemoRuntime:
         rolling_fps_deque = deque(maxlen=30)
         last_frame_time = time.time()
         source_ts_ms = 0.0
+        reader = FrameReader(cap)  # decodes the next frames while the GPU works on this one
+        stages = StageTimer()
 
         try:
             while not self._stop_event.is_set():
@@ -889,9 +895,11 @@ class DemoRuntime:
                     time.sleep(0.1)
                     continue
 
-                ret, frame = cap.read()
+                t_stage = time.perf_counter()
+                ret, frame = reader.read()
                 if not ret:
                     break
+                stages.add("decode_wait", t_stage)
 
                 frame_idx += 1
                 if config.max_frames and frame_idx > config.max_frames:
@@ -909,8 +917,13 @@ class DemoRuntime:
                 # Same clock as the CLI runner: the first frame is t=0.
                 source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
 
+                t_stage = time.perf_counter()
                 evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
+                stages.add("evidence_buffer", t_stage)
                 frame_result = pipeline.process_frame(frame, frame_idx, source_ts_ms)
+                for stage_name, stage_ms in frame_result.timings_ms.items():
+                    stages.put(stage_name, stage_ms)
+                t_stage = time.perf_counter()
                 detections = frame_result.detections
                 unmapped_dets = frame_result.roaming_detections
                 active_episodes_frame = frame_result.active_episodes
@@ -952,6 +965,7 @@ class DemoRuntime:
                         publish_evidence(events_by_id[event_id], job)
 
                 timeline.observe(source_ts_ms, {code: prof.risk_score for code, prof in risk_tracker.profiles.items()})
+                stages.add("incidents_db", t_stage)
 
                 # 5. Render Output Frame
                 active_seats_state = {}
@@ -976,6 +990,7 @@ class DemoRuntime:
 
                 renderer.behavior_labels = self.behavior_labels
                 renderer.debug_overlay = self.debug_overlay
+                t_stage = time.perf_counter()
                 annotated_frame = renderer.render_frame(
                     frame=frame,
                     frame_idx=frame_idx,
@@ -1006,9 +1021,14 @@ class DemoRuntime:
                         cv2.LINE_AA,
                     )
 
+                stages.add("render", t_stage)
+                t_stage = time.perf_counter()
                 out_writer.write(annotated_frame)
+                stages.add("video_writer_wait", t_stage)
+                t_stage = time.perf_counter()
                 _, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 jpeg_bytes = jpeg_buf.tobytes()
+                stages.add("stream_jpeg", t_stage)
 
                 with self._lock:
                     self.latest_frame = annotated_frame
@@ -1023,6 +1043,7 @@ class DemoRuntime:
                         1 for p in risk_tracker.profiles.values() if p.current_state in (RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value)
                     )
                     self.status.active_review_incidents = metrics_telemetry["active_review_incidents"]
+                    self.status.stage_ms = stages.averages()
 
                 for cb in self._callback_snapshot("frame"):
                     try:
@@ -1050,6 +1071,7 @@ class DemoRuntime:
                 job = evidence_jobs.get(completed_event.event_id)
                 if job is not None:
                     publish_evidence(completed_event, job)
+            reader.stop()
             out_writer.release()
             cap.release()
             if show_window:

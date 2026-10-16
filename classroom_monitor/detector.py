@@ -8,6 +8,7 @@ small object detail (e.g., phones at the back of large lecture halls).
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -16,6 +17,19 @@ import numpy as np
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
 from classroom_monitor.models import Detection
 from classroom_monitor.spatial_matcher import compute_bbox_iou
+
+
+def _cuda_half(env_name: str) -> bool:
+    """Half precision on an NVIDIA GPU (about twice the speed, same detections in practice);
+    the environment variable set to 0 keeps float32."""
+    if os.getenv(env_name, "1") == "0":
+        return False
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
 
 logger = logging.getLogger("ClassroomDetector")
 
@@ -370,6 +384,7 @@ class PoseClassroomDetector:
         self._is_mock = False
         self.allow_mock = bool(allow_mock)
         self.model_error: Optional[str] = None
+        self.half = _cuda_half("VIGIL_YOLO_FP16")
 
         self._initialize_model()
 
@@ -433,6 +448,7 @@ class PoseClassroomDetector:
                 classes=[0],  # Person class
                 conf=self.confidence,
                 imgsz=self.config.pose_input_resolution,
+                half=self.half,
                 verbose=False,
             )[0]
         except Exception as exc:

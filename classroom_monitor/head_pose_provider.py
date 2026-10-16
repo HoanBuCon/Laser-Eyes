@@ -20,12 +20,14 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import logging
+import os
 import threading
 import time
 from collections import deque
 from dataclasses import dataclass, replace
 from typing import Any, Deque, Dict, List, Optional, Set, Tuple
 
+import cv2
 import numpy as np
 
 from classroom_monitor.detector import calculate_head_pose_yaw_pitch
@@ -57,6 +59,33 @@ class HeadOrientationEstimate:
         }
 
 
+SIXDREPNET_INPUT = 224
+_IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(3, 1, 1)
+_IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(3, 1, 1)
+
+
+def sixdrepnet_input(crops: List[np.ndarray], size: int = SIXDREPNET_INPUT) -> np.ndarray:
+    """BGR head crops -> (N, 3, size, size) float32, as SixDRepNet's own torchvision transform
+    (Resize(shorter side) -> CenterCrop -> ToTensor -> ImageNet Normalize), without PIL per crop."""
+    batch = np.empty((len(crops), 3, size, size), dtype=np.float32)
+    for i, crop in enumerate(crops):
+        h, w = crop.shape[:2]
+        # torchvision Resize(int): the shorter side becomes ``size``, the other keeps the ratio (truncated)
+        if h <= w:
+            new_h, new_w = size, max(size, int(size * w / h))
+        else:
+            new_w, new_h = size, max(size, int(size * h / w))
+        shrinking = new_h < h or new_w < w
+        resized = cv2.resize(crop, (new_w, new_h), interpolation=cv2.INTER_AREA if shrinking else cv2.INTER_LINEAR)
+        top, left = int(round((new_h - size) / 2.0)), int(round((new_w - size) / 2.0))
+        square = resized[top:top + size, left:left + size, ::-1]  # BGR -> RGB
+        batch[i] = square.transpose(2, 0, 1)
+    batch *= 1.0 / 255.0
+    batch -= _IMAGENET_MEAN
+    batch /= _IMAGENET_STD
+    return batch
+
+
 class HeadOrientationProvider(ABC):
     """Abstract base class for all head orientation estimation providers."""
 
@@ -68,13 +97,15 @@ class HeadOrientationProvider(ABC):
         self.total_crops_valid: int = 0
         self.total_crops_rejected: int = 0
         self.batch_sizes: List[int] = []
-        self.forward_times_ms: List[float] = []
+        self.forward_times_ms: List[float] = []      # model only (GPU work)
+        self.preprocess_times_ms: List[float] = []   # crops -> input tensor (CPU work)
 
     def get_telemetry(self) -> Dict[str, Any]:
         """Return raw telemetry counters for verification and profiling."""
         avg_batch = float(np.mean(self.batch_sizes)) if self.batch_sizes else 0.0
         max_batch = int(max(self.batch_sizes)) if self.batch_sizes else 0
         avg_fwd = float(np.mean(self.forward_times_ms)) if self.forward_times_ms else 0.0
+        avg_pre = float(np.mean(self.preprocess_times_ms)) if self.preprocess_times_ms else 0.0
         return {
             "estimate_single_calls": self.total_single_calls,
             "estimate_batch_calls": self.total_batch_calls,
@@ -85,6 +116,7 @@ class HeadOrientationProvider(ABC):
             "average_batch_size": round(avg_batch, 2),
             "max_batch_size": max_batch,
             "average_forward_ms": round(avg_fwd, 2),
+            "average_preprocess_ms": round(avg_pre, 2),
         }
 
     @abstractmethod
@@ -328,6 +360,20 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
                     logger.error("Failed to load SixDRepNet weights: %s", e)
                     SixDRepNetHeadOrientationProvider._shared_model = None
 
+    @staticmethod
+    def _fp16(model_obj) -> bool:
+        """Half precision on the GPU (about twice as fast; VIGIL_HPE_FP16=0 keeps float32)."""
+        if os.getenv("VIGIL_HPE_FP16", "1") == "0":
+            return False
+        if not getattr(model_obj, "_vigil_fp16", False):
+            try:
+                model_obj.model.half()
+                model_obj._vigil_fp16 = True
+            except Exception as exc:  # keep float32 rather than fail
+                logger.warning("SixDRepNet half precision unavailable: %s", exc)
+                return False
+        return True
+
     def estimate(
         self,
         keypoints: np.ndarray,
@@ -403,23 +449,21 @@ class SixDRepNetHeadOrientationProvider(HeadOrientationProvider):
             self.batch_sizes.append(len(valid_crops))
 
             if hasattr(model_obj, "transformations") and hasattr(model_obj, "model"):
-                import cv2
                 import torch
-                from PIL import Image
                 from sixdrepnet import utils
 
-                tensors = []
-                for c in valid_crops:
-                    rgb = cv2.cvtColor(c, cv2.COLOR_BGR2RGB)
-                    pil_img = Image.fromarray(rgb)
-                    tensors.append(model_obj.transformations(pil_img))
-
-                batch_tensor = torch.stack(tensors)
-                if hasattr(model_obj, "gpu") and model_obj.gpu != -1 and torch.cuda.is_available():
-                    batch_tensor = batch_tensor.cuda(model_obj.gpu)
+                batch_tensor = torch.from_numpy(sixdrepnet_input(valid_crops))
+                on_gpu = hasattr(model_obj, "gpu") and model_obj.gpu != -1 and torch.cuda.is_available()
+                if on_gpu:
+                    batch_tensor = batch_tensor.cuda(model_obj.gpu, non_blocking=True)
+                    if self._fp16(model_obj):
+                        batch_tensor = batch_tensor.half()
+                pre_ms = (time.perf_counter() - t0) * 1000.0
+                self.preprocess_times_ms.append(pre_ms)
+                t0 = time.perf_counter()
 
                 with torch.inference_mode():
-                    preds = model_obj.model(batch_tensor)
+                    preds = model_obj.model(batch_tensor).float()
                     euler = utils.compute_euler_angles_from_rotation_matrices(preds) * 180.0 / np.pi
                     p_arr = euler[:, 0].cpu().numpy()
                     y_arr = euler[:, 1].cpu().numpy()

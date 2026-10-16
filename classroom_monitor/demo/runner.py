@@ -58,6 +58,7 @@ from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from classroom_monitor.pipeline import SRSv2Pipeline
+from classroom_monitor.video_io import AsyncVideoWriter, FrameReader
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, ExamRoom, ExamSite, SeatROI
 
@@ -183,7 +184,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     # Video Writer for annotated result.mp4
     result_video_path = out_p / "result.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h))
+    out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h)))
 
     all_episodes: List[TemporalEpisode] = []
     all_events: List[ClassroomEvent] = []
@@ -202,9 +203,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     processed_count = 0
     start_wall_time = time.time()
 
+    reader = FrameReader(cap)  # decodes ahead on its own thread
     try:
         while True:
-            ret, frame = cap.read()
+            ret, frame = reader.read()
             if not ret:
                 break
 
@@ -327,6 +329,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 )
 
     finally:
+        reader.stop()
         cap.release()
         out_writer.release()
         if config.show_window:
@@ -350,7 +353,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     total_wall_time = time.time() - start_wall_time
     overall_fps = processed_count / max(0.001, total_wall_time)
-    realtime_factor = (duration_sec / max(0.001, total_wall_time))
+    # The video actually analysed (--max-frames may stop early), not the file's whole length
+    last_frame = min(frame_idx, config.max_frames) if config.max_frames else frame_idx
+    analysed_sec = last_frame / fps if fps > 0 else 0.0
+    realtime_factor = (analysed_sec / max(0.001, total_wall_time))
 
     # 5. Strict Canonical Ground Truth Benchmark Comparison (Actor-Centric)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -436,9 +442,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     hpe_telemetry = head_provider_inst.get_telemetry()
     hpe_telemetry["target_hz"] = config.hpe_hz
     hpe_telemetry["scheduled_cycles"] = pipeline.scheduled_hpe_cycles
-    hpe_telemetry["effective_hpe_hz"] = round(hpe_telemetry["estimate_batch_calls"] / max(0.01, duration_sec), 2)
+    hpe_telemetry["effective_hpe_hz"] = round(hpe_telemetry["estimate_batch_calls"] / max(0.01, analysed_sec), 2)
     occ_seats_count = max(1, sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED))
-    hpe_telemetry["effective_hpe_hz_per_seat"] = round((hpe_telemetry["valid_head_crops"] / occ_seats_count) / max(0.01, duration_sec), 2)
+    hpe_telemetry["effective_hpe_hz_per_seat"] = round((hpe_telemetry["valid_head_crops"] / occ_seats_count) / max(0.01, analysed_sec), 2)
 
     # 7. Export All Standardized Demo Artifacts
     scene_meta = {
@@ -446,7 +452,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "room_code": config.room_code,
         "camera_id": config.camera_id,
         "video_file": str(config.video_path),
-        "duration_sec": duration_sec,
+        "duration_sec": analysed_sec,
         "fps": fps,
         "total_seats": len(seat_mgr.seats),
         "occupied_seats": sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED),
@@ -492,7 +498,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "video_path": str(config.video_path),
         "result_video": str(result_video_path),
         "total_frames": processed_count,
-        "duration_sec": duration_sec,
+        "duration_sec": analysed_sec,
         "wall_time_sec": total_wall_time,
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,

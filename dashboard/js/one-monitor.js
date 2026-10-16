@@ -72,7 +72,9 @@
             $('mEmpty').textContent = state.ended ? 'The candidate has submitted; the live picture has ended. The whole exam video is on “Whole exam video”.'
                 : (s.connection === 'LOST' ? 'No connection from the candidate’s computer.' : 'Waiting for the candidate’s camera…');
         }
-        $('mStreamInfo').textContent = stream.live ? `${stream.fps_in} fps in · ${stream.fps_analysed} fps analysed` : '—';
+        $('mStreamInfo').textContent = stream.live
+            ? `${stream.fps_in} fps in · ${stream.fps_analysed} fps analysed${a.lip_reading_limited ? ' · lips too slow to read speech (Hub busy or weak network)' : ''}`
+            : '—';
 
         const calibrating = a.calibration && a.calibration !== 'READY' && a.calibration !== '—';
         $('mCalib').hidden = !(stream.live && calibrating);

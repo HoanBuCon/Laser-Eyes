@@ -149,7 +149,7 @@ def play_video(hub: HubClient, args, exam_id, work: Path) -> int:
                                lambda seq, path, start_ms, dur: hub.add_video_segment(key, seq, start_ms, dur, path, speech=[]),
                                fps=float(policy.get("video_fps") or 10), width=int(policy.get("video_width") or 640),
                                segment_seconds=seconds, started=started)
-    streamer = None if args.no_live else LiveStreamer(hub, key, fps=float(policy.get("analysis_fps") or 5), width=640)
+    streamer = None if args.no_live else LiveStreamer(hub, key, fps=float(policy.get("analysis_fps") or 10), width=640)
     index, last_live = 0, 0.0
     try:
         while True:

@@ -474,7 +474,7 @@ class CandidateApp(tk.Tk):
                     if server:
                         if self._streamer is None:
                             self._streamer = LiveStreamer(
-                                self.hub, self._session.session_id, fps=float(self.policy.get("analysis_fps") or 5),
+                                self.hub, self._session.session_id, fps=float(self.policy.get("analysis_fps") or 10),
                                 width=min(640, int(self.policy.get("video_width") or 640)), on_reply=self._on_live_reply)
                         self._streamer.push(frame, (now - self._started_mono) * 1000.0, voice)
                     if not server:

@@ -538,7 +538,10 @@ class GazeAnalyzer:
 
         close_cycles, transitions = rhythm_counts(smoothed)
         motion = float(np.mean(np.abs(np.diff(smoothed))))
-        recent = smoothed[times >= times[-1] - 0.75]
+        # The last ~0.75 s, but never fewer than 5 samples: at the Hub's live rate (5-10 fps) a
+        # fixed 0.75 s window holds only 3-4 frames and the lips could never count as moving.
+        recent_from = min(times[-1] - 0.75, times[max(0, len(times) - 5)])
+        recent = smoothed[times >= recent_from]
         recent_span = (
             float(np.percentile(recent, 90) - np.percentile(recent, 10))
             if len(recent) >= 5

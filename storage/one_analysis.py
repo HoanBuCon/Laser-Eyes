@@ -63,7 +63,8 @@ CONFIG_VERSION = "vigil-one-server-v2"
 LIVE_JOIN_MS = 1500        # live frames closer than this belong to one covered stretch
 LIVE_COVER_PAD_MS = 250    # a segment frame this close to a covered stretch counts as covered
 LIVE_RESET_MS = 3000       # a longer pause in the main analysis restarts the behaviour state
-LIVE_WRITE_SECONDS = 1.0   # live status / saved state written at most this often per session
+LIVE_WRITE_SECONDS = 1.0
+LIP_MIN_FPS = 8.0          # lip movement while speaking needs at least this many analysed frames per second   # live status / saved state written at most this often per session
 # Same as the desktop app writes: H.264 where Windows can encode it, mp4v otherwise (the review page
 # makes an H.264 copy for browsers on demand).
 _CLIP_CODECS = (((cv2.CAP_MSMF, "avc1"),) if os.name == "nt" else ()) + ((cv2.CAP_ANY, "mp4v"),)
@@ -75,7 +76,9 @@ def default_analyzer_factory(policy: dict) -> Any:
     """MediaPipe face/iris + object detector, on the video's clock, calibrating from the start."""
     from exam_monitor.engine import GazeAnalyzer
 
-    analyzer = GazeAnalyzer(frame_clock=True, object_every=2)
+    # Face and lips on every frame (speech needs >= 8 fps); phones / books about 2.5 times a second
+    fps = float(policy.get("analysis_fps") or 10)
+    analyzer = GazeAnalyzer(frame_clock=True, object_every=max(1, round(fps / 2.5)))
     analyzer.set_allowed_materials({"book"} if policy.get("allow_materials") else set())
     analyzer.begin_calibration()
     return analyzer
@@ -551,7 +554,10 @@ class OneAnalysisService:
         values: dict[str, Any] = {"analysis": {"mode": "SERVER", "calibration": snapshot.get("state", "—"),
                                                "lag_s": round(max(0.0, lag), 1), "frames": state.frames,
                                                "live": bool(live.get("live")), "live_fps": live.get("fps_analysed", 0.0),
-                                               "allow_materials": state.allow_materials}}
+                                               "allow_materials": state.allow_materials,
+                                               # below this the lips are sampled too rarely to see speech
+                                               "lip_reading_limited": bool(live.get("live")) and 0 < float(
+                                                   live.get("fps_analysed") or 0) < LIP_MIN_FPS}}
         if result is not None:
             values["analysis"]["faces"] = int(result.face_count)  # the candidate's app shows hints from this
             values["calibrated"] = bool(result.calibrated)

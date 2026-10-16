@@ -54,7 +54,7 @@ DEFAULT_POLICY: dict[str, Any] = {
     # video, the Hub analyses it (no MediaPipe on the candidate's computer); "client": the old way,
     # kept as a fallback for a Hub that cannot keep up.
     "segment_seconds": 10,       # length of the uploaded video pieces (= delay before the Hub sees them)
-    "analysis_fps": 5,           # frames per second the Hub analyses
+    "analysis_fps": 10,          # frames per second streamed live and analysed (lips need >= 8)
 }
 
 # Integrity signals raised or confirmed by the server (category INTEGRITY)
@@ -82,6 +82,8 @@ def policy_for(exam: Exam) -> dict[str, Any]:
     except (TypeError, json.JSONDecodeError):
         stored = {}
     merged = {**DEFAULT_POLICY, **{k: v for k, v in stored.items() if k in DEFAULT_POLICY}}
+    if stored.get("analysis_fps") == 5:
+        merged["analysis_fps"] = DEFAULT_POLICY["analysis_fps"]  # the old default (too slow for lips), not a choice
     merged["thresholds"] = {str(k): float(v) for k, v in (merged.get("thresholds") or {}).items()}
     return merged
 

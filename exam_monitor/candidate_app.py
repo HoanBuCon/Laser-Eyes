@@ -120,8 +120,11 @@ class CandidateApp(tk.Tk):
         self.title(APP_TITLE)
         self._set_window_icon()
         self.configure(bg=COLORS["bg"])
-        self.geometry("880x640+80+50")
-        self.minsize(760, 560)
+        # Tall enough for every step on a scaled (125-150 %) laptop screen; the action buttons
+        # always sit in a bar at the bottom, so a shorter window only shrinks the content above them
+        height = max(560, min(780, self.winfo_screenheight() - 110))
+        self.geometry(f"900x{height}+80+30")
+        self.minsize(760, 520)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.dir = data_dir()
@@ -196,6 +199,12 @@ class CandidateApp(tk.Tk):
         frame.pack(fill="both", expand=True, padx=40, pady=28)
         return frame
 
+    def _action_bar(self, parent) -> tk.Frame:
+        """A bar at the bottom of the step for its buttons: packed before the content, so it stays visible."""
+        bar = tk.Frame(parent, bg=COLORS["bg"])
+        bar.pack(side="bottom", fill="x", pady=(12, 0))
+        return bar
+
     def _header(self, parent, title: str, subtitle: str = "") -> None:
         row = tk.Frame(parent, bg=COLORS["bg"])
         row.pack(fill="x", pady=(0, 18))
@@ -234,14 +243,15 @@ class CandidateApp(tk.Tk):
             self.hub_entry = self._field(frame, "Địa chỉ máy chủ thi", value=self.hub_url)
         else:
             self.hub_entry = None
+        bar = self._action_bar(frame)
+        self.join_button = Button(bar, "VÀO THI  →", self._join)
+        self.join_button.pack(side="bottom", anchor="w")
+        self.join_error = tk.Label(bar, text=message, bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"],
+                                   wraplength=560, justify="left")
+        self.join_error.pack(side="bottom", anchor="w", pady=(0, 10))
         self.code_entry = self._field(frame, "Mã kỳ thi")
         self.cand_entry = self._field(frame, "Mã thí sinh", value=self.candidate.get("code", ""))
         self.pin_entry = self._field(frame, "Mã PIN", show="•")
-        self.join_error = tk.Label(frame, text=message, bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"],
-                                   wraplength=560, justify="left")
-        self.join_error.pack(anchor="w", pady=(12, 0))
-        self.join_button = Button(frame, "VÀO THI  →", self._join)
-        self.join_button.pack(anchor="w", pady=(14, 0))
         self.bind("<Return>", lambda _e: self._join())
         self.code_entry.focus_set()
 
@@ -291,21 +301,27 @@ class CandidateApp(tk.Tk):
         frame = self._clear()
         self._header(frame, "Thông báo và đồng ý", f"{self.exam.get('name', '')} · Thí sinh {self.candidate.get('code', '')}"
                      + (f" · {self.candidate['full_name']}" if self.candidate.get("full_name") else ""))
-        box = tk.Text(frame, height=13, wrap="word", bg=COLORS["surface"], fg=COLORS["text"], relief="solid", bd=1,
-                      font=FONTS["body"], padx=14, pady=12)
-        box.insert("1.0", CONSENT_TEXT + ("" if self.policy.get("microphone", True) else "\n\nKỳ thi này không dùng micro."))
-        box.configure(state="disabled")
-        box.pack(fill="x")
+        bar = self._action_bar(frame)
         agreed = tk.BooleanVar(value=False)
-        tk.Checkbutton(frame, text="Tôi đã đọc và đồng ý cho VIGIL One giám sát trong thời gian làm bài.",
+        go = Button(bar, "TIẾP TỤC  →", self._consent)
+        go.configure(state="disabled")
+        go.pack(side="bottom", anchor="w")
+        self.consent_error = tk.Label(bar, text="", bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"])
+        self.consent_error.pack(side="bottom", anchor="w")
+        tk.Checkbutton(bar, text="Tôi đã đọc và đồng ý cho VIGIL One giám sát trong thời gian làm bài.",
                        variable=agreed, bg=COLORS["bg"], fg=COLORS["text"], activebackground=COLORS["bg"],
                        font=FONTS["body"], command=lambda: go.configure(state="normal" if agreed.get() else "disabled")
-                       ).pack(anchor="w", pady=(14, 6))
-        self.consent_error = tk.Label(frame, text="", bg=COLORS["bg"], fg=COLORS["danger"], font=FONTS["small"])
-        self.consent_error.pack(anchor="w")
-        go = Button(frame, "TIẾP TỤC  →", self._consent)
-        go.configure(state="disabled")
-        go.pack(anchor="w", pady=(8, 0))
+                       ).pack(side="bottom", anchor="w", pady=(0, 8))
+        text_row = tk.Frame(frame, bg=COLORS["bg"])
+        text_row.pack(fill="both", expand=True)
+        scroll = tk.Scrollbar(text_row, orient="vertical")
+        box = tk.Text(text_row, height=6, wrap="word", bg=COLORS["surface"], fg=COLORS["text"], relief="solid", bd=1,
+                      font=FONTS["body"], padx=14, pady=12, yscrollcommand=scroll.set)
+        scroll.configure(command=box.yview)
+        box.insert("1.0", CONSENT_TEXT + ("" if self.policy.get("microphone", True) else "\n\nKỳ thi này không dùng micro."))
+        box.configure(state="disabled")
+        scroll.pack(side="right", fill="y")
+        box.pack(side="left", fill="both", expand=True)
 
     def _consent(self) -> None:
         def work():
@@ -321,6 +337,7 @@ class CandidateApp(tk.Tk):
     def _show_check(self) -> None:
         frame = self._clear()
         self._header(frame, "Kiểm tra thiết bị", "Ngồi ngay ngắn, nhìn vào màn hình, đủ ánh sáng trên khuôn mặt")
+        bar = self._action_bar(frame)
         row = tk.Frame(frame, bg=COLORS["bg"])
         row.pack(fill="both", expand=True)
         self.preview = self._preview_label(row, 480, 270)
@@ -339,9 +356,9 @@ class CandidateApp(tk.Tk):
         self.check_hint = tk.Label(side, text="", bg=COLORS["bg"], fg=COLORS["text_muted"], font=FONTS["small"],
                                    wraplength=280, justify="left")
         self.check_hint.pack(anchor="w", pady=(12, 0))
-        self.start_button = Button(side, "BẮT ĐẦU LÀM BÀI", self._start_exam)
+        self.start_button = Button(bar, "BẮT ĐẦU LÀM BÀI", self._start_exam)
         self.start_button.configure(state="disabled")
-        self.start_button.pack(anchor="w", pady=(16, 0))
+        self.start_button.pack(anchor="w")
         self._set_check("hub", "ok", "")
         self._phase = "check"
         self._stop.clear()

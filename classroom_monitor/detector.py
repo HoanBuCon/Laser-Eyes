@@ -9,8 +9,9 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import replace
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -563,4 +564,14 @@ def create_detector(
     if cfg.pipeline_mode == "2stage_pose":
         return PoseClassroomDetector(model_path=model_path, config=cfg)
     return ClassroomDetector(model_path=model_path, config=cfg)
+
+
+def pose_detector_for(demo_config: Any, *, allow_mock: bool = False) -> "PoseClassroomDetector":
+    """The pose detector of a Classroom run, at the input size the run asks for (``pose_imgsz``)."""
+    imgsz = int(getattr(demo_config, "pose_imgsz", 0) or DEFAULT_CONFIG.pose_input_resolution)
+    return PoseClassroomDetector(
+        confidence_threshold=getattr(demo_config, "pose_conf", None),
+        config=replace(DEFAULT_CONFIG, pose_input_resolution=imgsz),
+        allow_mock=allow_mock,
+    )
 

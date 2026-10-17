@@ -50,7 +50,7 @@ from classroom_monitor.demo.seat_timeline import SeatTimelineRecorder
 from classroom_monitor.demo.paths import demo_runs_root, purge_replay_package, replay_package_dir
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer
 from classroom_monitor.demo.seating import build_scene_seating
-from classroom_monitor.detector import PoseClassroomDetector
+from classroom_monitor.detector import pose_detector_for
 from classroom_monitor.head_pose_provider import (
     HeadOrientationEstimate,
     create_head_pose_provider,
@@ -790,7 +790,7 @@ class DemoRuntime:
 
         # Initialize AI Models & Engines
         try:
-            detector = PoseClassroomDetector(confidence_threshold=config.pose_conf, allow_mock=allow_mock)
+            detector = pose_detector_for(config, allow_mock=allow_mock)
             detector.ensure_available()
         except Exception as exc:
             logger.error("LIVE start refused: %s", exc)

@@ -469,7 +469,7 @@ def test_live_worker_crosses_first_incident_and_persists_evidence(tmp_path: Path
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(runtime_module, "get_demo_config", lambda _preset: config)
-    monkeypatch.setattr(runtime_module, "PoseClassroomDetector", FakeDetector)
+    monkeypatch.setattr(runtime_module, "pose_detector_for", lambda *args, **kwargs: FakeDetector())
     monkeypatch.setattr(runtime_module, "SeatManager", FakeSeatManager)
     monkeypatch.setattr(runtime_module, "create_head_pose_provider", lambda _name: FakeProvider())
     monkeypatch.setattr(runtime_module, "ObservationExtractor", FakeObservationExtractor)

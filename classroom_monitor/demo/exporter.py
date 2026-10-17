@@ -25,6 +25,10 @@ from classroom_monitor.temporal_episode_engine import TemporalEpisode
 logger = logging.getLogger("DemoExporter")
 
 
+def _round_or_none(value, digits: int = 2):
+    return None if value is None else round(float(value), digits)
+
+
 def export_demo_artifacts(
     output_dir: Path,
     episodes: List[TemporalEpisode],
@@ -231,6 +235,9 @@ def export_demo_artifacts(
         "total_wall_time_sec": round(float(runtime_stats.get("wall_time_sec", 0.0)), 2),
         "total_video_time_sec": round(float(scene_metadata.get("duration_sec", 0.0)), 2),
         "realtime_factor": round(float(runtime_stats.get("realtime_factor", 0.0)), 2),
+        # From the first analysed frame to the last: what the LIVE page experiences
+        "steady_realtime_factor": _round_or_none(runtime_stats.get("steady_realtime_factor")),
+        "steady_analysed_fps": _round_or_none(runtime_stats.get("steady_analysed_fps")),
         "hardware": {
             "device": "cuda" if torch.cuda.is_available() else "cpu",
             "gpu_name": gpu_name,

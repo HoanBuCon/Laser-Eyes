@@ -210,6 +210,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     frame_idx = 0
     processed_count = 0
     start_wall_time = time.time()
+    # Steady state: from the first analysed frame (models warmed up) to the last one, without the
+    # model loading before and the evidence flush after (the whole-run factor includes both)
+    steady_first: Optional[tuple] = None  # (perf_counter, video ms) after the first analysed frame
+    steady_last: Optional[tuple] = None
 
     reader = FrameReader(cap)  # decodes ahead on its own thread
     try:
@@ -236,6 +240,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
             frame_result = pipeline.process_frame(frame, frame_idx, timestamp_ms)
             pacer.analysed_frame(timestamp_ms)
+            steady_last = (time.perf_counter(), timestamp_ms)
+            if steady_first is None:
+                steady_first = steady_last
             detections = frame_result.detections
             unmapped_dets = frame_result.roaming_detections
             seat_observations = frame_result.observations
@@ -378,6 +385,11 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     last_frame = min(frame_idx, config.max_frames) if config.max_frames else frame_idx
     analysed_sec = last_frame / fps if fps > 0 else 0.0
     realtime_factor = (analysed_sec / max(0.001, total_wall_time))
+    steady_realtime_factor = steady_fps = None
+    if steady_first and steady_last and steady_last[0] - steady_first[0] > 0.5:
+        steady_wall = steady_last[0] - steady_first[0]
+        steady_realtime_factor = ((steady_last[1] - steady_first[1]) / 1000.0) / steady_wall
+        steady_fps = (processed_count - 1) / steady_wall
 
     # 5. Strict Canonical Ground Truth Benchmark Comparison (Actor-Centric)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -484,6 +496,8 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "wall_time_sec": total_wall_time,
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,
+        "steady_realtime_factor": steady_realtime_factor,
+        "steady_analysed_fps": steady_fps,
         "head_pose_runtime": hpe_telemetry,
         "yolo_breakdown_ms": {k[5:]: round(float(np.mean(v)), 2) for k, v in yolo_parts.items() if v},
         "stride": "auto" if auto_rate else config.stride,
@@ -510,6 +524,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     print("\n" + "=" * 80)
     print(f" DEMO RUN COMPLETE: {config.name.upper()} in {total_wall_time:.1f}s ({overall_fps:.1f} FPS, {realtime_factor:.2f}x Realtime)")
+    if steady_realtime_factor is not None:
+        print(f" Steady state:    {steady_fps:.1f} analysed frames/s, {steady_realtime_factor:.2f}x realtime"
+              " (without model loading and the final evidence flush)")
     print(f" Output Video:    {result_video_path}")
     print(f" Canonical EPs:   {exported_files['episodes']} ({len(all_episodes)} episodes)")
     print(f" Review Events:   {exported_files['events']} ({len(all_events)} events)")

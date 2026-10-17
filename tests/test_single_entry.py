@@ -194,7 +194,7 @@ def test_setup_script_creates_proctor_exam_join_code_and_candidates(tmp_path):
     cmd = [sys.executable, "scripts/setup_exam.py", "--database", str(db_file), "--proctor", "giamthi01",
            "--password", "Mat-khau-2026", "--exam", "Kỳ thi cuối học kỳ", "--join-code", "dtc",
            "--candidate", "HS01,Nguyễn Văn A,1111", "--candidate", "HS02"]
-    out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    out = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=120)
     assert out.returncode == 0, out.stdout + out.stderr
     assert "Join code : DTC" in out.stdout and "HS02" in out.stdout
 
@@ -204,7 +204,7 @@ def test_setup_script_creates_proctor_exam_join_code_and_candidates(tmp_path):
     assert con.execute("select role from users where username='giamthi01'").fetchone() == ("PROCTOR",)
     assert con.execute("select join_code, join_open from exams where name='Kỳ thi cuối học kỳ'").fetchone() == ("DTC", 1)
     assert con.execute("select count(*) from candidates").fetchone()[0] == 2
-    again = subprocess.run(cmd[:10], capture_output=True, text=True, timeout=120)  # account + exam only, again
+    again = subprocess.run(cmd[:10], capture_output=True, text=True, encoding="utf-8", timeout=120)  # account + exam only, again
     assert again.returncode == 0 and "already existed" in again.stdout
 
 

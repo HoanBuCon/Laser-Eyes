@@ -210,3 +210,23 @@ def test_head_pose_batches_are_padded_to_a_few_fixed_sizes():
         batch = np.ones((n, 3, 2, 2), dtype=np.float32)
         padded = _pad_batch(batch)
         assert padded.shape[0] == size and padded[:n].sum() == batch.sum() and padded[n:].sum() == 0
+
+
+def test_pose_input_size_of_a_run_reaches_yolo():
+    """--imgsz / pose_imgsz used to be printed but never given to YOLO (always 1280)."""
+    import types
+
+    from classroom_monitor.detector import pose_detector_for
+
+    assert pose_detector_for(types.SimpleNamespace(pose_imgsz=960), allow_mock=True).config.pose_input_resolution == 960
+    assert pose_detector_for(types.SimpleNamespace(), allow_mock=True).config.pose_input_resolution == 1280
+
+
+def test_pipeline_can_be_imported_first():
+    """classroom_monitor.pipeline -> demo.config -> demo/__init__ -> runner -> pipeline used to be a cycle."""
+    import subprocess
+    import sys
+
+    for module in ("classroom_monitor.pipeline", "classroom_monitor.demo"):
+        out = subprocess.run([sys.executable, "-c", f"import {module}"], capture_output=True, text=True, timeout=120)
+        assert out.returncode == 0, out.stderr[-800:]

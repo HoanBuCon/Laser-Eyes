@@ -21,7 +21,7 @@ Mục tiêu của đợt này: đưa phân tích VIGIL One về Hub, xem trực 
 | Nhánh làm việc | `feat/one-server-analysis` — đã push, **chưa có PR, chưa merge** |
 | Nhánh gốc | `feat/vigil-one-hub` |
 | Commit gần nhất về code | `b13af81` Classroom LIVE: no fixed analysis rate |
-| Test | `516 passed, 1 warning` (Linux, Python 3.12, CPU, 2026-10-17). Warning SQLAlchemy cũ ở `test_demo_system_integration.py` |
+| Test | `516 passed, 1 warning` (Linux, Python 3.12, CPU, 2026-10-17); `516 passed` trên Windows, Python 3.11, RTX 4060 (2026-10-17, sau khi sửa bảng mã trong `test_single_entry.py`). Warning SQLAlchemy cũ ở `test_demo_system_integration.py` |
 
 Xem lịch sử: `git log --oneline feat/vigil-one-hub..feat/one-server-analysis` (khoảng 21 commit).
 
@@ -58,18 +58,26 @@ Số đo trên máy chủ dự án (300 khung `classroom-01`, 33 ghế):
 | Ban đầu | ~10 | 0,34× |
 | Mọi khung, sau tối ưu | 19,9–21,1 | 0,66–0,70× |
 | Nhảy cố định 2 khung | 17,3 | 1,15× |
-| **Tự động (mặc định hiện tại)** | **chưa đo trên GPU** | dự kiến ~1,0× với ~20 khung/s |
+| **Tự động (mặc định hiện tại)** — đo 2026-10-17 trên RTX 4060 Laptop, 1800 khung | **15,9** (847/1800 khung bỏ vì trễ) | **1,00× ở trạng thái ổn định**; 0,93× cả lần chạy (gồm nạp model và ghi bằng chứng cuối) |
 
 Thời gian một khung (mọi khung): YOLO ~21 ms (tiền xử lý CPU 5–6, suy luận 10, hậu xử lý 1,7), tư thế đầu ~13 ms, vẽ ~3 ms. cuDNN benchmark + gom lô cố định đã thử, không có lợi → tắt mặc định.
 
 ## 4. Việc còn mở (ưu tiên từ trên xuống)
 
-1. **Đo chế độ tự động trên RTX 4060** để xác nhận ~20 khung/s, ~1,0×:
-   `venv\Scripts\python.exe scripts\run_demo_video.py --video classroom-01 --max-frames 300 --stride 0 --output-dir data\bench\auto`
+1. ~~Đo chế độ tự động trên RTX 4060~~ **Đã đo 2026-10-17:** theo kịp camera (1,00× ở trạng thái ổn định) với 15,9 khung phân tích/s, chưa đạt ~20 như dự kiến. Điều kiện: cắm sạc nhưng Windows ở chế độ nguồn *Balanced*, GPU có tải của ứng dụng khác. Một khung: YOLO 25,6 ms (tiền xử lý 7,3 / suy luận 12,3 / hậu xử lý 2,1), tư thế đầu 18–23 ms (bàn giao cũ: 13 ms), vẽ 4 ms. Đo lại ở chế độ hiệu năng cao nếu cần con số 20.
+   `venv\Scripts\python.exe scripts\run_demo_video.py --video classroom-01 --max-frames 1800 --stride 0 --output data\bench\auto`
+   Đo **ít nhất 60 s** (1800 khung): với 300 khung, nạp model và ghi bằng chứng cuối chiếm phần lớn thời gian, cho số thấp giả (0,71×). `runtime_profile.json` giờ có thêm `steady_realtime_factor` và `steady_analysed_fps` (từ khung phân tích đầu tiên tới khung cuối).
 2. **Nghiệm thu thủ công VIGIL One qua LAN** với ≥2 máy thí sinh thật: tham gia bằng mã, hình trực tiếp, mất mạng rồi gửi bù, nộp bài, duyệt tín hiệu, xem video cả bài thi. Phần này mới kiểm tra bằng test tự động và mô phỏng.
-3. **(Tùy chọn) tăng tốc YOLO**: thử `--imgsz 960` thay 1280 (giảm ~40% thời gian YOLO) nhưng phải kiểm tra không mất đầu nhỏ ở cuối phòng. Hướng xa hơn: TensorRT, tiền xử lý trên GPU.
+3. **(Tùy chọn) tăng tốc YOLO** — **đã thử 2026-10-17, giữ 1280.** Trước đó `--imgsz` / `pose_imgsz` chỉ được in ra, YOLO luôn chạy 1280 (đã sửa: `classroom_monitor.detector.pose_detector_for`, dùng cho cả CLI và LIVE). Kết quả 1800 khung `classroom-01`, chế độ tự động:
+
+   | `--imgsz` | Khung phân tích/s | YOLO ms | Ghế có người | Đầu cắt/chu kỳ | Episode |
+   |---|---|---|---|---|---|
+   | 1280 (mặc định) | 15,9 | 25,6 | **15**/33 | 8,3 | 337 |
+   | 960 | 20,7 | 20,9 | **10**/33 | 5,1 | 255 |
+
+   960 nhanh hơn ~30% nhưng mất 1/3 số thí sinh (đầu nhỏ ở cuối phòng) → không dùng. Hướng còn lại: TensorRT, tiền xử lý trên GPU.
 4. **Chất lượng AI** vẫn như báo cáo cũ (precision India 2,58%): chỉ dùng để ưu tiên rà soát; cần thêm ground truth trước khi công bố số liệu.
-5. **Nợ kỹ thuật biết trước**: import `classroom_monitor.pipeline` đầu tiên gây vòng import (có từ trước, chưa sửa); ruff báo ~200 lỗi cũ (chủ yếu import thừa) — không thuộc đợt này.
+5. **Nợ kỹ thuật biết trước**: ~~import `classroom_monitor.pipeline` đầu tiên gây vòng import~~ (đã sửa 2026-10-17: `DemoVideoConfig` chỉ import khi kiểm tra kiểu; có test); ruff báo ~200 lỗi cũ (chủ yếu import thừa) — không thuộc đợt này.
 6. **Mở PR** `feat/one-server-analysis` → nhánh tích hợp khi chủ dự án đồng ý.
 
 ## 5. Chạy và kiểm thử
@@ -119,6 +127,6 @@ Classroom LIVE cần ghế đã hiệu chỉnh ở `/calibration` (lưu trong DB
 ## 8. Lưu ý cho bên nhận
 
 - Đo hiệu năng trên laptop: cắm sạc, chế độ hiệu năng cao, đóng ứng dụng nặng; một lần đo 13 FPS từng là do máy chưa lên xung chứ không phải code.
-- Mỗi lần đo dùng `--output-dir` riêng, nếu không `runtime_profile.json` bị ghi đè.
+- Mỗi lần đo dùng `--output` riêng (tham số của `run_demo_video.py`), nếu không `runtime_profile.json` bị ghi đè.
 - Container đám mây không có GPU: số hiệu năng chỉ đo được trên máy có RTX.
 - Giữ nguyên tắc: tín hiệu ≠ kết luận; bookmark giám thị tách khỏi sự cố AI; SHA-256 chỉ là kiểm tra toàn vẹn file.

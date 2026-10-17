@@ -9,13 +9,12 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
 from classroom_monitor.behavior_pattern_engine import BehaviorPattern, BehaviorPatternEngine
-from classroom_monitor.demo.config import DemoVideoConfig
-from classroom_monitor.detector import PoseClassroomDetector
+from classroom_monitor.detector import PoseClassroomDetector, pose_detector_for
 from classroom_monitor.head_pose_provider import (
     AdaptiveYawBaseline,
     HeadOffsetBaseline,
@@ -30,6 +29,9 @@ from classroom_monitor.scene_context import CapabilityStatus, SceneProfile, Seat
 from classroom_monitor.seat_manager import SeatManager, SeatState
 from classroom_monitor.seat_risk_tracker import SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import TemporalEpisode, TemporalEpisodeEngine
+
+if TYPE_CHECKING:  # type only: importing classroom_monitor.demo here closes an import cycle
+    from classroom_monitor.demo.config import DemoVideoConfig
 
 
 @dataclass
@@ -96,10 +98,7 @@ class SRSv2Pipeline:
         self.runtime_config = runtime_config
         self.seat_graph = seat_graph
         self.seat_manager = seat_manager
-        self.detector = detector or PoseClassroomDetector(
-            confidence_threshold=config.pose_conf,
-            allow_mock=config.allow_mock,
-        )
+        self.detector = detector or pose_detector_for(config, allow_mock=config.allow_mock)
         self.detector.ensure_available()
         self.head_provider = head_provider or create_head_pose_provider(config.head_provider)
         self.observation_extractor = observation_extractor or ObservationExtractor(

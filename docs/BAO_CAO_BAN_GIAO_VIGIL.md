@@ -1,6 +1,6 @@
 # Báo cáo bàn giao dự án VIGIL AI
 
-> **Tài liệu lịch sử (2026-10-06).** Số test, nhánh, commit và preset (India/Student) dưới đây là của lần bàn giao đó.
+> **Tài liệu lịch sử (2026-10-06).** Hiện trạng mới nhất: `docs/BAN_GIAO_HIEN_TRANG.md`. Số test, nhánh, commit và preset (India/Student) dưới đây là của lần bàn giao đó.
 > Trạng thái hiện tại: `README.md` và `docs/DEMO_RUNBOOK_VIGIL_HUB.md` trên nhánh `feat/one-server-analysis`
 > (preset `classroom-01..03`, hiệu chỉnh ghế từ database, khởi động bằng `python vigil.py`).
 

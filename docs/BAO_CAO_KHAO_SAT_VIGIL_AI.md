@@ -71,7 +71,7 @@ Bên cạnh đó có một số khoảng trống nền tảng: chưa có chính 
 
 **Hai pipeline Classroom cùng tồn tại:**
 - **SRS v2** (`classroom_monitor/pipeline/srs_v2_pipeline.py`) được dùng cho LIVE.
-- **Pipeline cũ** (`video_processor`, `event_engine`, `behavior_tracker`, `score_accumulator`, `live_event`, `room_context`) vẫn được nạp qua `api/routes/inference.py` (`/inference/start`, `/inference/upload`). Giao diện không còn gọi tới các endpoint này.
+- **Pipeline cũ** (`video_processor`, `event_engine`, `behavior_tracker`, `score_accumulator`, `live_event`, `room_context`) vẫn được nạp qua `api/routes/inference.py` (`/inference/start`, `/inference/upload`). Giao diện không còn gọi tới các endpoint này, và chúng **đã bị tắt mặc định** (trả 410 trừ khi đặt `VIGIL_ENABLE_LEGACY_INFERENCE=1`). Rủi ro thấp, chỉ còn là mã thừa.
 
 ---
 
@@ -193,7 +193,7 @@ Bên cạnh đó có một số khoảng trống nền tảng: chưa có chính 
 
 ## 4. Lộ trình đề xuất
 
-**Giai đoạn A: An toàn và nền tảng (1–2 tuần)**
+**Giai đoạn A: An toàn và nền tảng (1–2 tuần)** — *đã làm trên nhánh `feat/phase-a-foundation` (2026-10-24), xem mục 6*
 - Thời hạn lưu dữ liệu và tác vụ dọn (P0).
 - Bật xác thực khi mở mạng, kiểm tra vai trò ở API ghi (P0).
 - Tự đóng phiên One bỏ dở (P1).
@@ -244,3 +244,15 @@ Bên cạnh đó có một số khoảng trống nền tảng: chưa có chính 
 - Playback: video One, timeline đúng tỉ lệ.
 - Review: không tràn mã phòng hoặc mã thí sinh.
 - Báo cáo: không còn "110%" độ phủ ghế.
+
+---
+
+## 6. Cập nhật 2026-10-24: Giai đoạn A (nhánh `feat/phase-a-foundation`)
+
+| Mục | Trạng thái | Thay đổi |
+|---|---|---|
+| Thời hạn lưu dữ liệu (P0) | ✅ | `storage/retention.py`: xóa media sau `VIGIL_RETENTION_DAYS` (mặc định 90), giữ bản ghi, giữ phiên có vi phạm đã xác nhận, chỉ xóa trong thư mục dữ liệu. Chạy tự động mỗi 6 giờ. Có thẻ "Data retention" ở trang Hệ thống. Thí sinh thấy thời hạn ở màn hình đồng ý. |
+| Phân quyền API ghi (P0) | ✅ | `writes_need` cho 10 router: cấu hình phòng cần CHIEF, vận hành cần PROCTOR, công cụ dữ liệu cần ADMIN. Hub nghe ngoài loopback thì tự bật `VIGIL_AUTH_MODE=required`. |
+| Phiên One bỏ dở (P1) | ✅ | Watchdog đóng phiên im lặng quá `VIGIL_ONE_ABANDON_MINUTES` (mặc định 15): tín hiệu `ONE_ABANDONED`, phân tích nốt, ghép video. |
+| Camera trùng (P1) | ✅ | Sửa script tạo trùng; `merge_duplicate_cameras` chạy khi khởi động (CSDL thật: 56 → 13 camera, giữ nguyên 140 ghế). |
+| CI (P1) | ✅ | `.github/workflows/ci.yml`: pytest (CPU), ruff (lỗi nghiêm trọng), kiểm tra cú pháp JS. `requirements.txt` chuyển sang UTF-8 và cài được trực tiếp (thêm index CUDA 12.4). |

@@ -52,6 +52,28 @@ def require_roles(*roles: str, always: bool = False):
     return check
 
 
+READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def writes_need(*roles: str):
+    """Router dependency: anyone allowed in may read; changes need one of ``roles``.
+
+    Like :func:`require_roles` without ``always``: enforced in ``required`` mode
+    (any Hub opened to the network), not on the open local demo.
+    """
+
+    def check(request: Request, user: Optional[User] = Depends(current_user)) -> Optional[User]:
+        if request.method in READ_METHODS or auth_mode() != "required":
+            return user
+        if user is None:
+            raise HTTPException(status_code=401, detail="Sign in to continue.")
+        if not has_role(user, *roles):
+            raise HTTPException(status_code=403, detail=f"This needs the {' or '.join(roles)} role.")
+        return user
+
+    return check
+
+
 def actor_name(user: Optional[User], fallback: Optional[str] = None) -> str:
     """Name recorded in reviews and the audit log: the signed-in user wins."""
     if user is not None:

@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from api.auth import writes_need
 
 from api.dependencies import get_session_repo
 from api.schemas import SessionCreate, SessionResponse
 from storage.repositories import AuditLogRepository, SessionRepository
 from storage.database import get_db
 
-router = APIRouter(tags=["Exam Sessions"])
+router = APIRouter(tags=["Exam Sessions"], dependencies=[Depends(writes_need("PROCTOR"))])
 
 
 @router.post("/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)

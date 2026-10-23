@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from api.auth import writes_need
 from sqlalchemy.orm import Session
 
 from api.schemas import SeatBulkUpsertRequest, SeatCreate, SeatResponse, SeatUpdate
@@ -23,7 +24,7 @@ from storage.database import get_db
 from storage.db_models import Camera, ExamRoom
 from storage.repositories import SeatRepository
 
-router = APIRouter(tags=["Seats"])
+router = APIRouter(tags=["Seats"], dependencies=[Depends(writes_need("CHIEF"))])
 
 
 @router.get("/rooms/{room_id}/seats", response_model=List[SeatResponse])

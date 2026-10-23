@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from api.auth import writes_need
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db, get_event_repo, get_evidence_store, get_session_repo
@@ -39,7 +40,7 @@ router = APIRouter(
     prefix="/inference",
     tags=["Inference Engine (Legacy)"],
     deprecated=True,
-    dependencies=[Depends(require_legacy_inference_enabled)],
+    dependencies=[Depends(require_legacy_inference_enabled), Depends(writes_need("ADMIN"))],
 )
 
 # Active background runners tracking dict

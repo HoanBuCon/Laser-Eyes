@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from api.auth import writes_need
 
 from api.dependencies import get_room_repo
 from api.schemas import RoomCreate, RoomResponse, RoomUpdate
 from storage.repositories import RoomRepository
 
-router = APIRouter(tags=["Exam Rooms"])
+router = APIRouter(tags=["Exam Rooms"], dependencies=[Depends(writes_need("CHIEF"))])
 
 
 @router.post("/rooms", response_model=RoomResponse, status_code=status.HTTP_201_CREATED)

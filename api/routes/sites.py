@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from api.auth import writes_need
 
 from api.dependencies import get_site_repo
 from api.schemas import SiteCreate, SiteResponse
 from storage.repositories import SiteRepository
 
-router = APIRouter(prefix="/sites", tags=["Exam Sites"])
+router = APIRouter(prefix="/sites", tags=["Exam Sites"], dependencies=[Depends(writes_need("CHIEF"))])
 
 
 @router.post("/", response_model=SiteResponse, status_code=status.HTTP_201_CREATED)

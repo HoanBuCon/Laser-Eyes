@@ -13,7 +13,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.auth import actor_name, current_user
+from api.auth import actor_name, current_user, writes_need
 from storage.review_service import SessionClosed
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
@@ -33,7 +33,7 @@ from storage.proctor_service import (
     verify_bookmark_integrity,
 )
 
-router = APIRouter(prefix="/proctor", tags=["Human Proctor Support"])
+router = APIRouter(prefix="/proctor", tags=["Human Proctor Support"], dependencies=[Depends(writes_need("PROCTOR"))])
 
 
 class BookmarkCreateRequest(BaseModel):

@@ -25,7 +25,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.auth import actor_name, current_user
+from api.auth import actor_name, current_user, writes_need
 from api.realtime import realtime_manager
 from classroom_monitor.demo.paths import demo_final_root, demo_runs_root, replay_package_dir
 from classroom_monitor.demo.config import DEFAULT_PRESET, DEMO_PRESETS, get_demo_config
@@ -38,7 +38,7 @@ from storage.db_models import DetectionEvent
 from storage.review_service import ReviewCommand, ReviewTargetMissing, SessionClosed, submit_event_review
 
 logger = logging.getLogger("DemoRouter")
-router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"])
+router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"], dependencies=[Depends(writes_need("PROCTOR"))])
 
 
 class DemoStartRequest(BaseModel):

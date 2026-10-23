@@ -778,7 +778,7 @@ def proctor_mark(session_id: str, payload: ProctorMarkRequest, db: Session = Dep
 
 
 @router.post("/sessions/{session_id}/boost")
-def boost_live(session_id: str) -> dict[str, Any]:
+def boost_live(session_id: str, _user=Depends(require_roles("PROCTOR", "CHIEF", "ADMIN"))) -> dict[str, Any]:
     """A proctor opened this candidate: ask for a bigger, more frequent live picture for a minute."""
     online.boost(session_id)
     return {"boosted_for_seconds": online.BOOST_SECONDS}

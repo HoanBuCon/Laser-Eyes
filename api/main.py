@@ -86,20 +86,43 @@ async def lifespan(app: FastAPI):
 
     async def watch_one_connections():
         """Online exams: flag candidates whose VIGIL One went silent (every 10 s)."""
-        from storage.online_exam_service import check_connections
+        from storage import one_analysis as one_analysis_mod
+        from storage import one_video
+        from storage.db_models import ExamSession
+        from storage.online_exam_service import check_connections, close_abandoned
+
+        def session_provider():
+            db = SessionLocal()
+            try:
+                yield db
+            finally:
+                db.close()
 
         def check():
             session = SessionLocal()
             try:
-                return check_connections(session)
+                opened = check_connections(session)
+                closed = close_abandoned(session)
+                for session_id in closed:  # as if the candidate had stopped: last clips, then the whole video
+                    one_analysis_mod.notify(session_id)
+                    row = session.get(ExamSession, session_id)
+                    if row is not None and one_video.needs_merge(session, row):
+                        row.video_status = "MERGING"
+                        session.commit()
+                        one_video.merge_in_background(session_id, session_provider)
+                return opened, closed
             finally:
                 session.close()
 
         while True:
             await asyncio.sleep(10)
             try:
-                if await asyncio.to_thread(check):
+                opened, closed = await asyncio.to_thread(check)
+                if opened:
                     realtime_manager.broadcast_threadsafe({"type": "ONE_EVENTS", "reason": "connection_lost"})
+                if closed:
+                    logger.info("VIGIL One: closed %d abandoned session(s): %s", len(closed), ", ".join(closed))
+                    realtime_manager.broadcast_threadsafe({"type": "ONE_EVENTS", "reason": "abandoned", "sessions": closed})
             except Exception as exc:  # never let the watchdog take the server down
                 logger.warning("VIGIL One connection watchdog: %s", exc)
 

@@ -114,6 +114,33 @@ def test_silent_computer_raises_and_closes_offline_signal(client, db):  # noqa: 
     assert "trở lại" in json.loads(offline.incident_metadata_json)["reason"]
 
 
+def test_abandoned_session_is_closed_after_the_limit(client, db, monkeypatch):  # noqa: F811
+    _, code, _ = _exam(client, db)
+    headers = {"Authorization": f"Bearer {_join(client, code).json()['token']}"}
+    client.post("/api/v1/one/client/consent", headers=headers)
+    sid = _start(client, headers).json()["session"]["session_id"]
+    session = db.get(ExamSession, sid)
+    last = datetime.datetime.utcnow() - datetime.timedelta(minutes=8)
+    session.last_heartbeat_at = last
+    db.commit()
+    online.check_connections(db)  # the outage signal opens first
+    assert online.close_abandoned(db) == []  # 8 min < the 15 min default: still waiting for the computer
+    monkeypatch.setenv("VIGIL_ONE_ABANDON_MINUTES", "5")
+    assert online.close_abandoned(db) == [sid]
+    db.expire_all()
+    session = db.get(ExamSession, sid)
+    assert session.status == "COMPLETED" and abs((session.ended_at - last).total_seconds()) < 1
+    assert sorted(_signals(db, sid)) == ["ONE_ABANDONED", "ONE_CLIENT_OFFLINE"]
+    offline = db.query(DetectionEvent).filter(DetectionEvent.primary_signal == "ONE_CLIENT_OFFLINE").one()
+    assert offline.end_timestamp is not None  # the outage ends with the session
+    assert online.close_abandoned(db) == []  # closed once
+    # a session left INTERRUPTED by a Hub restart is closed the same way
+    other = db.get(ExamSession, sid)
+    other.status, other.last_heartbeat_at = "INTERRUPTED", last
+    db.commit()
+    assert online.close_abandoned(db) == [sid]
+
+
 @pytest.mark.parametrize("reason,expected", [("QUIT", ["ONE_LEFT_EARLY"]), ("SUBMITTED", [])])
 def test_leaving_without_submitting_is_flagged(client, db, reason, expected):  # noqa: F811
     _, code, _ = _exam(client, db)

@@ -251,7 +251,7 @@ async function renderDetail() {
     $('dTitle').textContent = `${row.candidate_code} · ${row.full_name || ''} · ${label}`;
     const live = session?.live || {};
     $('dReadings').textContent = session
-        ? `eyes ${live.eye || '—'} · head ${live.head || '—'} · people ${live.people ?? '—'} · ${live.fps ?? '—'} fps · last heartbeat ${session.seconds_since_heartbeat ?? '—'} s ago · ${analysisText(session)}${session.simulation ? ' · SIMULATION' : ''}`
+        ? `eyes ${live.eye || '—'} · head ${live.head || '—'} · people ${live.people ?? '—'} ${window.vigilDebug && window.vigilDebug.isOn() ? `· ${live.fps ?? '—'} fps ` : ''}· last heartbeat ${session.seconds_since_heartbeat ?? '—'} s ago · ${analysisText(session)}${session.simulation ? ' · SIMULATION' : ''}`
         : 'This candidate has not started yet.';
     if (session && stateOf(row) === 'LIVE') {
         if (Date.now() - state.detail.boostedAt > 50000) {

@@ -64,7 +64,7 @@
         <div class="vg-actions">
             <span id="modeBadge" class="vg-chip">MODE: <span id="modeText">LIVE AI ANALYSIS</span></span>
             <span id="stateBadge" class="vg-chip">STATUS: <span id="stateText">IDLE</span></span>
-            <span id="fpsBadge" class="vg-chip"><span id="fpsText">-- FPS (--x)</span></span>
+            <span id="fpsBadge" class="vg-chip debug-only"><span id="fpsText">-- FPS (--x)</span></span>
             <span id="wsBadge" class="vg-chip"><span class="ws-dot"></span><span id="wsText">LIVE WS</span></span>
             <a href="/review" class="vigil-btn vigil-btn--sm">Review queue</a>
         </div>
@@ -97,7 +97,7 @@
                 </div>
 
                 <label class="debug-toggle" title="Developer view: skeletons, all Seat ROIs and timing. Can be switched while running.">
-                    <input type="checkbox" id="chkDebugOverlay" onchange="toggleOverlay({ debug_overlay: this.checked })">
+                    <input type="checkbox" id="chkDebugOverlay" onchange="toggleOverlay({ debug_overlay: this.checked }); window.vigilDebug && window.vigilDebug.set(this.checked)">
                     <span>Debug</span>
                 </label>
                 <label class="debug-toggle" title="Show what each student is doing (head turn, posture, hands). Display only: does not change scores or incidents. Can be switched while running.">

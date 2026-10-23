@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import queue
 import threading
 import time
@@ -198,6 +199,8 @@ class ExamMonitorApp(tk.Tk):
             pass
         self._settings_path = DATA_DIR / "settings.json"
         self.settings = self._load_settings()
+        # Frame rates are developer details: shown only with VIGIL_DEBUG=1 or "debug": true in settings.json
+        self.debug_mode = os.environ.get("VIGIL_DEBUG") == "1" or bool(self.settings.get("debug"))
         self.theme_name = self.settings.get("theme", "light")
         if self.theme_name not in THEMES:
             self.theme_name = "light"
@@ -746,7 +749,8 @@ class ExamMonitorApp(tk.Tk):
         self.live_title = tk.Label(viewer_header, text="CAMERA CHƯA KHỞI ĐỘNG", bg=COLORS["surface"], fg=COLORS["text_muted"], font=FONTS["tiny"])
         self.live_title.pack(side="left", padx=(6, 0))
         self.fps_label = tk.Label(viewer_header, text="0.0 FPS", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["mono"])
-        self.fps_label.pack(side="right")
+        if self.debug_mode:
+            self.fps_label.pack(side="right")
         self.mic_label = tk.Label(viewer_header, text="MIC —", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["mono"])
         self.mic_label.pack(side="right", padx=(0, 14))
 
@@ -1921,7 +1925,8 @@ class ExamMonitorApp(tk.Tk):
         duration = session.duration_seconds
         self.report_session_label.configure(text=f"{session.session_id}  •  {session.candidate_id}  •  {session.exam_name}")
         self.report_meta.configure(
-            text=f"Thời lượng: {duration / 60:.1f} phút\nNguồn: {session.source_name}\nSự kiện: {len(session.events)}\nFPS trung bình: {session.average_fps:.1f}"
+            text=f"Thời lượng: {duration / 60:.1f} phút\nNguồn: {session.source_name}\nSự kiện: {len(session.events)}"
+            + (f"\nFPS trung bình: {session.average_fps:.1f}" if self.debug_mode else "")
         )
         counts = {Severity.LOW: 0, Severity.MEDIUM: 0, Severity.HIGH: 0}
         for event in session.events:

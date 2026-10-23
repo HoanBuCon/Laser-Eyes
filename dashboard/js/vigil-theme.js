@@ -59,6 +59,34 @@
 
   applyTheme(storedTheme() || preferredTheme(), false);
 
+  // Debug mode: frame rates and timings are for developers.  Elements with class
+  // "debug-only" show only while it is on.  Switched by the Live monitor's Debug box,
+  // or by opening any page with ?debug=1 (?debug=0 turns it off); remembered per browser.
+  const DEBUG_KEY = 'vigil-debug';
+
+  function storedDebug() {
+    try {
+      return window.localStorage.getItem(DEBUG_KEY) === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setDebug(on) {
+    root.classList.toggle('vigil-debug', Boolean(on));
+    try {
+      window.localStorage.setItem(DEBUG_KEY, on ? '1' : '0');
+    } catch (_) {
+      // Storage can be unavailable in hardened/private browser contexts.
+    }
+    document.dispatchEvent(new CustomEvent('vigil-debug', { detail: { on: Boolean(on) } }));
+  }
+
+  const debugParam = new URLSearchParams(window.location.search).get('debug');
+  if (debugParam === '1' || debugParam === '0') setDebug(debugParam === '1');
+  else root.classList.toggle('vigil-debug', storedDebug());
+  window.vigilDebug = { isOn: () => root.classList.contains('vigil-debug'), set: setDebug };
+
   document.addEventListener('DOMContentLoaded', () => {
     renderThemeControls(root.dataset.theme || 'dark');
     document.querySelectorAll('[data-theme-toggle]').forEach((button) => {

@@ -427,3 +427,6 @@ html[data-product="CLASSROOM"] [data-for-product="ONE"] { display: none !importa
 @media (max-width: 840px) {
   .vigil-product { flex: 0 0 auto; margin: 0 6px 0 0; }
 }
+
+/* Developer details (frame rates, timings): only in debug mode (vigil-theme.js) */
+html:not(.vigil-debug) .debug-only { display: none !important; }

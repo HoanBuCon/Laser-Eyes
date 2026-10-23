@@ -48,7 +48,8 @@
         const data = await api('/api/v1/exam-sessions?limit=300');
         const wanted = new URLSearchParams(location.search).get('session');
         const items = data.items.filter((s) => s.total_events > 0 || s.id === wanted || s.preset);
-        $('sessionSelect').innerHTML = items.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(s.room_code || '')} · ${s.total_events} incidents</option>`).join('');
+        const where = (s) => (s.product === 'ONE' ? `VIGIL One · ${s.subject_ref || s.subject_name || '—'}` : (s.room_code || ''));
+        $('sessionSelect').innerHTML = items.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(where(s))} · ${s.total_events} incidents</option>`).join('');
         if (wanted && items.some((s) => s.id === wanted)) $('sessionSelect').value = wanted;
         if ($('sessionSelect').value) await loadSession($('sessionSelect').value);
     }
@@ -123,16 +124,19 @@
         const tl = data.timeline;
         const seats = [...new Set(data.incidents.map((i) => i.seat_code).filter(Boolean))].sort();
         $('timelineNote').textContent = tl ? 'risk score per second · bars = incidents' : 'bars = incidents (no per-second risk recorded for this run)';
-        const W = 1000;
-        const LABEL = 56;
+        // Drawn at the box's real pixel width (a stretched viewBox would also stretch the labels)
+        const pad = parseFloat(getComputedStyle(box).paddingLeft) + parseFloat(getComputedStyle(box).paddingRight);
+        const W = Math.max(320, Math.floor((box.clientWidth || 1000) - (pad || 0)));
+        const LABEL = Math.max(56, 14 + 7.5 * Math.max(0, ...seats.map((code) => String(seat(code)).length)));
         const LANE = 22;
         const AXIS = 18;
         const H = AXIS + Math.max(1, seats.length) * LANE + 4;
         const x = (ms) => LABEL + (Math.max(0, ms) / state.durationMs) * (W - LABEL);
-        const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, class: 'pb-timeline-svg', preserveAspectRatio: 'none' });
+        const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, class: 'pb-timeline-svg' });
 
-        // Axis: a tick every minute (or 10 s for short videos)
-        const step = state.durationMs > 120000 ? 60000 : 10000;
+        // Axis: ticks at least ~90 px apart (10 s, 30 s, 1 min, 5 min ...)
+        const pxPerMs = (W - LABEL) / state.durationMs;
+        const step = [10000, 30000, 60000, 120000, 300000, 600000, 1800000].find((s) => s * pxPerMs >= 90) || 3600000;
         for (let t = 0; t <= state.durationMs; t += step) {
             svg.append(svgEl('line', { x1: x(t), x2: x(t), y1: AXIS - 4, y2: H, class: 'pb-grid' }));
             svg.append(svgEl('text', { x: x(t) + 2, y: 11, class: 'pb-axis' }, clock(t)));
@@ -252,6 +256,13 @@
         if (event.key === 'ArrowLeft') $('backBtn').click();
         if (event.key === 'ArrowRight') $('fwdBtn').click();
     });
+
+    // Redraw the timeline at the new width when the window (or the layout) changes size
+    let resizeTimer = null;
+    new ResizeObserver(() => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => { if (state.data) renderTimeline(); }, 150);
+    }).observe($('timeline'));
 
     loadSessionOptions().catch((err) => { $('incidentList').innerHTML = `<div class="vg-empty">${esc(err.message)}</div>`; });
     requestAnimationFrame(draw);

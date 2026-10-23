@@ -23,6 +23,7 @@ from typing import Any, Optional
 MAX_FRAME_BYTES = 1024 * 1024
 VIEWER_TTL_SECONDS = 6.0     # a viewer that stopped asking for frames no longer costs an overlay
 STALE_SECONDS = 5.0          # no frame for this long = the stream is down
+ANNOTATED_MAX_AGE_S = 1.5    # an analysed picture this recent is shown instead of the raw one
 AHEAD_TOLERANCE_S = 2.0      # the app's clock may not run ahead of the Hub's by more than this
 START_TOLERANCE_MS = 60_000  # first frame: at most this far past the time elapsed since the session began
 
@@ -42,6 +43,7 @@ class _Slot:
     taken_seq: int = 0               # newest frame the analysis has taken
     annotated: Optional[bytes] = None
     annotated_seq: int = 0
+    annotated_at: float = 0.0
     viewers_until: float = 0.0
     received: list[float] = field(default_factory=list)   # arrival times over the last seconds (fps)
     analysed: list[float] = field(default_factory=list)
@@ -125,7 +127,7 @@ def analysed(session_id: str, frame: Frame, annotated: Optional[bytes]) -> None:
         slot = _slot(session_id)
         slot.analysed = _recent(slot.analysed, now) + [now]
         if annotated is not None and frame.seq >= slot.annotated_seq:
-            slot.annotated, slot.annotated_seq = annotated, frame.seq
+            slot.annotated, slot.annotated_seq, slot.annotated_at = annotated, frame.seq, now
 
 
 def disconnected(session_id: str) -> None:
@@ -157,8 +159,10 @@ def view(session_id: str, after_seq: int = 0, annotated: bool = True) -> Optiona
         frame = slot.latest
         if frame is None or now - frame.received > STALE_SECONDS:
             return None
-        # The annotated copy lags one analysis behind; use it unless it is clearly older
-        if annotated and slot.annotated is not None and frame.seq - slot.annotated_seq <= 3:
+        # The annotated copy lags one analysis behind. Keep showing it while it is recent, even when the
+        # analysis runs a few frames behind a busy Hub: falling back to raw frames then made the drawing
+        # (face box, gaze) flicker on and off for the proctor
+        if annotated and slot.annotated is not None and now - slot.annotated_at <= ANNOTATED_MAX_AGE_S:
             seq, data = slot.annotated_seq, slot.annotated
         else:
             seq, data = frame.seq, frame.jpeg

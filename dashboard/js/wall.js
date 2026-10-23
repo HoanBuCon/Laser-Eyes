@@ -61,10 +61,25 @@ async function loadSources() {
         const res = await fetch('/api/v1/demo/presets');
         if (res.ok) presets = await res.json();
     } catch (e) { /* offline */ }
+    // Finished VIGIL One sessions whose full recording is on the Hub
+    let oneRecorded = [];
+    try {
+        const res = await fetch('/api/v1/one/sessions?active_only=false');
+        if (res.ok) oneRecorded = (await res.json()).filter((s) => s.video_url);
+    } catch (e) { /* offline */ }
     sourceOptions = [
         ...presets.map((p) => ({ id: `preset:${p.name}`, label: `${p.title} · replay`, preset: p.name })),
         { id: 'live', label: 'Live analysis stream' },
         ...Array.from({ length: 9 }, (_, k) => ({ id: `one-slot:${k}`, label: `VIGIL One · candidate #${k + 1} (auto)` })),
+        ...oneRecorded.map((s) => ({
+            id: `one-rec:${s.session_id}`,
+            label: `VIGIL One · ${s.candidate_ref || s.candidate_name || s.session_id.slice(0, 8)} · ${s.started_at
+                ? new Date(/Z|[+-]\d\d:\d\d$/.test(s.started_at) ? s.started_at : `${s.started_at}Z`)
+                    .toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                : 'recording'}`,
+            videoUrl: s.video_url,
+            tag: `ONE · ${s.candidate_ref || 'REC'}`,
+        })),
         { id: '', label: '— empty —' },
     ];
     const defaults = [...presets.map((p) => `preset:${p.name}`), 'live'];
@@ -94,6 +109,7 @@ function setStatus(tile, text, tone = '') {
 }
 
 function clearMedia(tile) {
+    tile.replayLabel = '';
     tile.video.pause();
     tile.video.removeAttribute('src');
     tile.video.load();
@@ -120,6 +136,16 @@ async function assignSource(tile, sourceId) {
         tile.empty.hidden = false;
         tile.empty.textContent = 'Waiting for a VIGIL One candidate';
         pollOne();
+        return;
+    }
+    if (sourceId.startsWith('one-rec:')) {
+        const option = sourceOptions.find((o) => o.id === sourceId);
+        tile.video.hidden = false;
+        tile.video.src = option ? option.videoUrl : `/api/v1/one/sessions/${sourceId.slice(8)}/video/file`;
+        tile.replayLabel = option ? option.tag : 'ONE · REC';
+        tile.frameSize = [1, 1]; // no boxes to draw; lets the clock and status tick
+        if (!state.paused) tile.video.play().catch(() => {});
+        setStatus(tile, tile.replayLabel);
         return;
     }
     if (sourceId === 'live') {
@@ -233,7 +259,7 @@ function drawBoxes(tile) {
     if (tile.status.textContent !== 'VIDEO ERROR') {
         if (flaggedCount) setStatus(tile, `${flaggedCount} FLAGGED${suspectCount ? ` · ${suspectCount} SUSPECT` : ''}`, 'danger');
         else if (suspectCount) setStatus(tile, `${suspectCount} SUSPECT`, 'warning');
-        else setStatus(tile, tile.video.paused ? 'PAUSED' : 'REPLAY');
+        else setStatus(tile, tile.video.paused ? 'PAUSED' : (tile.replayLabel || 'REPLAY'));
     }
     if (key === tile.lastDrawKey) return;
     tile.lastDrawKey = key;
@@ -311,12 +337,19 @@ async function pollOne() {
     oneTiles.forEach((tile) => {
         const session = sessions[Number(tile.source.split(':')[1])];
         if (!session) {
+            tile.oneSession = null;
             tile.img.hidden = true;
             tile.empty.hidden = false;
             tile.empty.textContent = 'Waiting for a VIGIL One candidate';
             tile.time.textContent = '';
             setStatus(tile, 'VIGIL ONE');
             return;
+        }
+        // The slot now shows another candidate: never leave the previous one's picture under this label
+        if (tile.oneSession !== session.session_id) {
+            tile.oneSession = session.session_id;
+            tile.img.removeAttribute('src');
+            tile.img.hidden = true;
         }
         const live = session.live || {};
         const lost = session.connection !== 'LIVE';
@@ -325,9 +358,20 @@ async function pollOne() {
         setStatus(tile, lost ? `${label} · CONNECTION LOST` : (signals ? `${label} · ${signals} SIGNALS` : label), lost ? 'danger' : (signals ? 'warning' : 'good'));
         tile.time.textContent = [live.eye && `Eyes ${live.eye}`, live.head && `Head ${live.head}`, live.people !== undefined && `${live.people} person(s)`]
             .filter(Boolean).join(' · ');
-        if (!lost) {
+        // Debug mode: the live stream with the analysis drawn on it (face box, gaze), as on One monitor
+        const debug = Boolean(window.vigilDebug && window.vigilDebug.isOn());
+        if (!lost && debug) {
+            const stream = `/api/v1/one/sessions/${encodeURIComponent(session.session_id)}/live.mjpg?overlay=1`;
+            if (!tile.img.src.includes(stream)) {
+                tile.img.src = `${stream}&t=${Date.now()}`;
+                tile.img.hidden = false;
+                tile.empty.hidden = true;
+            }
+        } else if (!lost) {
             const next = new Image();
+            const sid = session.session_id;
             next.onload = () => {
+                if (tile.oneSession !== sid) return; // a picture of a candidate this slot no longer shows
                 tile.img.src = next.src;
                 tile.img.hidden = false;
                 tile.empty.hidden = true;

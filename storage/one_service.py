@@ -650,4 +650,7 @@ def serialize_live(session: ExamSession) -> dict[str, Any]:
         "started_at": session.started_at.isoformat() if session.started_at else None,
         "live": live,
         "thumbnail_url": f"/api/v1/one/sessions/{session.id}/thumbnail",
+        "video_status": session.video_status or "NONE",
+        "video_url": (f"/api/v1/one/sessions/{session.id}/video/file"
+                      if session.video_status in ("READY", "PARTIAL") else None),
     }

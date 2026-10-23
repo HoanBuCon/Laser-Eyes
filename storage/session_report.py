@@ -40,6 +40,8 @@ def build_session_report(db: Session, session: ExamSession, serialize: Callable[
     )
     seats = db.query(SeatROI).filter(SeatROI.room_id == session.room_id, SeatROI.enabled == True).count()  # noqa: E712
     capacity = int(room.capacity or 0) if room else 0
+    if capacity and seats > capacity:
+        capacity = seats  # the declared capacity was never updated: the calibrated seats are there (no "110 %")
 
     by_status = {state: 0 for state in REVIEW_STATES}
     by_pattern: Dict[str, Dict[str, int]] = {}

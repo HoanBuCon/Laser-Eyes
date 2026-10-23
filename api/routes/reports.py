@@ -45,6 +45,17 @@ def _session(db: Session, session_id: str) -> ExamSession:
 
 # --- Playback ----------------------------------------------------------------------
 
+def _video_size(path: Path) -> Optional[list]:
+    import cv2
+
+    cap = cv2.VideoCapture(str(path))
+    try:
+        w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    finally:
+        cap.release()
+    return [w, h] if w and h else None
+
+
 @router.get("/exam-sessions/{session_id}/playback")
 def session_playback(session_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Everything the playback page draws: video sources, incidents and the seat timeline."""
@@ -84,14 +95,22 @@ def session_playback(session_id: str, db: Session = Depends(get_db)) -> Dict[str
         if "x" in res:
             frame_size = [int(v) for v in res.split("x")]
     source_ok = bool(preset and Path(DEMO_PRESETS[preset]["video_path"]).is_file())
+    source_url = f"/api/v1/demo/presets/{preset}/source" if source_ok else None
+    if session.product == "ONE":
+        # VIGIL One: the whole-exam video the Hub joined from the candidate's segments
+        video_file = Path(session.video_path or "")
+        if session.video_status in ("READY", "PARTIAL") and video_file.is_file():
+            source_url = f"/api/v1/one/sessions/{session.id}/video/file"
+            frame_size = frame_size or _video_size(video_file)
     rendered = artifacts / "result.mp4" if artifacts else None
     room = db.get(ExamRoom, session.room_id)
     return {
         "session": {"id": session.id, "name": session.exam_name, "status": session.status,
-                    "room_code": room.room_code if room else None,
+                    "room_code": room.room_code if room else None, "product": session.product,
+                    "subject_ref": session.subject_ref,
                     "started_at": session.started_at.isoformat() if session.started_at else None},
         "video": {
-            "source_url": f"/api/v1/demo/presets/{preset}/source" if source_ok else None,
+            "source_url": source_url,
             "rendered_url": f"/api/v1/exam-sessions/{session.id}/playback/rendered" if rendered and rendered.is_file() else None,
         },
         "frame_size": frame_size,

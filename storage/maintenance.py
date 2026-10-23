@@ -260,3 +260,55 @@ def reset_incident_data(db: Session) -> Dict[str, int]:
         db.rollback()
         raise
     return counts
+
+
+def normalise_source_uri(uri: Optional[str]) -> Optional[str]:
+    """A file path with forward slashes (a Windows path and the same path with "/" are one camera);
+    device indexes and stream URLs are left alone."""
+    if not uri or "://" in uri or uri.isdigit():
+        return uri
+    return uri.replace("\\", "/")
+
+
+def merge_duplicate_cameras(db: Session) -> Dict[str, int]:
+    """Merge cameras of the same room with the same name into one.
+
+    A calibration script used to create a new camera on every run (it looked one up by a fixed id
+    the camera never had), leaving dozens of identical rows.  The camera kept is the one most
+    referenced (Seat ROIs first, then sessions); seats, sessions and incidents of the others are
+    moved to it.  File paths are normalised to forward slashes on the way.  Idempotent.
+    """
+    cameras = db.query(Camera).all()
+    groups: Dict[Tuple[str, str], List[Camera]] = {}
+    for cam in cameras:
+        groups.setdefault((cam.room_id, (cam.name or "").strip()), []).append(cam)
+    merged = normalised = 0
+    try:
+        for cams in groups.values():
+            if len(cams) > 1:
+                def weight(cam: Camera) -> Tuple[int, int, str]:
+                    seats = db.query(SeatROI).filter(SeatROI.camera_id == cam.id).count()
+                    sessions = db.query(ExamSession).filter(ExamSession.camera_id == cam.id).count()
+                    return (seats, sessions, cam.id)
+
+                keep, *others = sorted(cams, key=weight, reverse=True)
+                ids = [cam.id for cam in others]
+                for model in (SeatROI, ExamSession, DetectionEvent):
+                    db.query(model).filter(model.camera_id.in_(ids)).update(
+                        {model.camera_id: keep.id}, synchronize_session=False)
+                for cam in others:
+                    db.delete(cam)
+                merged += len(others)
+                cams = [keep]
+            for cam in cams:
+                for attr in ("source_uri", "rtsp_url_protected"):
+                    value = getattr(cam, attr)
+                    clean = normalise_source_uri(value)
+                    if clean != value:
+                        setattr(cam, attr, clean)
+                        normalised += 1
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    return {"merged": merged, "normalised": normalised}

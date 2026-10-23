@@ -528,7 +528,7 @@ class DemoRuntime:
                 camera = Camera(
                     room_id=room.id,
                     name=demo_cfg.camera_id,
-                    source_uri=str(demo_cfg.video_path),
+                    source_uri=Path(demo_cfg.video_path).as_posix(),
                     status="online",
                 )
                 db.add(camera)

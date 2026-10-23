@@ -72,8 +72,6 @@ async def lifespan(app: FastAPI):
         db.close()
     loop = asyncio.get_running_loop()
     realtime_manager.set_event_loop(loop)
-    runtime = DemoRuntime.get_instance()
-
     def publish_event(_event, payload):
         realtime_manager.broadcast_threadsafe({"type": "REVIEW_INCIDENT", "event": payload})
 
@@ -81,8 +79,9 @@ async def lifespan(app: FastAPI):
         payload = status.to_dict() if hasattr(status, "to_dict") else dict(status)
         realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": payload})
 
-    runtime.register_event_callback(publish_event)
-    runtime.register_status_callback(publish_status)
+    # Every room's runtime (Classroom LIVE runs several rooms at once) publishes to the web
+    DemoRuntime.register_global_callback("event", publish_event)
+    DemoRuntime.register_global_callback("status", publish_status)
 
     async def watch_one_connections():
         """Online exams: flag candidates whose VIGIL One went silent (every 10 s)."""
@@ -164,8 +163,8 @@ async def lifespan(app: FastAPI):
         watchdog.cancel()
         retention.cancel()
         one_analysis.stop_service()
-        runtime.unregister_event_callback(publish_event)
-        runtime.unregister_status_callback(publish_status)
+        DemoRuntime.unregister_global_callback("event", publish_event)
+        DemoRuntime.unregister_global_callback("status", publish_status)
         realtime_manager.clear_event_loop(loop)
         logger.info("Shutting down VIGIL AI server...")
 

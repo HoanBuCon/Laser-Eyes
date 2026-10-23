@@ -54,9 +54,10 @@ class AdminAction(BaseModel):
     actor: Optional[str] = Field(None, description="Who performed the action (audit log)")
 
 
-def _orphan_runs(db: Session, active_run_id: str):
-    # Replay packages refer to clips inside run folders; those runs are kept too
-    return orphan_run_dirs(db, demo_runs_root(), active_run_id, also_keep=run_ids_in_files(demo_final_root()))
+def _orphan_runs(db: Session, active_run_ids):
+    # Replay packages refer to clips inside run folders; those runs are kept too, as are running ones
+    keep = run_ids_in_files(demo_final_root()) | set(active_run_ids)
+    return orphan_run_dirs(db, demo_runs_root(), "", also_keep=keep)
 
 
 def _demo_room_codes():
@@ -64,9 +65,15 @@ def _demo_room_codes():
 
 
 def _active_run() -> Dict[str, Any]:
-    status = DemoRuntime.get_instance().get_status()
-    busy = status.get("state") in (DemoState.RUNNING.value, DemoState.PAUSED.value)
-    return {"busy": busy, "run_id": status.get("run_id") or "", "state": status.get("state")}
+    """Busy while any room is analysed (several rooms can run at once)."""
+    running = [rt.get_status() for rt in DemoRuntime.all_rooms().values() if rt.is_active()]
+    if not running and DemoRuntime.get_instance().is_active():
+        running = [DemoRuntime.get_instance().get_status()]
+    states = {s.get("state") for s in running}
+    state = DemoState.RUNNING.value if DemoState.RUNNING.value in states else (states.pop() if states else DemoState.IDLE.value)
+    return {"busy": bool(running), "run_id": running[0].get("run_id") if running else "",
+            "run_ids": [s.get("run_id") for s in running if s.get("run_id")], "state": state,
+            "rooms": [s.get("room_code") for s in running]}
 
 
 # Destructive maintenance: an administrator, signed in, in every auth mode
@@ -136,7 +143,7 @@ def overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Database rows, disk usage and what each cleanup would remove."""
     active = _active_run()
     runs_root = demo_runs_root()
-    orphans = _orphan_runs(db, active["run_id"])
+    orphans = _orphan_runs(db, active["run_ids"])
     run_count = len([d for d in runs_root.iterdir() if d.is_dir()]) if runs_root.is_dir() else 0
     plan = plan_test_room_cleanup(db, keep_room_codes=_demo_room_codes())
     return {
@@ -184,7 +191,7 @@ def cleanup_test_rooms(payload: AdminAction, db: Session = Depends(get_db), user
 def cleanup_orphan_runs(payload: AdminAction, db: Session = Depends(get_db), user=Depends(ADMIN_ONLY)) -> Dict[str, Any]:
     """Delete demo run folders that no incident in the database refers to."""
     _guard("orphan-runs", payload, db)
-    orphans = _orphan_runs(db, _active_run()["run_id"])
+    orphans = _orphan_runs(db, _active_run()["run_ids"])
     freed = sum(directory_size(d)[0] for d in orphans)
     result = {"runs": remove_directories(orphans), "bytes": freed}
     _audit(db, user, "orphan-runs", result)
@@ -221,7 +228,8 @@ def reset_incidents(payload: AdminAction, db: Session = Depends(get_db), user=De
     _guard("reset-incidents", payload, db)
     backup = _backup()
     counts = reset_incident_data(db)
-    DemoRuntime.get_instance().reset()
+    for runtime in {DemoRuntime.get_instance(), *DemoRuntime.all_rooms().values()}:
+        runtime.reset()
     result = {**counts, "backup": backup}
     _audit(db, user, "reset-incidents", result)
     return result

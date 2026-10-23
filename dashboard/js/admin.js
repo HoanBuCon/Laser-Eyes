@@ -10,6 +10,7 @@ const ACTIONS = {
     'test-rooms': { title: 'Remove test rooms', url: `${API}/cleanup/test-rooms` },
     'orphan-runs': { title: 'Purge unused run folders', url: `${API}/cleanup/orphan-runs` },
     'playback-cache': { title: 'Clear playback cache', url: `${API}/cleanup/playback-cache` },
+    retention: { title: 'Delete media past its retention time', url: `${API}/cleanup/retention` },
     'reset-incidents': { title: 'Reset all sessions and incidents', url: `${API}/reset/incidents` },
 };
 let overview = null;
@@ -54,6 +55,10 @@ function describe(action) {
             return `${c.test_rooms.rooms} rooms, ${c.test_rooms.sessions} sessions, ${c.test_rooms.incidents} incidents will be deleted.`;
         case 'orphan-runs':
             return `${c.orphan_runs.runs} run folders (${formatBytes(c.orphan_runs.bytes)}) will be deleted from disk.`;
+        case 'retention':
+            return c.retention.days
+                ? `Media of ${c.retention.due_sessions} sessions (${formatBytes(c.retention.due_bytes)}) will be deleted from disk. Their incidents, decisions and reports stay.`
+                : 'Retention is off.';
         case 'playback-cache':
             return `${overview.storage.playback_cache.files} cached files (${formatBytes(overview.storage.playback_cache.bytes)}) will be deleted.`;
         case 'reset-incidents':
@@ -96,6 +101,11 @@ function render(data) {
         : 'Nothing to remove.';
     const orphan = data.cleanup.orphan_runs;
     $('previewOrphanRuns').textContent = orphan.runs ? `${orphan.runs} folders · ${formatBytes(orphan.bytes)}` : 'Nothing to purge.';
+    const ret = data.cleanup.retention;
+    $('previewRetention').textContent = !ret.days
+        ? 'Off (VIGIL_RETENTION_DAYS=0): media is kept for ever.'
+        : `${ret.days} days · due now: ${ret.due_sessions} sessions (${formatBytes(ret.due_bytes)})`
+          + (ret.held_sessions ? ` · ${ret.held_sessions} kept for a confirmed incident` : '');
     $('previewCache').textContent = `${s.playback_cache.files} files · ${formatBytes(s.playback_cache.bytes)}`;
     $('previewReset').textContent = describe('reset-incidents');
 

@@ -318,7 +318,10 @@ class CandidateApp(tk.Tk):
         box = tk.Text(text_row, height=6, wrap="word", bg=COLORS["surface"], fg=COLORS["text"], relief="solid", bd=1,
                       font=FONTS["body"], padx=14, pady=12, yscrollcommand=scroll.set)
         scroll.configure(command=box.yview)
-        box.insert("1.0", CONSENT_TEXT + ("" if self.policy.get("microphone", True) else "\n\nKỳ thi này không dùng micro."))
+        days = self.policy.get("retention_days")
+        keep = (f"\n\nVideo, ảnh và đoạn ghi hình của buổi thi được lưu {days} ngày sau khi buổi thi kết thúc rồi tự xóa; "
+                "chỉ bằng chứng của vi phạm đã được giám thị xác nhận được giữ lâu hơn." if days else "")
+        box.insert("1.0", CONSENT_TEXT + keep + ("" if self.policy.get("microphone", True) else "\n\nKỳ thi này không dùng micro."))
         box.configure(state="disabled")
         scroll.pack(side="right", fill="y")
         box.pack(side="left", fill="both", expand=True)

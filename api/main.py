@@ -128,6 +128,27 @@ async def lifespan(app: FastAPI):
 
     watchdog = asyncio.create_task(watch_one_connections())
 
+    async def apply_retention_periodically():
+        """Media past VIGIL_RETENTION_DAYS is deleted: 2 minutes after start, then every 6 hours."""
+        from storage.retention import run_retention
+
+        def run():
+            db = SessionLocal()
+            try:
+                return run_retention(db)
+            finally:
+                db.close()
+
+        await asyncio.sleep(120)
+        while True:
+            try:
+                await asyncio.to_thread(run)
+            except Exception as exc:  # never let retention take the server down
+                logger.warning("Retention: %s", exc)
+            await asyncio.sleep(6 * 3600)
+
+    retention = asyncio.create_task(apply_retention_periodically())
+
     # VIGIL One sessions in analysis_mode SERVER are analysed here, next to Classroom
     from storage import one_analysis
 
@@ -141,6 +162,7 @@ async def lifespan(app: FastAPI):
         yield
     finally:
         watchdog.cancel()
+        retention.cancel()
         one_analysis.stop_service()
         runtime.unregister_event_callback(publish_event)
         runtime.unregister_status_callback(publish_status)

@@ -33,6 +33,7 @@ from storage.db_models import ClientDevice, ExamSession
 from storage import one_service as one
 from storage import online_exam_service as online
 from storage import one_analysis, one_live, one_video
+from storage.retention import retention_days
 from storage.db_models import Exam
 from storage.proctor_service import serialize_bookmark
 
@@ -474,7 +475,8 @@ def join_exam(payload: JoinRequest, db: Session = Depends(get_db)) -> dict[str, 
         "exam": {"id": exam.id, "name": exam.name, "subject_code": exam.subject_code, "exam_date": exam.exam_date},
         "candidate": {"code": candidate.candidate_code, "full_name": candidate.full_name,
                       "consent_given": candidate.consent_at is not None},
-        "policy": online.policy_for(exam),
+        # How long the exam's videos and pictures are kept: shown to the candidate before consent
+        "policy": {**online.policy_for(exam), "retention_days": retention_days()},
     }
 
 

@@ -234,11 +234,13 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
         "duration_seconds": event.duration_seconds,
         "occurrence_count": int(meta.get("occurrence_count") or 1),
         "evidence_status": evidence.status if evidence else "NOT_AVAILABLE",
+        # Media deleted by retention (storage.retention): no links; evidence_error says why
         "snapshot_url": f"/api/v1/demo/events/{event.event_id}/evidence/snapshot"
-        if evidence and evidence.snapshot_path
+        if evidence and evidence.snapshot_path and evidence.status != "PURGED"
         else None,
         "video_url": f"/api/v1/demo/events/{event.event_id}/evidence/video"
-        if evidence and str(evidence.video_path or evidence.file_path or "").lower().endswith(".mp4")
+        if evidence and evidence.status != "PURGED"
+        and str(evidence.video_path or evidence.file_path or "").lower().endswith(".mp4")
         else None,
         "sha256": evidence.video_sha256 if evidence else None,
         "file_size_bytes": evidence.file_size_bytes if evidence else 0,

@@ -225,6 +225,8 @@ class ExamSession(Base):
     video_duration_s = Column(Float, nullable=True)
     video_gaps_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] of the exam with no video
     video_error = Column(Text, nullable=True)
+    # Retention: when the session's media (videos, clips, pictures, traces) was deleted; records stay
+    media_purged_at = Column(DateTime, nullable=True)
     # VIGIL One: where the perception runs.  SERVER = the candidate's computer only records and
     # uploads video, the Hub analyses it (storage.one_analysis); CLIENT = the app analyses locally.
     analysis_mode = Column(String(10), nullable=True)

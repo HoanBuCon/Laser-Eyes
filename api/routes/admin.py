@@ -24,6 +24,7 @@ from classroom_monitor.demo.runtime import DemoRuntime, DemoState
 from classroom_monitor.evidence_playback import playback_cache_root
 from storage import database
 from storage.db_models import AuditLog, ExamSession, SessionVideoSegment
+from storage.retention import apply_retention, plan_retention
 from storage.maintenance import (
     apply_cleanup,
     backup_sqlite,
@@ -43,6 +44,7 @@ CONFIRM_PHRASES = {
     "test-rooms": "DELETE",
     "orphan-runs": "DELETE",
     "playback-cache": "DELETE",
+    "retention": "DELETE",
     "reset-incidents": "RESET ALL",
 }
 
@@ -153,6 +155,8 @@ def overview(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "incidents": len(plan.event_ids),
                 "examples": [f"{room.room_code or room.id} — {room.name}" for room in plan.rooms[:8]],
             },
+            # Media past its retention time (VIGIL_RETENTION_DAYS), deleted automatically every 6 hours
+            "retention": plan_retention(db).summary(),
             "orphan_runs": {
                 "runs": len(orphans),
                 "bytes": sum(directory_size(d)[0] for d in orphans),
@@ -195,6 +199,19 @@ def cleanup_playback_cache(payload: AdminAction, db: Session = Depends(get_db), 
     freed = directory_size(root)[0]
     result = {"entries": clear_directory(root), "bytes": freed}
     _audit(db, user, "playback-cache", result)
+    return result
+
+
+@router.post("/cleanup/retention")
+def cleanup_retention(payload: AdminAction, db: Session = Depends(get_db), user=Depends(ADMIN_ONLY)) -> Dict[str, Any]:
+    """Delete now the media past its retention time (the Hub also does it every 6 hours)."""
+    _guard("retention", payload, db)
+    plan = plan_retention(db)
+    if plan.days is None:
+        raise HTTPException(status_code=409, detail="Retention is off (VIGIL_RETENTION_DAYS=0).")
+    result = apply_retention(db, plan, actor=actor_name(user, "admin")[:100])
+    result["held_sessions"] = len(plan.held)
+    _audit(db, user, "retention", result)
     return result
 
 

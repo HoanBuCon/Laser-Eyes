@@ -314,6 +314,47 @@ class AnalyzerSignalTests(unittest.TestCase):
         self.assertGreater(gaze_x, 0.0)
         self.assertEqual(GazeAnalyzer._eye_direction(gaze_x, gaze_y), "right")
 
+    def test_looking_down_is_down_even_when_the_upper_lid_covers_the_iris(self):
+        """Looking down, the upper lid drops with the iris: the iris centre ends up near the upper
+        lid.  The eyelid ratio called that "up"; the corner line and the eye's closing say down."""
+        class Point:
+            def __init__(self, x=0.5, y=0.5):
+                self.x = x
+                self.y = y
+
+        def eye_face(iris_y, upper_y, lower_y):
+            face = [Point() for _ in range(478)]
+            for a, center, b in ((33, 468, 133), (362, 473, 263)):
+                face[a].x, face[b].x, face[center].x = 0.40, 0.50, 0.45
+                face[a].y = face[b].y = 0.50
+                face[center].y = iris_y
+            for upper, lower in ((159, 145), (386, 374)):
+                face[upper].y, face[lower].y = upper_y, lower_y
+            return face
+
+        analyzer = object.__new__(GazeAnalyzer)
+        # 640x360 frame: eye 64 px wide.  At the screen: open eye (0.30), iris a bit above the corners
+        _, screen_y, _ = analyzer._iris_position(eye_face(0.488, 0.443, 0.497), 640, 360)
+        # Down at the desk: eye half closed (0.15), iris just below the corners, close to the upper lid
+        _, down_y, _ = analyzer._iris_position(eye_face(0.503, 0.497, 0.524), 640, 360)
+        self.assertLess(abs(screen_y), 0.2)
+        self.assertGreater(down_y - screen_y, 0.34)  # out of the calibrated zone, downwards
+        self.assertEqual(GazeAnalyzer._eye_direction(0.0, down_y - screen_y), "down")
+
+    def test_calibration_from_the_old_vertical_measure_is_not_restored(self):
+        analyzer = GazeAnalyzer.__new__(GazeAnalyzer)
+        analyzer._baseline_x = analyzer._baseline_y = 0.0
+        analyzer._calibrated = False
+        analyzer._calibration_quality = 0.0
+        analyzer._calibration_state = "COLLECTING"
+        analyzer._calibration_message = ""
+        analyzer.restore_calibration({"calibrated": True, "baseline_x": 0.1, "baseline_y": -0.3, "quality": 0.5})
+        self.assertFalse(analyzer._calibrated)
+        analyzer.restore_calibration({"calibrated": True, "baseline_x": 0.1, "baseline_y": -0.3, "quality": 0.5,
+                                      "vertical": GazeAnalyzer.VERTICAL_MEASURE})
+        self.assertTrue(analyzer._calibrated)
+        self.assertEqual(analyzer._baseline_y, -0.3)
+
     def test_new_calibration_clears_previous_session_tracking(self):
         analyzer = object.__new__(GazeAnalyzer)
         analyzer._calibration_samples = [(0.2, 0.1)]

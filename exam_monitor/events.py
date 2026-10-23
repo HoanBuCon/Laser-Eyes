@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from .models import normalize_review_status
 from .models import AnalysisResult, EventType, MonitoringEvent, ProctorBookmark, SessionInfo, Severity
 
 
@@ -214,7 +215,7 @@ class SessionStore:
                         reason=item.get("reason", ""),
                         confidence=float(item.get("confidence", 0.0)),
                         evidence_path=item.get("evidence_path"),
-                        review_status=item.get("review_status", "Chưa xem"),
+                        review_status=normalize_review_status(item.get("review_status")),
                         reviewer_note=item.get("reviewer_note", ""),
                     )
                 )
@@ -262,6 +263,7 @@ class SessionStore:
                 events=events,
                 bookmarks=bookmarks,
                 schema_version=data.get("schema_version", "vigil.local-session.v1"),
+                exam_id=data.get("exam_id"),
             )
         except (KeyError, TypeError, ValueError):
             return None

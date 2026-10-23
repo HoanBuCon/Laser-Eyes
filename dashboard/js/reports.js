@@ -22,8 +22,10 @@
     // --- Session report ----------------------------------------------------------------
     async function loadSessionList() {
         const data = await api('/api/v1/exam-sessions?limit=300');
-        state.sessions = data.items.filter((s) => s.total_events > 0 || s.exam_id || s.id === params.get('session'));
-        $('rpSession').innerHTML = state.sessions.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(s.room_code || '')} · ${esc(s.status)}</option>`).join('');
+        const shown = (s) => !window.VIGIL_PRODUCT || window.VIGIL_PRODUCT.includes(s.product) || s.id === params.get('session');
+        state.sessions = data.items.filter((s) => (s.total_events > 0 || s.exam_id || s.id === params.get('session')) && shown(s));
+        const where = (s) => (s.product === 'ONE' ? `ONE · ${s.subject_ref || ''}${s.subject_name ? ` ${s.subject_name}` : ''}` : (s.room_code || ''));
+        $('rpSession').innerHTML = state.sessions.map((s) => `<option value="${esc(s.id)}">${esc(s.name)} · ${esc(where(s))} · ${esc(s.status)}</option>`).join('');
         if (params.get('session')) $('rpSession').value = params.get('session');
         if ($('rpSession').value) await loadReport();
         else $('rpConfirmed').innerHTML = '<div class="vg-empty">No sessions yet.</div>';
@@ -72,11 +74,15 @@
         const facts = [
             ['Session', s.name],
             ['Exam', r.exam ? `${r.exam.name}${r.exam.exam_date ? ` · ${r.exam.exam_date}` : ''}` : '—'],
-            ['Room', r.room ? `${r.room.code} · ${r.room.name}` : '—'],
+            s.product === 'ONE'
+                ? ['Candidate', `${s.candidate_ref || '—'}${s.candidate_name ? ` · ${s.candidate_name}` : ''} · VIGIL One${s.simulation ? ' (simulation)' : ''}`]
+                : ['Room', r.room ? `${r.room.code} · ${r.room.name}` : '—'],
             ['Proctor', r.proctor || '—'],
             ['Scheduled', s.scheduled_start ? `${fmt(new Date(s.scheduled_start))} – ${fmt(new Date(s.scheduled_end), false)}` : '—'],
             ['Analysed', s.started_at ? `${fmt(utc(s.started_at))} – ${s.ended_at ? fmt(utc(s.ended_at), false) : '…'}` : '—'],
-            ['Seat coverage', cov.capacity ? `${cov.seats_with_roi} of ${cov.capacity} seats (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} seats`],
+            s.product === 'ONE'
+                ? ['Source', 'Candidate computer webcam (VIGIL One)']
+                : ['Seat coverage', cov.capacity ? `${cov.seats_with_roi} of ${cov.capacity} seats (${Math.round((cov.ratio || 0) * 100)} %)` : `${cov.seats_with_roi} seats`],
             ['Status', s.status],
         ];
         $('rpFacts').innerHTML = facts.map(([k, v]) => `<tr><td class="vg-label">${esc(k)}</td><td class="strong">${esc(v)}</td></tr>`).join('');
@@ -193,5 +199,9 @@
     document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => setTab(b.dataset.tab)));
     P2.wireDialogs();
     loadSessionList().catch((err) => { $('rpConfirmed').innerHTML = `<div class="vg-empty">${esc(err.message)}</div>`; });
+    document.addEventListener('vigil:product', () => {
+        params.delete('session');  // the session picked before may belong to the other product
+        loadSessionList().catch(() => {});
+    });
     setTab(state.tab);
 })();

@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VIGIL AI — Online exams</title>
+    <link rel="icon" href="/static/assets/brand/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/assets/brand/favicon-32.png">
+    <link rel="apple-touch-icon" href="/static/assets/brand/apple-touch-icon.png">
+    <link rel="stylesheet" href="/static/css/vigil-tokens.css">
+    <link rel="stylesheet" href="/static/css/vigil-shell.css">
+    <link rel="stylesheet" href="/static/css/phase2.css">
+    <link rel="stylesheet" href="/static/css/online.css">
+    <script src="/static/js/vigil-theme.js"></script>
+    <script src="/static/js/vigil-product.js"></script>
+</head>
+<body class="vigil-classroom online-page">
+
+    <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
+        <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="36" height="36">
+            <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
+        </a>
+        <div class="vigil-nav-label">MONITOR</div>
+        <nav class="vigil-nav">
+            <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
+            <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
+            <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+            <a href="/online" class="vigil-nav-item is-active" aria-current="page"><span>04</span><strong>Online exams</strong></a>
+        </nav>
+        <div class="vigil-nav-label">REVIEW</div>
+        <nav class="vigil-nav">
+            <a href="/review" class="vigil-nav-item"><span>05</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>06</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>07</span><strong>Reports</strong></a>
+        </nav>
+        <div class="vigil-nav-label">SETUP</div>
+        <nav class="vigil-nav">
+            <a href="/sessions" class="vigil-nav-item"><span>08</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>09</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item"><span>10</span><strong>System</strong></a>
+            <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
+        </nav>
+        <div class="vigil-user" data-user-slot></div>
+        <div class="vigil-sidebar-note">
+            <span class="vigil-sidebar-note-dot"></span>
+            <div><strong>HUMAN REVIEW</strong><small>AI prioritizes. Proctors decide.</small></div>
+        </div>
+    </aside>
+
+    <header class="vg-topbar">
+        <div class="vg-topbar-title">
+            <span class="vg-eyebrow">04 · Online exams</span>
+            <h1 class="vg-title">Online exams</h1>
+            <span class="vg-subtitle">Candidates sitting the exam on their own computer with VIGIL One. Signals go to the same review queue as Classroom.</span>
+        </div>
+        <div class="vg-actions">
+            <select id="examSelect" class="vg-select" aria-label="Exam"></select>
+            <button type="button" id="setupBtn" class="vigil-btn vigil-btn--sm">Exam setup</button>
+            <a id="reviewLink" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/review?product=ONE">Review signals</a>
+        </div>
+    </header>
+
+    <main class="vg-page">
+        <section class="vg-kpis" aria-label="Candidates">
+            <button type="button" class="vg-kpi on-kpi" data-filter="ALL"><span class="vg-label">Candidates</span><span class="vg-kpi-value" id="kAll">—</span><span class="vg-kpi-hint">on the list</span></button>
+            <button type="button" class="vg-kpi on-kpi" data-filter="LIVE" data-tone="good"><span class="vg-label">Sitting now</span><span class="vg-kpi-value" id="kLive">—</span><span class="vg-kpi-hint">connected</span></button>
+            <button type="button" class="vg-kpi on-kpi" data-filter="LOST" data-tone="danger"><span class="vg-label">Connection lost</span><span class="vg-kpi-value" id="kLost">—</span><span class="vg-kpi-hint">no heartbeat &gt; 10 s</span></button>
+            <button type="button" class="vg-kpi on-kpi" data-filter="DONE"><span class="vg-label">Submitted</span><span class="vg-kpi-value" id="kDone">—</span><span class="vg-kpi-hint" id="kLeft">—</span></button>
+            <button type="button" class="vg-kpi on-kpi" data-filter="WAITING" data-tone="warning"><span class="vg-label">Not started</span><span class="vg-kpi-value" id="kWaiting">—</span><span class="vg-kpi-hint">not joined or not begun</span></button>
+        </section>
+
+        <section id="setupPanel" class="vg-panel on-setup" hidden>
+            <div class="vg-panel-head"><h2>Exam setup</h2><span class="vg-label">chief / admin</span></div>
+            <div class="on-setup-grid">
+                <div>
+                    <div class="vg-label">Join code</div>
+                    <div class="on-joincode"><code id="joinCode">—</code><span id="joinState" class="vg-chip">closed</span></div>
+                    <div class="on-row">
+                        <button type="button" id="joinToggle" class="vigil-btn vigil-btn--sm vigil-btn--primary">Open joining</button>
+                        <button type="button" id="joinRotate" class="vigil-btn vigil-btn--sm">New code</button>
+                    </div>
+                    <p class="on-help">Candidates start <strong>VIGIL One</strong>, enter this server's address, the join code, their candidate code and PIN.</p>
+                    <div class="vg-label" style="margin-top:14px">Monitoring policy</div>
+                    <label class="on-check"><input type="checkbox" data-policy="microphone"> Microphone (voice + lip movement)</label>
+                    <label class="on-check"><input type="checkbox" data-policy="allow_materials"> Books / notes allowed</label>
+                    <label class="on-check"><input type="checkbox" data-policy="record_video"> Record the whole exam (one video per candidate)</label>
+                    <label class="on-check">Recording
+                        <select class="vg-select on-mini" data-policy="video_width"><option>480</option><option>640</option><option>960</option><option>1280</option></select> px,
+                        <select class="vg-select on-mini" data-policy="video_fps"><option>5</option><option>10</option><option>15</option></select> fps
+                    </label>
+                    <label class="on-check"><input type="checkbox" data-policy="video_clips"> Video clip with each signal (5 s before + 4 s after)</label>
+                    <label class="on-check"><input type="checkbox" data-policy="live_preview"> Small live picture for this page</label>
+                    <label class="on-check">Live picture every
+                        <select class="vg-select on-mini" data-policy="live_interval"><option>2</option><option>3</option><option>5</option><option>10</option></select> s
+                    </label>
+                    <div class="vg-label" style="margin-top:14px">A behaviour becomes a signal after (seconds; empty = default)</div>
+                    <div class="on-thresholds">
+                        <label>Eyes outside the screen <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="look_away" placeholder="1.6"></label>
+                        <label>Head turned away <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="head_turn" placeholder="1.4"></label>
+                        <label>Talking <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="talking" placeholder="1.0"></label>
+                        <label>No face <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="no_face" placeholder="3.0"></label>
+                        <label>Several people <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="multiple_faces" placeholder="0.8"></label>
+                        <label>Phone / book <input type="number" min="0.2" max="60" step="0.1" class="vg-input on-mini" data-threshold="suspicious_object" placeholder="1.0"></label>
+                    </div>
+                </div>
+                <div>
+                    <div class="vg-label">Candidates (one per line: code, full name, PIN — PIN optional)</div>
+                    <textarea id="rosterInput" class="on-textarea" spellcheck="false" placeholder="HS001, Nguyễn Văn An, 2468&#10;HS002, Trần Thị Bình"></textarea>
+                    <div class="on-row">
+                        <button type="button" id="rosterImport" class="vigil-btn vigil-btn--sm vigil-btn--primary">Add / update</button>
+                        <span id="rosterMsg" class="on-help"></span>
+                    </div>
+                    <div id="pinsBox" class="on-pins" hidden>
+                        <div class="vg-label">New PINs — shown once. Hand them to the candidates.</div>
+                        <table class="vg-table"><tbody id="pinsBody"></tbody></table>
+                        <button type="button" id="pinsDownload" class="vigil-btn vigil-btn--sm">Download CSV</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="vg-panel">
+            <div class="vg-panel-head"><h2 id="gridTitle">Candidates</h2><span class="vg-label" id="gridHint">updates every 3 s</span></div>
+            <div id="grid" class="on-grid"><div class="vg-empty">Choose an exam.</div></div>
+        </section>
+    </main>
+
+    <dialog id="detail" class="p2-dialog p2-dialog--wide on-detail">
+        <div class="vg-panel-head"><h2 id="dTitle">Candidate</h2><button type="button" id="dClose" class="vigil-btn vigil-btn--sm">Close</button></div>
+        <div class="on-detail-body">
+            <div>
+                <div class="on-live-frame"><img id="dLive" alt="Live picture"><span id="dLiveNote">Waiting for a picture…</span></div>
+                <div id="dReadings" class="on-readings"></div>
+            </div>
+            <div>
+                <div class="vg-label">Signals in this session</div>
+                <div id="dSignals" class="on-signals"><div class="vg-empty">Loading…</div></div>
+                <div class="on-row">
+                    <a id="dMonitor" class="vigil-btn vigil-btn--sm vigil-btn--primary" href="/one-monitor">Live monitor</a>
+                    <a id="dReview" class="vigil-btn vigil-btn--sm" href="/review">Review these signals</a>
+                    <a id="dVideo" class="vigil-btn vigil-btn--sm" href="/one-video">Whole exam video</a>
+                    <a id="dReport" class="vigil-btn vigil-btn--sm" href="/reports">Session report</a>
+                </div>
+            </div>
+        </div>
+    </dialog>
+
+    <script src="/static/js/online.js"></script>
+    <script src="/static/js/vigil-auth.js"></script>
+</body>
+</html>

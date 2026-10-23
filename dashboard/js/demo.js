@@ -441,6 +441,14 @@ function renderStatus(st) {
 
     if (fpsText) {
         fpsText.textContent = `${st.processing_fps.toFixed(1)} FPS (${st.realtime_factor.toFixed(2)}x)`;
+        // Where each frame's time goes (rolling average, ms): hover the FPS chip
+        const stages = Object.entries(st.stage_ms || {});
+        const badge = document.getElementById('fpsBadge') || fpsText;
+        if (stages.length) {
+            const total = stages.reduce((sum, [, ms]) => sum + ms, 0);
+            badge.title = `Per frame ≈ ${total.toFixed(0)} ms\n` + stages.sort((a, b) => b[1] - a[1])
+                .map(([name, ms]) => `${name.replace(/_/g, ' ')}: ${ms.toFixed(1)} ms`).join('\n');
+        }
     }
 
     if (lblFrameIdx) lblFrameIdx.textContent = st.frame_index;

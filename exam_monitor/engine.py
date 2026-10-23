@@ -29,11 +29,20 @@ class GazeAnalyzer:
         max_faces: int = 5,
         object_model_path: Path | None = None,
         allowed_materials: set[str] | None = None,
+        frame_clock: bool = False,
+        object_every: int = 8,
     ):
         self.model_path = Path(model_path or MODEL_PATH)
         self.object_model_path = Path(object_model_path or OBJECT_MODEL_PATH)
         self.max_faces = max_faces
+        # On the server frames come from recorded video faster than real time: the model clock must
+        # then follow the video timestamps, not the wall clock (frame_clock=True).
+        self.frame_clock = bool(frame_clock)
+        # Object detection runs on every n-th analysed frame (a desktop camera gives ~25 fps; the
+        # server analyses ~5 fps, so it asks for every 2nd frame to keep the same ~0.3 s cadence).
+        self.object_every = max(1, int(object_every))
         self.backend_name = "OpenCV fallback"
+        self.init_error = ""  # why MediaPipe could not start (shown by --selftest)
         self._landmarker = None
         self._object_detector = None
         self._timestamp_ms = 0
@@ -87,8 +96,9 @@ class GazeAnalyzer:
             self._landmarker = FaceLandmarker.create_from_options(options)
             self.backend_name = "MediaPipe Face Landmarker"
             self._init_object_detector(BaseOptions, RunningMode)
-        except Exception:
+        except Exception as exc:
             self._landmarker = None
+            self.init_error = f"{exc.__class__.__name__}: {exc}"
 
     def _init_object_detector(self, base_options_cls, running_mode_cls) -> None:
         if not self.object_model_path.exists():
@@ -163,6 +173,29 @@ class GazeAnalyzer:
         self._last_objects_at = -1e9
         self._frame_index = 0
 
+    def calibration_snapshot(self) -> dict:
+        """What a restarted server needs to resume this candidate without calibrating again."""
+        return {
+            "calibrated": self._calibrated,
+            "baseline_x": round(float(self._baseline_x), 5),
+            "baseline_y": round(float(self._baseline_y), 5),
+            "quality": self._calibration_quality,
+            "state": self._calibration_state,
+            "vertical": self.VERTICAL_MEASURE,
+        }
+
+    def restore_calibration(self, snapshot: dict) -> None:
+        if not snapshot or not snapshot.get("calibrated"):
+            return
+        if snapshot.get("vertical") != self.VERTICAL_MEASURE:
+            return  # baseline_y from the old eyelid measure: calibrate again on the coming frames
+        self._baseline_x = float(snapshot.get("baseline_x") or 0.0)
+        self._baseline_y = float(snapshot.get("baseline_y") or 0.0)
+        self._calibration_quality = float(snapshot.get("quality") or 0.0)
+        self._calibrated = True
+        self._calibration_state = "READY"
+        self._calibration_message = "Calibration ready."
+
     def reset_calibration(self) -> None:
         self._calibration_samples.clear()
         self._baseline_x = 0.0
@@ -185,10 +218,13 @@ class GazeAnalyzer:
         object_detections = self._detect_objects(mp_image, timestamp)
         person_count = sum(label == "person" for label, _, _ in object_detections)
         suspicious_objects = self.prohibited_objects(object_detections)
-        now = time.monotonic()
-        delta_ms = max(1, int((now - self._last_wall_time) * 1000))
-        self._timestamp_ms += delta_ms
-        self._last_wall_time = now
+        if self.frame_clock:
+            self._timestamp_ms = max(self._timestamp_ms + 1, int(timestamp * 1000))
+        else:
+            now = time.monotonic()
+            delta_ms = max(1, int((now - self._last_wall_time) * 1000))
+            self._timestamp_ms += delta_ms
+            self._last_wall_time = now
         detection = self._landmarker.detect_for_video(mp_image, self._timestamp_ms)
         faces = detection.face_landmarks
         if not faces:
@@ -223,7 +259,7 @@ class GazeAnalyzer:
         face_box = self._face_box(primary, w, h)
         face_boxes = [self._face_box(face, w, h) for face in faces]
         yaw, pitch, roll = self._head_pose(primary, w, h)
-        iris_x, iris_y, eye_confidence = self._iris_position(primary)
+        iris_x, iris_y, eye_confidence = self._iris_position(primary, w, h)
 
         # Eye movement and head movement are intentionally kept separate. A
         # candidate can look sideways without turning their head, or turn the
@@ -377,9 +413,35 @@ class GazeAnalyzer:
     def _point(face, index: int) -> np.ndarray:
         return np.array([face[index].x, face[index].y], dtype=np.float32)
 
-    def _iris_position(self, face) -> tuple[float, float, float]:
+    # Vertical gaze: where the iris sits against the line through the eye corners, plus how far
+    # the eye is closed.  The eyelids are no reference: looking down, the upper lid drops with
+    # the iris and covers its top, so the iris centre seems close to the upper lid ("up").
+    # Measured on candidates looking at their screen vs. down at the desk: the corner offset
+    # goes from about -0.07 to +0.01..+0.07 (eye widths) and the opening from ~0.30 to ~0.15.
+    VERTICAL_MEASURE = 2  # stored with a calibration: a baseline from another measure is not reused
+    VERTICAL_CORNER_GAIN = 3.0
+    VERTICAL_CORNER_REF = -0.03
+    VERTICAL_OPENING_GAIN = 2.0
+    VERTICAL_OPENING_REF = 0.29
+
+    def _iris_position(self, face, width: int = 1, height: int = 1) -> tuple[float, float, float]:
         if len(face) < 478:
             return 0.0, 0.0, 0.45
+        scale = np.array([float(width), float(height)], dtype=np.float32)
+
+        def vertical(center_index: int, a_index: int, b_index: int, upper_index: int, lower_index: int):
+            """(iris offset below the corner line, eye opening), both in eye widths (pixel space)."""
+            a, b = self._point(face, a_index) * scale, self._point(face, b_index) * scale
+            axis = b - a
+            eye_width = float(np.linalg.norm(axis))
+            if eye_width < 1e-6:
+                return 0.0, self.VERTICAL_OPENING_REF
+            normal = np.array([-axis[1], axis[0]], dtype=np.float32) / eye_width
+            if normal[1] < 0:
+                normal = -normal  # points down the image
+            offset = float(np.dot(self._point(face, center_index) * scale - (a + b) * 0.5, normal)) / eye_width
+            lids = self._point(face, lower_index) * scale - self._point(face, upper_index) * scale
+            return offset, float(np.linalg.norm(lids)) / eye_width
 
         def ratio(center_index: int, a_index: int, b_index: int) -> float:
             center = self._point(face, center_index)
@@ -393,13 +455,15 @@ class GazeAnalyzer:
 
         left_x = ratio(468, 33, 133)
         right_x = ratio(473, 362, 263)
-        left_y = ratio(468, 159, 145)
-        right_y = ratio(473, 386, 374)
+        left_offset, left_opening = vertical(468, 33, 133, 159, 145)
+        right_offset, right_opening = vertical(473, 362, 263, 386, 374)
         # Real sources are mirrored before analysis, so increasing x follows
         # the candidate's own right side. Do not invert this a second time.
         gaze_x = ((left_x + right_x) * 0.5 - 0.5) * 2.8
-        gaze_y = ((left_y + right_y) * 0.5 - 0.5) * 2.6
-        symmetry = 1.0 - min(1.0, abs(left_x - right_x) + abs(left_y - right_y))
+        # + = down, - = up (the calibrated screen position is subtracted later)
+        gaze_y = (self.VERTICAL_CORNER_GAIN * ((left_offset + right_offset) * 0.5 - self.VERTICAL_CORNER_REF)
+                  + self.VERTICAL_OPENING_GAIN * (self.VERTICAL_OPENING_REF - (left_opening + right_opening) * 0.5))
+        symmetry = 1.0 - min(1.0, abs(left_x - right_x) + abs(left_offset - right_offset) * 4.0)
         return float(gaze_x), float(gaze_y), float(0.55 + symmetry * 0.4)
 
     def _head_pose(self, face, width: int, height: int) -> tuple[float, float, float]:
@@ -505,7 +569,10 @@ class GazeAnalyzer:
 
         close_cycles, transitions = rhythm_counts(smoothed)
         motion = float(np.mean(np.abs(np.diff(smoothed))))
-        recent = smoothed[times >= times[-1] - 0.75]
+        # The last ~0.75 s, but never fewer than 5 samples: at the Hub's live rate (5-10 fps) a
+        # fixed 0.75 s window holds only 3-4 frames and the lips could never count as moving.
+        recent_from = min(times[-1] - 0.75, times[max(0, len(times) - 5)])
+        recent = smoothed[times >= recent_from]
         recent_span = (
             float(np.percentile(recent, 90) - np.percentile(recent, 10))
             if len(recent) >= 5
@@ -559,7 +626,7 @@ class GazeAnalyzer:
         self._frame_index += 1
         if self._object_detector is None:
             return []
-        if self._frame_index % 8 == 1:
+        if self._frame_index % self.object_every == 1 or self.object_every == 1:
             try:
                 detected = self._object_detector.detect(mp_image)
                 objects: list[tuple[str, float, tuple[int, int, int, int]]] = []

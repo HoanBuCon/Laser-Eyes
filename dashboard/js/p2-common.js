@@ -29,7 +29,12 @@ const P2 = {
         return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
     },
     pretty(name) { return String(name || '').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase()); },
-    seat(code) { const parts = String(code || '').split('-'); return code ? `S${parts[parts.length - 1]}` : '—'; },
+    // "SEAT-CLASSROOM-03-15" -> "S15"; a VIGIL One candidate code stays as it is
+    seat(code) {
+        if (!code) return '—';
+        const last = String(code).split('-').pop();
+        return /^\d+$/.test(last) ? `S${last}` : String(code);
+    },
 
     STATUS_TONE: {
         DRAFT: '', READY: 'good', RUNNING: 'warning', STOPPING: 'warning', COMPLETED: '', STOPPED: '',

@@ -35,6 +35,26 @@ EVENT_LABELS = {
     EventType.CAMERA_INTERRUPTED: "Camera bị gián đoạn",
 }
 
+# Human review decisions: the same vocabulary as VIGIL Hub / Classroom
+REVIEW_LABELS = {
+    "PENDING": "Chờ xem",
+    "CONFIRMED": "Đã xác nhận",
+    "REJECTED": "Bỏ qua",
+    "INCONCLUSIVE": "Đã xem, chưa kết luận",
+}
+_LEGACY_REVIEW = {"Chưa xem": "PENDING", "Đã xem": "INCONCLUSIVE"}
+
+
+def normalize_review_status(value: str | None) -> str:
+    """Map saved values (including old free-text ones) onto the shared enum."""
+    if not value:
+        return "PENDING"
+    if value in _LEGACY_REVIEW:
+        return _LEGACY_REVIEW[value]
+    upper = str(value).upper()
+    return upper if upper in REVIEW_LABELS else "PENDING"
+
+
 SEVERITY_LABELS = {
     Severity.INFO: "Thông tin",
     Severity.LOW: "Thấp",
@@ -98,12 +118,16 @@ class MonitoringEvent:
     reason: str
     confidence: float
     evidence_path: str | None = None
-    review_status: str = "Chưa xem"
+    review_status: str = "PENDING"
     reviewer_note: str = ""
 
     @property
     def label(self) -> str:
         return EVENT_LABELS[self.event_type]
+
+    @property
+    def review_label(self) -> str:
+        return REVIEW_LABELS.get(normalize_review_status(self.review_status), self.review_status)
 
     @property
     def severity_label(self) -> str:
@@ -120,7 +144,7 @@ class MonitoringEvent:
 
 @dataclass(slots=True)
 class ProctorBookmark:
-    """A human-created Local Gaze frame marker, separate from AI events."""
+    """A frame marked by the person at the VIGIL One computer, separate from AI events."""
 
     bookmark_id: str
     request_id: str
@@ -129,13 +153,13 @@ class ProctorBookmark:
     session_elapsed_ms: float
     captured_at: str
     created_at: str
-    created_by: str = "Local_Proctor"
+    created_by: str = "VIGIL_One"
     note: str = ""
     review_decision: str = "PENDING"
     evidence_status: str = "PENDING"
     snapshot_path: str | None = None
     sha256: str | None = None
-    source_product: str = "LOCAL_GAZE"
+    source_product: str = "VIGIL_ONE"
     source_kind: str = "CAMERA"
     source_ref: str = ""
     coordinate_space: dict[str, Any] = field(default_factory=dict)
@@ -159,7 +183,8 @@ class SessionInfo:
     average_fps: float = 0.0
     events: list[MonitoringEvent] = field(default_factory=list)
     bookmarks: list[ProctorBookmark] = field(default_factory=list)
-    schema_version: str = "vigil.local-session.v2"
+    schema_version: str = "vigil.local-session.v3"  # v3: review status uses the shared enum
+    exam_id: str | None = None   # exam on VIGIL Hub, when the session is synced
 
     @property
     def risk_score(self) -> int:
@@ -193,4 +218,5 @@ class SessionInfo:
             "events": [event.to_dict() for event in self.events],
             "bookmarks": [bookmark.to_dict() for bookmark in self.bookmarks],
             "schema_version": self.schema_version,
+            "exam_id": self.exam_id,
         }

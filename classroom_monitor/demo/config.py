@@ -242,6 +242,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--stride",
         type=int,
         default=1,
-        help="Frame subsampling stride.",
+        help="Analyse every n-th frame (1 = every frame). 0 = like LIVE on the web: as many frames "
+        "as this machine can while staying real time.",
     )
     return parser

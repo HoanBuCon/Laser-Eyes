@@ -79,6 +79,8 @@ data/*.db-wal
 data/*.sqlite
 data/*.sqlite3
 data/evidence/
+data/one_evidence/
+data/proctor_bookmarks/
 data/sessions/
 data/uploads/
 data/output_demo/
@@ -123,3 +125,10 @@ Desktop.ini
 # ---- 9. Scratch Scripts & Temp Workspace ----
 scratch/
 tmp/
+
+# HyperFrames video projects (renders and captured footage are large)
+videos/
+
+# Generated per build by packaging/build_vigil_one.py (Hub address of that build)
+packaging/vigil-one.json
+

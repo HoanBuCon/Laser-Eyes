@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import queue
 import threading
 import time
@@ -18,16 +19,22 @@ import cv2
 from PIL import Image, ImageGrab, ImageTk
 
 from .audio import VoiceActivityDetector, speech_is_confirmed
+from .clip_recorder import ClipRecorder
+from .session_recorder import SessionRecorder
 from .engine import GazeAnalyzer, OverlayRenderer
 from .events import EventDetector, SessionStore
-from .models import EventType, MonitoringEvent, ProctorBookmark, SessionInfo, Severity
+from .paths import app_data_dir, resource
+from .hub_client import DISABLED, OFFLINE, PENDING, SYNCED, UNPAIRED, HubClient, HubError, SyncStatus
+from .models import REVIEW_LABELS, EventType, MonitoringEvent, ProctorBookmark, SessionInfo, Severity, normalize_review_status
 from .sources import CameraSource, DemoSource, FrameSource, VideoSource
-from .theme import COLORS, FONTS, THEMES, set_theme
+from .theme import COLORS, FONTS, THEMES, brand_font, set_theme
 
 
-APP_TITLE = "VIGIL AI — Hệ thống giám sát thi trực tuyến"
+APP_TITLE = "VIGIL One — Hỗ trợ giám sát thi trên máy tính"
+LOGO_PATH = resource("assets", "V.png")
+LIVE_THUMB_WIDTH = 640
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = app_data_dir()
 
 
 def wait_for_worker_shutdown(
@@ -183,8 +190,17 @@ class ExamMonitorApp(tk.Tk):
     def __init__(self, auto_demo: bool = False, screenshot_path: str | None = None):
         super().__init__()
         self.title(APP_TITLE)
+        try:
+            icon = Image.open(LOGO_PATH).convert("RGBA")
+            icon.thumbnail((64, 64), Image.Resampling.LANCZOS)
+            self._window_icon = ImageTk.PhotoImage(icon)
+            self.iconphoto(True, self._window_icon)
+        except OSError:
+            pass
         self._settings_path = DATA_DIR / "settings.json"
         self.settings = self._load_settings()
+        # Frame rates are developer details: shown only with VIGIL_DEBUG=1 or "debug": true in settings.json
+        self.debug_mode = os.environ.get("VIGIL_DEBUG") == "1" or bool(self.settings.get("debug"))
         self.theme_name = self.settings.get("theme", "light")
         if self.theme_name not in THEMES:
             self.theme_name = "light"
@@ -233,6 +249,15 @@ class ExamMonitorApp(tk.Tk):
         self._alert_toast_until = 0.0
         self._alert_toast_priority = -1
         self._presentation_mode = False
+        self._last_live_push = 0.0
+        self._hub_exams: list[dict] = []
+        self.hub = HubClient(
+            DATA_DIR,
+            base_url=self.settings.get("hub_url", ""),
+            token=self.settings.get("hub_token", ""),
+            on_change=lambda status: self._put_message("sync", status),
+        )
+        self.hub.start()
 
         self._setup_ttk()
         self._build_shell()
@@ -246,6 +271,8 @@ class ExamMonitorApp(tk.Tk):
         self._show_page("dashboard")
         self.after(35, self._poll_frames)
         self.after(700, self._tick_clock)
+        self.after(300, lambda: self._on_sync_status(self.hub.status()))
+        self._load_hub_exams()
         if auto_demo:
             self.after(650, lambda: self._show_page("monitor"))
             self.after(900, self.start_session)
@@ -354,21 +381,21 @@ class ExamMonitorApp(tk.Tk):
         brand = tk.Frame(self.sidebar, bg=COLORS["sidebar"])
         self.sidebar_brand = brand
         brand.pack(fill="x", padx=18, pady=(20, 24))
-        mark = tk.Label(
-            brand,
-            text="V",
-            bg=COLORS["primary"],
-            fg=COLORS["primary_text"],
-            font=("Segoe UI Black", 14),
-            width=2,
-            height=1,
-        )
+        self._logo_photo = None
+        try:
+            logo = Image.open(LOGO_PATH).convert("RGBA")
+            logo.thumbnail((40, 40), Image.Resampling.LANCZOS)
+            self._logo_photo = ImageTk.PhotoImage(logo)
+            mark = tk.Label(brand, image=self._logo_photo, bg=COLORS["sidebar"])
+        except OSError:
+            mark = tk.Label(brand, text="V", bg=COLORS["primary"], fg=COLORS["primary_text"],
+                            font=("Segoe UI Black", 14), width=2, height=1)
         mark.pack(side="left")
         names = tk.Frame(brand, bg=COLORS["sidebar"])
         self.sidebar_brand_names = names
         names.pack(side="left", padx=(10, 0))
-        tk.Label(names, text="VIGIL AI", bg=COLORS["sidebar"], fg=COLORS["text"], font=("Segoe UI Semibold", 12)).pack(anchor="w")
-        tk.Label(names, text="LOCAL PROCTOR", bg=COLORS["sidebar"], fg=COLORS["text_dim"], font=FONTS["tiny"]).pack(anchor="w")
+        tk.Label(names, text="vigil one", bg=COLORS["sidebar"], fg=COLORS["text"], font=brand_font(20)).pack(anchor="w")
+        tk.Label(names, text="THÍ SINH TRÊN MÁY TÍNH", bg=COLORS["sidebar"], fg=COLORS["text_dim"], font=FONTS["tiny"]).pack(anchor="w")
 
         section = tk.Label(
             self.sidebar,
@@ -417,15 +444,18 @@ class ExamMonitorApp(tk.Tk):
         privacy = tk.Frame(bottom, bg=COLORS["sidebar"])
         self.sidebar_privacy = privacy
         privacy.pack(fill="x")
-        tk.Label(privacy, text="●  LOCAL / PRIVATE", bg=COLORS["sidebar"], fg=COLORS["good"], font=FONTS["tiny"]).pack(anchor="w")
-        tk.Label(
+        self.sync_badge = tk.Label(privacy, text="●  CHỈ LƯU TRÊN MÁY", bg=COLORS["sidebar"], fg=COLORS["good"], font=FONTS["tiny"])
+        self.sync_badge.pack(anchor="w")
+        self.sync_detail = tk.Label(
             privacy,
-            text="Dữ liệu chỉ lưu trên máy",
+            text="Chưa ghép nối VIGIL Hub",
             justify="left",
+            wraplength=170,
             bg=COLORS["sidebar"],
             fg=COLORS["text_dim"],
             font=FONTS["tiny"],
-        ).pack(anchor="w", pady=(4, 0))
+        )
+        self.sync_detail.pack(anchor="w", pady=(4, 0))
 
     def _build_header(self) -> None:
         self.header = tk.Frame(self.main, bg=COLORS["bg"], height=90)
@@ -438,7 +468,7 @@ class ExamMonitorApp(tk.Tk):
         self.page_title.pack(anchor="w")
         self.page_subtitle = tk.Label(
             title_wrap,
-            text="Trung tâm điều khiển phiên giám sát cục bộ",
+            text="Trung tâm điều khiển phiên giám sát",
             bg=COLORS["bg"],
             fg=COLORS["text_muted"],
             font=FONTS["small"],
@@ -649,7 +679,7 @@ class ExamMonitorApp(tk.Tk):
                 ("sessions", "PHIÊN ĐÃ LƯU", "0", COLORS["text"]),
                 ("events", "CẢNH BÁO GẦN NHẤT", "0", COLORS["warning"]),
                 ("risk", "ĐIỂM RỦI RO", "00", COLORS["good"]),
-                ("mode", "CHẾ ĐỘ XỬ LÝ", "LOCAL", COLORS["text"]),
+                ("mode", "ĐỒNG BỘ HUB", "—", COLORS["text"]),
             ]
         ):
             card = Card(stats)
@@ -674,7 +704,7 @@ class ExamMonitorApp(tk.Tk):
         ).grid(row=1, column=0, sticky="nw", padx=22)
         tk.Label(
             hero,
-            text="Camera, video hoặc chế độ mô phỏng đều chạy hoàn toàn trên máy.\nKết quả chỉ là tín hiệu hỗ trợ giám thị xem lại.",
+            text="Phân tích hình ảnh chạy ngay trên máy này; khi đã ghép nối, phiên và tín hiệu\nđược gửi tới VIGIL Hub để giám thị theo dõi và rà soát. Kết quả chỉ là tín hiệu hỗ trợ.",
             justify="left",
             bg=COLORS["surface"],
             fg=COLORS["text_muted"],
@@ -719,7 +749,8 @@ class ExamMonitorApp(tk.Tk):
         self.live_title = tk.Label(viewer_header, text="CAMERA CHƯA KHỞI ĐỘNG", bg=COLORS["surface"], fg=COLORS["text_muted"], font=FONTS["tiny"])
         self.live_title.pack(side="left", padx=(6, 0))
         self.fps_label = tk.Label(viewer_header, text="0.0 FPS", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["mono"])
-        self.fps_label.pack(side="right")
+        if self.debug_mode:
+            self.fps_label.pack(side="right")
         self.mic_label = tk.Label(viewer_header, text="MIC —", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["mono"])
         self.mic_label.pack(side="right", padx=(0, 14))
 
@@ -761,13 +792,19 @@ class ExamMonitorApp(tk.Tk):
         control.grid_columnconfigure(0, weight=1)
         tk.Label(control, text="THIẾT LẬP PHIÊN", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["tiny"]).grid(row=0, column=0, sticky="w", padx=14, pady=(14, 8))
         self.candidate_entry = self._labeled_entry(control, "Mã thí sinh", "SV-2026-001", 1)
-        self.exam_entry = self._labeled_entry(control, "Tên kỳ thi", "Kỳ thi thử nghiệm", 2)
+        exam_wrap = tk.Frame(control, bg=COLORS["surface"])
+        exam_wrap.grid(row=2, column=0, sticky="ew", padx=14, pady=(2, 7))
+        exam_wrap.grid_columnconfigure(0, weight=1)
+        tk.Label(exam_wrap, text="Kỳ thi", bg=COLORS["surface"], fg=COLORS["text_muted"], font=FONTS["small"]).grid(row=0, column=0, sticky="w", pady=(0, 5))
+        self.exam_var = tk.StringVar(value="Kỳ thi thử nghiệm")
+        self.exam_entry = ttk.Combobox(exam_wrap, textvariable=self.exam_var, values=(), style="Vigil.TCombobox")
+        self.exam_entry.grid(row=1, column=0, sticky="ew")
 
         source_wrap = tk.Frame(control, bg=COLORS["surface"])
         source_wrap.grid(row=3, column=0, sticky="ew", padx=14, pady=(2, 7))
         source_wrap.grid_columnconfigure(0, weight=1)
         tk.Label(source_wrap, text="Nguồn hình ảnh", bg=COLORS["surface"], fg=COLORS["text_muted"], font=FONTS["small"]).grid(row=0, column=0, sticky="w", pady=(0, 5))
-        self.source_var = tk.StringVar(value="Mô phỏng có sẵn")
+        self.source_var = tk.StringVar(value="Camera trực tiếp")
         self.source_combo = ttk.Combobox(
             source_wrap,
             textvariable=self.source_var,
@@ -789,7 +826,7 @@ class ExamMonitorApp(tk.Tk):
         self.calibration_bar.grid(row=2, column=0, sticky="ew")
         self.recalibrate_button = PillButton(
             calibration,
-            text="RECALIBRATE",
+            text="HIỆU CHỈNH LẠI",
             variant="secondary",
             command=self._recalibrate,
             pady=6,
@@ -810,7 +847,7 @@ class ExamMonitorApp(tk.Tk):
             OptionToggle(options, text=text, variable=var).pack(fill="x", pady=3)
         OptionToggle(
             options,
-            text="Allow books/materials for this session",
+            text="Cho phép sách/tài liệu trong phiên này",
             variable=self.allow_book_var,
         ).pack(fill="x", pady=3)
 
@@ -1018,8 +1055,31 @@ class ExamMonitorApp(tk.Tk):
             label_value.grid(row=row, column=2, sticky="e", padx=20, pady=10)
             var.trace_add("write", lambda *_args, v=var, target=label_value: target.configure(text=f"{v.get():.1f} giây"))
 
+        hub = Card(page)
+        hub.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        hub.grid_columnconfigure(1, weight=1)
+        tk.Label(hub, text="KẾT NỐI VIGIL HUB", bg=COLORS["surface"], fg=COLORS["text_dim"], font=FONTS["tiny"]).grid(row=0, column=0, columnspan=4, sticky="w", padx=20, pady=(15, 10))
+        tk.Label(hub, text="Địa chỉ Hub", bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["body"]).grid(row=1, column=0, sticky="w", padx=(20, 12), pady=6)
+        self.hub_url_var = tk.StringVar(value=self.settings.get("hub_url", "http://127.0.0.1:8000"))
+        tk.Entry(hub, textvariable=self.hub_url_var, bg=COLORS["surface_alt"], fg=COLORS["text"], relief="flat",
+                 insertbackground=COLORS["text"], font=FONTS["body"]).grid(row=1, column=1, sticky="ew", pady=6, ipady=5)
+        tk.Label(hub, text="Mã ghép nối", bg=COLORS["surface"], fg=COLORS["text"], font=FONTS["body"]).grid(row=2, column=0, sticky="w", padx=(20, 12), pady=6)
+        self.hub_code_var = tk.StringVar()
+        tk.Entry(hub, textvariable=self.hub_code_var, width=12, bg=COLORS["surface_alt"], fg=COLORS["text"], relief="flat",
+                 insertbackground=COLORS["text"], font=FONTS["mono"]).grid(row=2, column=1, sticky="w", pady=6, ipady=5)
+        self.hub_pair_button = PillButton(hub, text="GHÉP NỐI", command=self._pair_hub, pady=6)
+        self.hub_pair_button.grid(row=2, column=2, sticky="e", padx=(12, 6))
+        PillButton(hub, text="NGẮT KẾT NỐI", variant="secondary", command=self._unpair_hub, pady=6).grid(row=2, column=3, sticky="e", padx=(0, 20))
+        self.live_preview_var = tk.BooleanVar(value=bool(self.settings.get("hub_live_preview", True)))
+        OptionToggle(hub, text="Gửi hình trực tiếp thu nhỏ (cập nhật 2 giây/lần) để giám thị theo dõi",
+                     variable=self.live_preview_var).grid(row=3, column=0, columnspan=4, sticky="ew", padx=20, pady=(6, 2))
+        self.live_preview_var.trace_add("write", lambda *_a: self._save_setting("hub_live_preview", bool(self.live_preview_var.get())))
+        self.hub_status_label = tk.Label(hub, text="", justify="left", anchor="w", wraplength=760, bg=COLORS["surface"],
+                                         fg=COLORS["text_muted"], font=FONTS["small"])
+        self.hub_status_label.grid(row=4, column=0, columnspan=4, sticky="ew", padx=20, pady=(6, 16))
+
         note = Card(page)
-        note.grid(row=1, column=0, sticky="ew", pady=(10, 0))
+        note.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         tk.Label(note, text="NGUYÊN TẮC SỬ DỤNG", bg=COLORS["surface"], fg=COLORS["warning"], font=FONTS["tiny"]).pack(anchor="w", padx=20, pady=(17, 7))
         tk.Label(
             note,
@@ -1036,11 +1096,11 @@ class ExamMonitorApp(tk.Tk):
     def _show_page(self, name: str) -> None:
         self._page_name = name
         titles = {
-            "dashboard": ("Tổng quan", "Trung tâm điều khiển phiên giám sát cục bộ"),
+            "dashboard": ("Tổng quan", "Trung tâm điều khiển phiên giám sát"),
             "monitor": ("Giám sát trực tiếp", "Mắt, hướng đầu và các tín hiệu rủi ro theo thời gian thực"),
             "events": ("Dòng sự kiện", "Bằng chứng có thể giải thích và quy trình giám thị xem lại"),
-            "report": ("Báo cáo phiên thi", "Tóm tắt rủi ro, sự kiện và dữ liệu xuất cục bộ"),
-            "settings": ("Cài đặt", "Điều chỉnh ngưỡng phát hiện cho môi trường demo"),
+            "report": ("Báo cáo phiên thi", "Tóm tắt mức ưu tiên rà soát, sự kiện và dữ liệu xuất"),
+            "settings": ("Cài đặt", "Ngưỡng phát hiện và kết nối VIGIL Hub"),
         }
         title, subtitle = titles[name]
         self.page_title.configure(text=title)
@@ -1059,6 +1119,8 @@ class ExamMonitorApp(tk.Tk):
             self._refresh_events()
         elif name == "report":
             self._refresh_report()
+        elif name == "monitor" and not self.monitoring:
+            self._load_hub_exams()
 
     def _quick_demo(self) -> None:
         self.source_var.set("Mô phỏng có sẵn")
@@ -1093,6 +1155,7 @@ class ExamMonitorApp(tk.Tk):
             return
         candidate = self.candidate_entry.get().strip() or "SV-DEMO-001"
         exam = self.exam_entry.get().strip() or "Kỳ thi thử nghiệm"
+        exam_id = next((e["id"] for e in self._hub_exams if e.get("name") == exam), None)
         source_label = self.source_var.get()
         try:
             if source_label == "Camera trực tiếp":
@@ -1126,7 +1189,18 @@ class ExamMonitorApp(tk.Tk):
             exam_name=exam,
             started_at=datetime.now().isoformat(timespec="seconds"),
             source_name=source.label,
+            exam_id=exam_id,
         )
+        source_kind, _ref, simulation = self._source_identity(source)
+        self.hub.open_session(session_id, {
+            "candidate_ref": candidate,
+            "exam_id": exam_id,
+            "exam_name": exam,
+            "source_kind": source_kind,
+            "simulation": simulation,
+            "started_at": _with_offset(self.session.started_at),
+        })
+        self._last_live_push = 0.0
         self.detector.reset()
         self.last_raw_frame = None
         self.last_display_frame = None
@@ -1151,7 +1225,7 @@ class ExamMonitorApp(tk.Tk):
         self.global_status.configure(text="Đang giám sát", fg=COLORS["text"])
         self.live_dot.configure(fg=COLORS["danger"])
         self.live_title.configure(text=f"LIVE  •  {candidate}", fg=COLORS["text"])
-        self.session_status.configure(text="Đang khởi tạo bộ phân tích cục bộ…", fg=COLORS["text"])
+        self.session_status.configure(text="Đang khởi tạo bộ phân tích…", fg=COLORS["text"])
         self._worker = threading.Thread(target=self._monitoring_loop, daemon=False, name="monitoring-worker")
         self._worker.start()
         self._toast("Phiên giám sát đã bắt đầu")
@@ -1172,14 +1246,7 @@ class ExamMonitorApp(tk.Tk):
         )
         if note is None:
             return
-        if isinstance(self.source, DemoSource):
-            source_kind, source_ref, simulation = "SIMULATION", "built-in-demo", True
-        elif isinstance(self.source, VideoSource):
-            source_kind = "VIDEO"
-            source_ref = str(getattr(self.source, "path", self._video_path or ""))
-            simulation = False
-        else:
-            source_kind, source_ref, simulation = "CAMERA", "camera:0", False
+        source_kind, source_ref, simulation = self._source_identity(self.source)
 
         future = self._bookmark_executor.submit(
             persist_local_bookmark,
@@ -1236,6 +1303,16 @@ class ExamMonitorApp(tk.Tk):
         frames = 0
         fps_started = time.monotonic()
         last_emit = 0.0
+        # Hub only: a short MP4 around each signal (local review keeps using the snapshot)
+        clips = recorder = None
+        if self.hub.configured and self._save_evidence_enabled:
+            clips = ClipRecorder(lambda event_id, path: self.hub.add_clip(session.session_id, event_id, path))
+        if self.hub.configured:
+            # The whole session on video for VIGIL Hub (one file per session once it ends)
+            recorder = SessionRecorder(
+                self.store.evidence_dir.parent / "recordings" / session.session_id,
+                lambda seq, path, start_ms, duration_s: self.hub.add_video_segment(session.session_id, seq, start_ms, duration_s, path),
+                started=self._session_started_monotonic)
         try:
             while not self._stop_worker.is_set():
                 ok, frame = source.read()
@@ -1252,6 +1329,7 @@ class ExamMonitorApp(tk.Tk):
                         confidence=1.0,
                     )
                     session.events.append(interrupted)
+                    self._sync_event(session, interrupted)
                     self._put_message("event", interrupted)
                     self._put_message("error", "Không nhận được khung hình từ nguồn đã chọn.")
                     break
@@ -1283,6 +1361,10 @@ class ExamMonitorApp(tk.Tk):
                         audio_level_db=audio_state.level_db,
                         status_text=status_text,
                     )
+                if clips is not None:
+                    clips.push(frame, now)
+                if recorder is not None:
+                    recorder.push(frame, now)
                 created = self.detector.update(result, session.session_id, now)
                 if created:
                     for event in created:
@@ -1290,10 +1372,17 @@ class ExamMonitorApp(tk.Tk):
                             path = self.store.evidence_dir / f"{session.session_id}_{event.event_id}.jpg"
                             cv2.imwrite(str(path), frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
                             event.evidence_path = str(path)
+                        if clips is not None:
+                            clips.request(f"{session.session_id}-{event.event_id}"[:36],
+                                          self.store.evidence_dir / f"{session.session_id}_{event.event_id}.mp4", now)
                         session.events.append(event)
+                        self._sync_event(session, event, now)
                         self._put_message("event", event)
 
                 display = OverlayRenderer.draw(frame, result, show_landmarks=self._show_landmarks_enabled)
+                if now - self._last_live_push >= 2.0:
+                    self._last_live_push = now
+                    self._push_live(session, display, result, frames, fps_started, now)
                 frames += 1
                 elapsed = max(0.001, now - fps_started)
                 fps = frames / elapsed
@@ -1309,6 +1398,10 @@ class ExamMonitorApp(tk.Tk):
         finally:
             if audio_detector is not None:
                 audio_detector.stop()
+            if recorder is not None:
+                recorder.close()
+            if clips is not None:
+                clips.close()
             source.release()
             self._put_message("worker_stopped", None)
 
@@ -1374,6 +1467,16 @@ class ExamMonitorApp(tk.Tk):
             self.after(100, self.stop_session)
         elif kind == "bookmark_saved":
             self._on_bookmark_saved(payload)
+        elif kind == "sync":
+            self._on_sync_status(payload)
+        elif kind == "hub_exams":
+            self._hub_exams = payload or []
+            names = [e["name"] for e in self._hub_exams]
+            self.exam_entry.configure(values=names)
+            if names and not self.monitoring and self.exam_var.get() in ("", "Kỳ thi thử nghiệm"):
+                self.exam_var.set(names[0])
+        elif kind == "hub_paired":
+            self._on_hub_paired(payload)
 
     def _on_bookmark_saved(self, bookmark: ProctorBookmark) -> None:
         with self._bookmark_futures_lock:
@@ -1385,10 +1488,21 @@ class ExamMonitorApp(tk.Tk):
             return
         target.bookmarks.append(bookmark)
         self.store.save_session(target)
+        if bookmark.evidence_status == "READY" and bookmark.snapshot_path:
+            self.hub.add_bookmark(target.session_id, {
+                "request_id": bookmark.request_id,
+                "frame_id": bookmark.frame_id,
+                "session_elapsed_ms": round(bookmark.session_elapsed_ms, 1),
+                "captured_at": _with_offset(bookmark.captured_at),
+                "note": bookmark.note,
+                "source_kind": bookmark.source_kind,
+                "width": bookmark.coordinate_space.get("width", 0),
+                "height": bookmark.coordinate_space.get("height", 0),
+            }, bookmark.snapshot_path)
         if self._page_name == "events":
             self._refresh_events()
         if bookmark.evidence_status == "READY":
-            self._toast("Đã lưu bookmark của giám thị")
+            self._toast("Đã lưu khung hình đánh dấu")
         else:
             self._toast(f"Bookmark đã ghi nhận nhưng ảnh lỗi: {bookmark.error_message}", danger=True)
 
@@ -1522,23 +1636,23 @@ class ExamMonitorApp(tk.Tk):
             return
         if not wait_for_worker_shutdown(self._worker, self._stop_worker, timeout=5.0):
             self.session_status.configure(
-                text="Worker did not stop; session has not been finalized.",
+                text="Bộ phân tích chưa dừng; phiên chưa được chốt.",
                 fg=COLORS["danger"],
             )
             messagebox.showerror(
-                "Unable to stop safely",
-                "The analysis worker is still running. A new session cannot start yet.",
+                "Chưa thể dừng an toàn",
+                "Bộ phân tích vẫn đang chạy. Chưa thể bắt đầu phiên mới.",
                 parent=self,
             )
             return
         if not self._wait_for_bookmark_io(timeout=5.0):
             self.session_status.configure(
-                text="Bookmark I/O is still running; session has not been finalized.",
+                text="Đang ghi khung hình đánh dấu; phiên chưa được chốt.",
                 fg=COLORS["danger"],
             )
             messagebox.showerror(
-                "Unable to save bookmark safely",
-                "A marked frame is still being written. Please try stopping again.",
+                "Chưa lưu xong khung hình đánh dấu",
+                "Một khung hình đánh dấu vẫn đang được ghi. Hãy thử kết thúc lại.",
                 parent=self,
             )
             return
@@ -1546,6 +1660,11 @@ class ExamMonitorApp(tk.Tk):
         if self.session:
             self.session.ended_at = datetime.now().isoformat(timespec="seconds")
             self.store.save_session(self.session)
+            self.hub.stop_session(self.session.session_id, {
+                "ended_at": _with_offset(self.session.ended_at),
+                "frame_count": self.session.frame_count,
+                "average_fps": round(self.session.average_fps, 2),
+            })
             self.last_session = self.session
         self.start_button.configure(state="normal")
         self.start_button.configure(text="BẮT ĐẦU GIÁM SÁT")
@@ -1560,7 +1679,8 @@ class ExamMonitorApp(tk.Tk):
         self.global_status.configure(text="Sẵn sàng", fg=COLORS["text_muted"])
         self.live_dot.configure(fg=COLORS["text_dim"])
         self.live_title.configure(text="PHIÊN ĐÃ KẾT THÚC", fg=COLORS["text_muted"])
-        self.session_status.configure(text="Phiên đã được lưu cục bộ. Mở Báo cáo để xem tóm tắt.", fg=COLORS["text_muted"])
+        saved_where = "trên máy và đang gửi tới VIGIL Hub" if self.hub.configured else "trên máy"
+        self.session_status.configure(text=f"Phiên đã được lưu {saved_where}. Mở Báo cáo để xem tóm tắt.", fg=COLORS["text_muted"])
         self._toast("Đã lưu phiên giám sát")
         self._refresh_dashboard()
         self._refresh_events()
@@ -1642,7 +1762,7 @@ class ExamMonitorApp(tk.Tk):
                 "",
                 "end",
                 iid=f"ai:{event.event_id}",
-                values=(time_text, event.label, event.severity_label, f"{event.duration_seconds:.1f}s", f"{event.confidence * 100:.0f}%", event.review_status),
+                values=(time_text, event.label, event.severity_label, f"{event.duration_seconds:.1f}s", f"{event.confidence * 100:.0f}%", event.review_label),
             )
         for bookmark in reversed(self._current_bookmarks()):
             time_text = bookmark.captured_at.split("T")[-1]
@@ -1652,11 +1772,11 @@ class ExamMonitorApp(tk.Tk):
                 iid=f"bookmark:{bookmark.bookmark_id}",
                 values=(
                     time_text,
-                    "Frame do giám thị đánh dấu",
-                    "HUMAN",
+                    "Khung hình được đánh dấu thủ công",
+                    "THỦ CÔNG",
                     f"{bookmark.session_elapsed_ms / 1000:.1f}s",
                     "—",
-                    bookmark.review_decision,
+                    REVIEW_LABELS.get(bookmark.review_decision, bookmark.review_decision),
                 ),
             )
 
@@ -1680,7 +1800,7 @@ class ExamMonitorApp(tk.Tk):
         note = simpledialog.askstring("Xem lại cảnh báo", f"{event.label}\n{event.reason}\n\nGhi chú của giám thị:", parent=self)
         if note is None:
             return
-        event.review_status = "Đã xem"
+        event.review_status = "INCONCLUSIVE"  # seen and noted here; the decision is taken on VIGIL Hub
         event.reviewer_note = note.strip()
         target = self.session or self.last_session
         if target:
@@ -1690,7 +1810,7 @@ class ExamMonitorApp(tk.Tk):
 
     def _open_bookmark_viewer(self, bookmark: ProctorBookmark) -> None:
         window = tk.Toplevel(self)
-        window.title(f"Proctor bookmark {bookmark.bookmark_id}")
+        window.title(f"Khung hình đánh dấu {bookmark.bookmark_id}")
         window.geometry("900x680")
         window.configure(bg=COLORS["bg"])
         window.transient(self)
@@ -1699,7 +1819,7 @@ class ExamMonitorApp(tk.Tk):
         header.pack(fill="x")
         tk.Label(
             header,
-            text="FRAME DO GIÁM THỊ ĐÁNH DẤU",
+            text="KHUNG HÌNH ĐÁNH DẤU THỦ CÔNG",
             bg=COLORS["surface"],
             fg=COLORS["text"],
             font=FONTS["h2"],
@@ -1784,7 +1904,7 @@ class ExamMonitorApp(tk.Tk):
             {
                 "previous_decision": previous,
                 "decision": decision,
-                "reviewer_id": "Local_Proctor",
+                "reviewer_id": "VIGIL_One",
                 "note": bookmark.note,
                 "reviewed_at": datetime.now().isoformat(timespec="seconds"),
             }
@@ -1805,18 +1925,19 @@ class ExamMonitorApp(tk.Tk):
         duration = session.duration_seconds
         self.report_session_label.configure(text=f"{session.session_id}  •  {session.candidate_id}  •  {session.exam_name}")
         self.report_meta.configure(
-            text=f"Thời lượng: {duration / 60:.1f} phút\nNguồn: {session.source_name}\nSự kiện: {len(session.events)}\nFPS trung bình: {session.average_fps:.1f}"
+            text=f"Thời lượng: {duration / 60:.1f} phút\nNguồn: {session.source_name}\nSự kiện: {len(session.events)}"
+            + (f"\nFPS trung bình: {session.average_fps:.1f}" if self.debug_mode else "")
         )
         counts = {Severity.LOW: 0, Severity.MEDIUM: 0, Severity.HIGH: 0}
         for event in session.events:
             if event.severity in counts:
                 counts[event.severity] += 1
-        reviewed = sum(event.review_status == "Đã xem" for event in session.events)
+        reviewed = sum(normalize_review_status(event.review_status) != "PENDING" for event in session.events)
         text = (
             f"Phiên thi ghi nhận {len(session.events)} sự kiện: {counts[Severity.HIGH]} mức cao, "
             f"{counts[Severity.MEDIUM]} mức trung bình và {counts[Severity.LOW]} mức thấp. "
             f"Hiện có {reviewed}/{len(session.events)} cảnh báo đã được giám thị xem lại.\n\n"
-            "Điểm rủi ro dùng để ưu tiên phiên cần kiểm tra, không phải điểm kết luận gian lận. "
+            "Mức ưu tiên rà soát dùng để sắp xếp phiên cần kiểm tra, không phải điểm kết luận gian lận. "
             "Cần xem ảnh bằng chứng, bối cảnh kỳ thi và ghi chú của giám thị trước khi đưa ra quyết định."
         )
         self.report_text.configure(state="normal")
@@ -1885,23 +2006,173 @@ class ExamMonitorApp(tk.Tk):
                 writer = csv.writer(handle)
                 writer.writerow(["ID", "Nguồn", "Loại", "Mức độ", "Bắt đầu", "Thời lượng", "Tin cậy", "Lý do", "Trạng thái", "Ghi chú", "Ảnh", "SHA-256"])
                 for event in session.events:
-                    writer.writerow([event.event_id, "AI_SIGNAL", event.label, event.severity_label, event.started_at, event.duration_seconds, event.confidence, event.reason, event.review_status, event.reviewer_note, event.evidence_path, ""])
+                    writer.writerow([event.event_id, "AI_SIGNAL", event.label, event.severity_label, event.started_at, event.duration_seconds, event.confidence, event.reason, normalize_review_status(event.review_status), event.reviewer_note, event.evidence_path, ""])
                 for bookmark in session.bookmarks:
                     writer.writerow([
                         bookmark.bookmark_id,
                         "PROCTOR_BOOKMARK",
-                        "Frame do giám thị đánh dấu",
+                        "Khung hình được đánh dấu thủ công",
                         "HUMAN",
                         bookmark.captured_at,
                         bookmark.session_elapsed_ms / 1000,
                         "",
-                        "Observable frame selected by human proctor",
+                        "Khung hình do người dùng chọn",
                         bookmark.review_decision,
                         bookmark.note,
                         bookmark.snapshot_path,
                         bookmark.sha256,
                     ])
             self._toast("Đã xuất danh sách CSV")
+
+    # ------------------------------------------------------------ VIGIL Hub
+    @staticmethod
+    def _source_identity(source) -> tuple[str, str, bool]:
+        if isinstance(source, DemoSource):
+            return "SIMULATION", "built-in-demo", True
+        if isinstance(source, VideoSource):
+            return "VIDEO", str(getattr(source, "path", "")), False
+        return "CAMERA", "camera:0", False
+
+    def _sync_event(self, session: SessionInfo, event: MonitoringEvent, now: float | None = None) -> None:
+        """Queue one AI signal (and its snapshot) for VIGIL Hub. Runs on the worker thread."""
+        if not self.hub.configured:
+            return
+        now = time.monotonic() if now is None else now
+        elapsed_ms = max(0.0, (now - self._session_started_monotonic - event.duration_seconds) * 1000.0)
+        payload = {
+            # Hub event ids are global: prefix the short local id with the session id
+            "event_id": f"{session.session_id}-{event.event_id}"[:36],
+            "event_type": event.event_type.value,
+            "severity": event.severity.value,
+            "started_at": _with_offset(event.started_at),
+            "ended_at": _with_offset(event.ended_at),
+            "duration_seconds": round(event.duration_seconds, 2),
+            "session_elapsed_ms": round(elapsed_ms, 1),
+            "confidence": round(float(event.confidence), 3),
+            "label": event.label,
+            "reason": event.reason,
+            "capability_health": self._capability_health(),
+        }
+        evidence = event.evidence_path if event.evidence_path and Path(event.evidence_path).is_file() else None
+        self.hub.add_event(session.session_id, payload, evidence)
+
+    def _capability_health(self) -> dict[str, str]:
+        if isinstance(self.source, DemoSource):
+            return {"face": "MOCK", "objects": "MOCK", "audio": "MOCK"}
+        analyzer = self.analyzer
+        backend = getattr(analyzer, "backend_name", "") or ""
+        return {
+            "face": "ENABLED" if analyzer and "MediaPipe" in backend else ("DEGRADED" if analyzer else "DISABLED"),
+            "objects": "ENABLED" if analyzer and getattr(analyzer, "_object_detector", None) is not None else "DISABLED",
+            "audio": "ENABLED" if self._audio_confirmation_enabled else "DISABLED",
+        }
+
+    def _push_live(self, session: SessionInfo, display, result, frames: int, fps_started: float, now: float) -> None:
+        """Latest state (and a small frame) for the Hub's video wall. Worker thread, every 2 s."""
+        if not self.hub.configured:
+            return
+        jpeg = None
+        if bool(self.settings.get("hub_live_preview", True)):
+            height, width = display.shape[:2]
+            scale = LIVE_THUMB_WIDTH / max(1, width)
+            small = cv2.resize(display, (LIVE_THUMB_WIDTH, max(1, int(height * scale))), interpolation=cv2.INTER_AREA) if scale < 1 else display
+            ok, encoded = cv2.imencode(".jpg", small, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+            jpeg = encoded.tobytes() if ok else None
+        labels = {"center": "THẲNG", "left": "TRÁI", "right": "PHẢI", "up": "TRÊN", "down": "DƯỚI", "unknown": "—"}
+        if result.face_count == 0:
+            eye = "—"
+        elif not result.calibrated:
+            eye = "ĐANG HỌC"
+        else:
+            eye = f"NGOÀI • {labels.get(result.eye_direction, '—')}" if result.eyes_outside_zone else "TRONG VÙNG"
+        status = {
+            "fps": round(frames / max(0.001, now - fps_started), 1),
+            "eye": eye,
+            "head": labels.get(result.head_direction, "—") if result.face_count else "—",
+            "people": int(result.detected_people_count),
+            "alerts": len(session.events),
+            "risk_score": session.risk_score,
+            "calibrated": bool(result.calibrated),
+            "capability_health": self._capability_health(),
+            "source_kind": self._source_identity(self.source)[0],
+            "frame_count": frames,
+        }
+        self.hub.update_live(session.session_id, status, jpeg)
+
+    def _load_hub_exams(self) -> None:
+        if not self.hub.configured:
+            return
+        threading.Thread(target=lambda: self._put_message("hub_exams", self.hub.list_exams()), daemon=True, name="hub-exams").start()
+
+    def _pair_hub(self) -> None:
+        url = self.hub_url_var.get().strip()
+        code = self.hub_code_var.get().strip()
+        if not url or not code:
+            self._toast("Nhập địa chỉ Hub và mã ghép nối", danger=True)
+            return
+        self.hub_pair_button.configure(state="disabled", text="ĐANG GHÉP…")
+
+        def work() -> None:
+            try:
+                device = self.hub.pair(url, code)
+                self._put_message("hub_paired", {"ok": True, "device": device})
+            except HubError as exc:
+                self._put_message("hub_paired", {"ok": False, "error": str(exc)})
+
+        threading.Thread(target=work, daemon=True, name="hub-pair").start()
+
+    def _on_hub_paired(self, result: dict) -> None:
+        self.hub_pair_button.configure(state="normal", text="GHÉP NỐI")
+        if not result.get("ok"):
+            self._toast(result.get("error") or "Ghép nối thất bại", danger=True)
+            self.hub_status_label.configure(text=result.get("error") or "", fg=COLORS["danger"])
+            return
+        self.settings["hub_url"] = self.hub.base_url
+        self.settings["hub_token"] = self.hub.token
+        self._save_settings()
+        self.hub_code_var.set("")
+        self._toast("Đã ghép nối VIGIL Hub")
+        self._on_sync_status(self.hub.status())
+        self._load_hub_exams()
+
+    def _unpair_hub(self) -> None:
+        if self.monitoring:
+            self._toast("Hãy kết thúc phiên trước khi ngắt kết nối", danger=True)
+            return
+        if not messagebox.askyesno("Ngắt kết nối VIGIL Hub",
+                                   "Máy này sẽ chỉ lưu dữ liệu tại chỗ. Các mục chưa gửi vẫn được giữ lại.\nTiếp tục?", parent=self):
+            return
+        self.settings.pop("hub_token", None)
+        self._save_settings()
+        self.hub.configure(self.hub.base_url, "")
+        self._hub_exams = []
+        self.exam_entry.configure(values=())
+        self._on_sync_status(self.hub.status())
+
+    def _on_sync_status(self, status: SyncStatus) -> None:
+        texts = {
+            DISABLED: ("●  CHỈ LƯU TRÊN MÁY", COLORS["text_dim"], "Chưa ghép nối VIGIL Hub"),
+            SYNCED: ("●  ĐÃ ĐỒNG BỘ", COLORS["good"], f"VIGIL Hub: {status.hub_url}"),
+            PENDING: ("●  ĐANG GỬI", COLORS["warning"], f"Còn {status.pending} mục chờ gửi"),
+            OFFLINE: ("●  MẤT KẾT NỐI HUB", COLORS["danger"], f"{status.pending} mục được giữ trên máy, sẽ gửi lại khi có mạng"),
+            UNPAIRED: ("●  CẦN GHÉP NỐI LẠI", COLORS["danger"], "Hub đã thu hồi thiết bị này; dữ liệu vẫn lưu trên máy"),
+        }
+        badge, color, detail = texts.get(status.state, texts[DISABLED])
+        if status.failed:
+            detail += f" • {status.failed} mục bị Hub từ chối"
+        if hasattr(self, "sync_badge"):
+            self.sync_badge.configure(text=badge, fg=color)
+            self.sync_detail.configure(text=detail)
+        if hasattr(self, "dashboard_values"):
+            short = {DISABLED: "TẠI CHỖ", SYNCED: "ĐÃ ĐỒNG BỘ", PENDING: f"CHỜ {status.pending}", OFFLINE: "MẤT MẠNG", UNPAIRED: "LỖI GHÉP"}
+            self.dashboard_values["mode"].configure(text=short.get(status.state, "—"), fg=color)
+        if hasattr(self, "hub_status_label"):
+            extra = f"\nLỗi gần nhất: {status.last_error}" if status.last_error else ""
+            self.hub_status_label.configure(text=f"Trạng thái: {badge.strip('● ').strip()} — {detail}{extra}", fg=color)
+
+    def _save_setting(self, key: str, value) -> None:
+        self.settings[key] = value
+        self._save_settings()
 
     def _setting_changed(self, event_type: EventType) -> None:
         value = self.setting_vars[event_type].get()
@@ -1949,6 +2220,7 @@ class ExamMonitorApp(tk.Tk):
             if self.monitoring or (self._worker and self._worker.is_alive()):
                 return
         self._bookmark_executor.shutdown(wait=True, cancel_futures=False)
+        self.hub.drain(timeout=3.0)  # anything left stays in the outbox for the next launch
         if self.analyzer:
             try:
                 self.analyzer.close()
@@ -1959,12 +2231,12 @@ class ExamMonitorApp(tk.Tk):
     def _recalibrate(self) -> None:
         if self.analyzer is None:
             self.session_status.configure(
-                text="Start a real camera/video source before calibration.",
+                text="Hãy bắt đầu với camera hoặc video thật trước khi hiệu chỉnh.",
                 fg=COLORS["text_muted"],
             )
             return
         self.analyzer.reset_calibration()
-        self.calibration_text.configure(text="Look at the center target... 0%", fg=COLORS["warning"])
+        self.calibration_text.configure(text="Nhìn vào tâm màn hình… 0%", fg=COLORS["warning"])
         self._draw_progress(self.calibration_bar, 0.0)
 
     def _capture_screenshot(self) -> None:
@@ -1983,6 +2255,17 @@ class ExamMonitorApp(tk.Tk):
         ImageGrab.grab(bbox=(x, y, x + width, y + height), all_screens=True).save(self._screenshot_path)
         self.attributes("-topmost", False)
         self.after(200, self._on_close)
+
+
+def _with_offset(value: str | None) -> str | None:
+    """Local wall-clock ISO text -> ISO with this computer's UTC offset (what the Hub expects)."""
+    if not value:
+        return value
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return value
+    return (parsed if parsed.tzinfo else parsed.astimezone()).isoformat(timespec="milliseconds")
 
 
 def run(auto_demo: bool = False, screenshot_path: str | None = None) -> None:

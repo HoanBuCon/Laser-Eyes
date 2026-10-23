@@ -25,6 +25,10 @@ from classroom_monitor.temporal_episode_engine import TemporalEpisode
 logger = logging.getLogger("DemoExporter")
 
 
+def _round_or_none(value, digits: int = 2):
+    return None if value is None else round(float(value), digits)
+
+
 def export_demo_artifacts(
     output_dir: Path,
     episodes: List[TemporalEpisode],
@@ -231,12 +235,18 @@ def export_demo_artifacts(
         "total_wall_time_sec": round(float(runtime_stats.get("wall_time_sec", 0.0)), 2),
         "total_video_time_sec": round(float(scene_metadata.get("duration_sec", 0.0)), 2),
         "realtime_factor": round(float(runtime_stats.get("realtime_factor", 0.0)), 2),
+        # From the first analysed frame to the last: what the LIVE page experiences
+        "steady_realtime_factor": _round_or_none(runtime_stats.get("steady_realtime_factor")),
+        "steady_analysed_fps": _round_or_none(runtime_stats.get("steady_analysed_fps")),
         "hardware": {
             "device": "cuda" if torch.cuda.is_available() else "cpu",
             "gpu_name": gpu_name,
             "torch_version": torch.__version__,
         },
         "head_pose_runtime": runtime_stats.get("head_pose_runtime", {}),
+        "yolo_breakdown_ms": runtime_stats.get("yolo_breakdown_ms", {}),
+        "stride": runtime_stats.get("stride", 1),
+        "skipped_frames": runtime_stats.get("skipped_frames", 0),
         "stage_latency_averages_ms": {
             "perception_yolo_pose": round(float(runtime_stats.get("lat_perception_avg_ms", 0.0)), 2),
             "observation_6drepnet": round(float(runtime_stats.get("lat_6drepnet_avg_ms", 0.0)), 2),

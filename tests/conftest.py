@@ -17,6 +17,8 @@ _TEST_DATA_DIR = Path(tempfile.mkdtemp(prefix="vigil-tests-"))
 os.environ["DATABASE_URL"] = f"sqlite:///{(_TEST_DATA_DIR / 'vigil_test.db').as_posix()}"
 os.environ["VIGIL_PROCTOR_EVIDENCE_ROOT"] = str(_TEST_DATA_DIR / "proctor_bookmarks")
 os.environ["VIGIL_PLAYBACK_CACHE_ROOT"] = str(_TEST_DATA_DIR / "evidence_playback")
+# Server-side VIGIL One analysis runs on worker threads in a real server; tests drive it explicitly.
+os.environ.setdefault("VIGIL_ONE_ANALYSIS", "0")
 
 
 @pytest.fixture(autouse=True)

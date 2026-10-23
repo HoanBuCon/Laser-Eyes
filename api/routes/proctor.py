@@ -200,10 +200,12 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
     return {
         "queue_id": f"AI:{event.event_id}",
         "source_type": "AI_INCIDENT",
-        "source_product": "VIGIL_CLASSROOM",
+        "source_product": event.source_product or "VIGIL_CLASSROOM",
         "event_id": event.event_id,
         "session_id": event.session_id,
-        "subject_ref": event.seat.seat_code if event.seat else None,
+        "subject_ref": event.seat.seat_code if event.seat else event.subject_ref,
+        "label": meta.get("label"),
+        "reason": meta.get("reason"),
         "primary_signal": event.primary_signal or event.behavior,
         "supporting_signals": supporting_signals,
         "severity": event.severity,
@@ -236,7 +238,7 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
         if evidence and evidence.snapshot_path
         else None,
         "video_url": f"/api/v1/demo/events/{event.event_id}/evidence/video"
-        if evidence and (evidence.video_path or evidence.file_path)
+        if evidence and str(evidence.video_path or evidence.file_path or "").lower().endswith(".mp4")
         else None,
         "sha256": evidence.video_sha256 if evidence else None,
         "file_size_bytes": evidence.file_size_bytes if evidence else 0,
@@ -275,6 +277,7 @@ def _bookmark_status(item: dict[str, Any]) -> str:
 def get_review_queue(
     status: str = Query("PENDING", pattern="^(ALL|PENDING|CONFIRMED|REJECTED|INCONCLUSIVE)$"),
     source: str = Query("ALL", pattern="^(ALL|AI|MANUAL)$"),
+    product: str = Query("ALL", pattern="^(ALL|CLASSROOM|ONE)$", description="VIGIL Classroom or VIGIL One"),
     room: Optional[str] = Query(None, description="Room code"),
     pattern_name: Optional[str] = Query(None, alias="pattern"),
     severity: Optional[str] = Query(None),
@@ -308,13 +311,20 @@ def get_review_queue(
         ai_query = ai_query.filter(DetectionEvent.session_id == session_id)
     if event_id:
         ai_query = ai_query.filter(DetectionEvent.event_id == event_id)
+    if product == "ONE":
+        ai_query = ai_query.filter(DetectionEvent.source_product == "VIGIL_ONE")
+    elif product == "CLASSROOM":
+        ai_query = ai_query.filter((DetectionEvent.source_product.is_(None)) | (DetectionEvent.source_product != "VIGIL_ONE"))
 
     items: list[dict[str, Any]] = []
     if source in ("ALL", "AI"):
         items += [_serialize_ai_event(event) for event in ai_query.order_by(DetectionEvent.created_at.desc()).limit(2000)]
     # Bookmarks have no room/pattern/severity of their own: only shown without those filters
     if source in ("ALL", "MANUAL") and not (room or pattern_name or severity or event_id):
-        items += [{**serialize_bookmark(b), "review_status": None} for b in list_bookmarks(db, session_id=session_id, limit=1000)]
+        bookmarks = list_bookmarks(db, session_id=session_id, limit=1000)
+        if product != "ALL":
+            bookmarks = [b for b in bookmarks if (b.source_product == "VIGIL_ONE") == (product == "ONE")]
+        items += [{**serialize_bookmark(b), "review_status": None} for b in bookmarks]
         for item in items:
             if item.get("source_type") == "MANUAL_BOOKMARK":
                 item["review_status"] = _bookmark_status(item)
@@ -349,6 +359,11 @@ def get_review_queue(
         .order_by(ExamRoom.room_code)
         .all()
     )
+    product_rows = dict(
+        db.query(func.coalesce(DetectionEvent.source_product, "VIGIL_CLASSROOM"), func.count(DetectionEvent.id))
+        .group_by(func.coalesce(DetectionEvent.source_product, "VIGIL_CLASSROOM"))
+        .all()
+    )
     pattern_rows = (
         db.query(func.coalesce(DetectionEvent.primary_pattern, DetectionEvent.behavior), func.count(DetectionEvent.id))
         .group_by(func.coalesce(DetectionEvent.primary_pattern, DetectionEvent.behavior))
@@ -361,6 +376,7 @@ def get_review_queue(
         "closed_unresolved": closed_unresolved,
         "facets": {
             "rooms": [{"code": code, "name": name, "count": n} for code, name, n in room_rows if code],
+            "products": {"CLASSROOM": int(product_rows.get("VIGIL_CLASSROOM", 0)), "ONE": int(product_rows.get("VIGIL_ONE", 0))},
             "patterns": sorted(({"name": name, "count": n} for name, n in pattern_rows if name), key=lambda p: -p["count"]),
         },
     }

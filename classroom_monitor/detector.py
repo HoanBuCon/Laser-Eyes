@@ -8,14 +8,29 @@ small object detail (e.g., phones at the back of large lecture halls).
 from __future__ import annotations
 
 import logging
+import os
+from dataclasses import replace
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 from classroom_monitor.config import DEFAULT_CONFIG, ClassroomConfig
 from classroom_monitor.models import Detection
 from classroom_monitor.spatial_matcher import compute_bbox_iou
+
+
+def _cuda_half(env_name: str) -> bool:
+    """Half precision on an NVIDIA GPU (about twice the speed, same detections in practice);
+    the environment variable set to 0 keeps float32."""
+    if os.getenv(env_name, "1") == "0":
+        return False
+    try:
+        import torch
+
+        return bool(torch.cuda.is_available())
+    except Exception:
+        return False
 
 logger = logging.getLogger("ClassroomDetector")
 
@@ -370,6 +385,8 @@ class PoseClassroomDetector:
         self._is_mock = False
         self.allow_mock = bool(allow_mock)
         self.model_error: Optional[str] = None
+        self.half = _cuda_half("VIGIL_YOLO_FP16")
+        self.last_speed: Dict[str, float] = {}
 
         self._initialize_model()
 
@@ -433,6 +450,7 @@ class PoseClassroomDetector:
                 classes=[0],  # Person class
                 conf=self.confidence,
                 imgsz=self.config.pose_input_resolution,
+                half=self.half,
                 verbose=False,
             )[0]
         except Exception as exc:
@@ -440,6 +458,8 @@ class PoseClassroomDetector:
             logger.error("%s", self.model_error)
             raise ModelUnavailableError(self.model_error) from exc
 
+        # Ultralytics' own split (ms): CPU letterbox / GPU model / NMS + keypoints
+        self.last_speed = dict(getattr(results, "speed", None) or {})
         if results.boxes is None or len(results.boxes) == 0:
             return []
 
@@ -544,4 +564,14 @@ def create_detector(
     if cfg.pipeline_mode == "2stage_pose":
         return PoseClassroomDetector(model_path=model_path, config=cfg)
     return ClassroomDetector(model_path=model_path, config=cfg)
+
+
+def pose_detector_for(demo_config: Any, *, allow_mock: bool = False) -> "PoseClassroomDetector":
+    """The pose detector of a Classroom run, at the input size the run asks for (``pose_imgsz``)."""
+    imgsz = int(getattr(demo_config, "pose_imgsz", 0) or DEFAULT_CONFIG.pose_input_resolution)
+    return PoseClassroomDetector(
+        confidence_threshold=getattr(demo_config, "pose_conf", None),
+        config=replace(DEFAULT_CONFIG, pose_input_resolution=imgsz),
+        allow_mock=allow_mock,
+    )
 

@@ -27,6 +27,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import relationship
 
@@ -206,6 +207,28 @@ class ExamSession(Base):
     closed_at = Column(DateTime, nullable=True)
     closed_by = Column(String(100), nullable=True)
     close_note = Column(Text, nullable=True)
+    # Product that produced the session: CLASSROOM (room camera) or ONE (one
+    # candidate on their own computer, synced from the VIGIL One desktop app)
+    product = Column(String(20), default="CLASSROOM", index=True)
+    subject_ref = Column(String(100), nullable=True)   # VIGIL One: candidate code
+    subject_name = Column(String(255), nullable=True)
+    device_id = Column(String(36), ForeignKey("client_devices.id"), nullable=True)
+    client_session_id = Column(String(64), nullable=True, unique=True, index=True)  # idempotency key from the client
+    candidate_id = Column(String(36), ForeignKey("candidates.id"), nullable=True)  # online exam candidate
+    simulation = Column(Boolean, default=False)
+    last_heartbeat_at = Column(DateTime, nullable=True)
+    live_status_json = Column(Text, nullable=True)
+    # VIGIL One full-session recording: segments uploaded during the exam, joined into one MP4 at the end
+    video_status = Column(String(20), nullable=True)   # RECORDING, MERGING, READY, PARTIAL, FAILED
+    video_path = Column(String(500), nullable=True)
+    video_sha256 = Column(String(64), nullable=True)
+    video_duration_s = Column(Float, nullable=True)
+    video_gaps_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] of the exam with no video
+    video_error = Column(Text, nullable=True)
+    # VIGIL One: where the perception runs.  SERVER = the candidate's computer only records and
+    # uploads video, the Hub analyses it (storage.one_analysis); CLIENT = the app analyses locally.
+    analysis_mode = Column(String(10), nullable=True)
+    analysis_state_json = Column(Text, nullable=True)   # calibration, next segment, pending clips
 
     # Relationships
     room = relationship("ExamRoom", back_populates="sessions")
@@ -255,6 +278,10 @@ class DetectionEvent(Base):
     # Timing and reviewer context of the incident (behaviour start, first/last
     # flag, occurrence count, where the student is in the frame, cues)
     incident_metadata_json = Column(Text, nullable=True)
+    # Which product raised the signal and whom it is about (candidate code for
+    # VIGIL One, seat code for Classroom)
+    source_product = Column(String(30), default="VIGIL_CLASSROOM", index=True)
+    subject_ref = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
     # Relationships
@@ -624,6 +651,10 @@ class Exam(Base):
     status = Column(String(20), default="ACTIVE")  # "ACTIVE", "ARCHIVED"
     created_by = Column(String(100), nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    # Online exam with VIGIL One: candidates join with this code (+ their code and PIN)
+    join_code = Column(String(12), nullable=True, unique=True, index=True)
+    join_open = Column(Boolean, default=False)
+    one_policy_json = Column(Text, nullable=True)  # monitoring policy pushed to the candidates' VIGIL One
 
 
 class SessionReportVersion(Base):
@@ -638,3 +669,78 @@ class SessionReportVersion(Base):
     content_sha256 = Column(String(64), nullable=False)
     approved_by = Column(String(100), nullable=False)
     approved_at = Column(DateTime, default=datetime.datetime.utcnow)
+
+
+# ---- VIGIL One: paired desktop clients ----------------------------------------
+
+class ClientDevice(Base):
+    """A VIGIL One desktop paired with this server; only the SHA-256 of its token is stored."""
+
+    __tablename__ = "client_devices"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    name = Column(String(120), nullable=False)
+    hostname = Column(String(255), nullable=True)
+    app_version = Column(String(50), nullable=True)
+    token_hash = Column(String(64), nullable=False, unique=True, index=True)
+    paired_by = Column(String(100), nullable=True)
+    paired_at = Column(DateTime, default=datetime.datetime.utcnow)
+    last_seen_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    # PAIRED: a computer a chief paired by code; CANDIDATE: issued when a candidate joins an online exam
+    kind = Column(String(20), default="PAIRED")
+    candidate_id = Column(String(36), ForeignKey("candidates.id"), nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+
+class PairingCode(Base):
+    """A short one-time code a chief proctor hands to a VIGIL One computer."""
+
+    __tablename__ = "pairing_codes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    code_hash = Column(String(64), nullable=False, unique=True, index=True)
+    created_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    expires_at = Column(DateTime, nullable=False)
+    used_at = Column(DateTime, nullable=True)
+    device_id = Column(String(36), ForeignKey("client_devices.id"), nullable=True)
+
+
+class SessionVideoSegment(Base):
+    """One piece of a VIGIL One session recording, as uploaded (kept after joining, with its digest)."""
+
+    __tablename__ = "session_video_segments"
+    __table_args__ = (UniqueConstraint("session_id", "seq", name="uq_session_video_segment"),)
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    session_id = Column(String(36), ForeignKey("exam_sessions.id"), nullable=False, index=True)
+    seq = Column(Integer, nullable=False)              # 0, 1, 2 ... in recording order
+    start_ms = Column(Float, nullable=False)           # from the start of the session
+    duration_s = Column(Float, nullable=False)
+    file_path = Column(String(500), nullable=False)
+    sha256 = Column(String(64), nullable=False)
+    file_size_bytes = Column(Integer, default=0)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    # Server-side analysis (sessions in analysis_mode SERVER): PENDING -> DONE | FAILED | SKIPPED
+    analysis_status = Column(String(20), nullable=True, index=True)
+    analysis_error = Column(Text, nullable=True)
+    analyzed_at = Column(DateTime, nullable=True)
+    frames_analyzed = Column(Integer, default=0)
+    speech_json = Column(Text, nullable=True)      # [[start_ms, end_ms], ...] the candidate's microphone heard a voice
+
+
+class Candidate(Base):
+    """A candidate on the list of an online exam; signs in to VIGIL One with code + PIN."""
+
+    __tablename__ = "candidates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    exam_id = Column(String(36), ForeignKey("exams.id"), nullable=False, index=True)
+    candidate_code = Column(String(50), nullable=False, index=True)
+    full_name = Column(String(255), nullable=True)
+    pin_hash = Column(String(255), nullable=False)
+    consent_at = Column(DateTime, nullable=True)
+    last_join_at = Column(DateTime, nullable=True)
+    last_device = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)

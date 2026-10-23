@@ -58,6 +58,7 @@ from classroom_monitor.seat_risk_tracker import RiskState, SeatRiskTracker
 from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType, TemporalEpisode, TemporalEpisodeEngine
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from classroom_monitor.pipeline import SRSv2Pipeline
+from classroom_monitor.video_io import AsyncVideoWriter, FrameReader, RealtimePacer
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, ExamRoom, ExamSite, SeatROI
 
@@ -183,7 +184,14 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     # Video Writer for annotated result.mp4
     result_video_path = out_p / "result.mp4"
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out_writer = cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h))
+    # --stride 0: like LIVE on the web, as many frames as this machine can while staying real time
+    auto_rate = config.stride == 0
+    step = 1 if auto_rate else config.stride
+    out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / step, (orig_w, orig_h)))
+    pacer = RealtimePacer(fps)
+    last_written_idx = 0
+    last_read_idx = 0
+    last_annotated = None
 
     all_episodes: List[TemporalEpisode] = []
     all_events: List[ClassroomEvent] = []
@@ -191,6 +199,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     # Timing metrics accumulators
     t_det_list: List[float] = []
+    yolo_parts: Dict[str, List[float]] = {}  # Ultralytics' preprocess / inference / postprocess
     t_hpe_list: List[float] = []
     t_temp_list: List[float] = []
     t_pat_list: List[float] = []
@@ -201,33 +210,48 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     frame_idx = 0
     processed_count = 0
     start_wall_time = time.time()
+    # Steady state: from the first analysed frame (models warmed up) to the last one, without the
+    # model loading before and the evidence flush after (the whole-run factor includes both)
+    steady_first: Optional[tuple] = None  # (perf_counter, video ms) after the first analysed frame
+    steady_last: Optional[tuple] = None
 
+    reader = FrameReader(cap)  # decodes ahead on its own thread
     try:
         while True:
-            ret, frame = cap.read()
+            ret, frame = reader.read()
             if not ret:
                 break
 
             frame_idx += 1
             if config.max_frames and frame_idx > config.max_frames:
                 break
+            last_read_idx = frame_idx
 
-            if config.stride > 1 and (frame_idx % config.stride != 0):
+            timestamp_ms = (frame_idx - 1) * (1000.0 / fps)
+            # Every frame goes into the evidence buffer, analysed or not (clips keep the real frame rate)
+            evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=timestamp_ms)
+
+            if step > 1 and (frame_idx % step != 0):
+                continue
+            if auto_rate and not pacer.should_analyse(timestamp_ms):
                 continue
 
             processed_count += 1
-            timestamp_ms = (frame_idx - 1) * (1000.0 / fps)
-
-            # Buffer raw frame
-            evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=timestamp_ms)
 
             frame_result = pipeline.process_frame(frame, frame_idx, timestamp_ms)
+            pacer.analysed_frame(timestamp_ms)
+            steady_last = (time.perf_counter(), timestamp_ms)
+            if steady_first is None:
+                steady_first = steady_last
             detections = frame_result.detections
             unmapped_dets = frame_result.roaming_detections
             seat_observations = frame_result.observations
             active_this_frame = frame_result.active_episodes
             new_patterns = frame_result.patterns
             all_patterns.extend(new_patterns)
+            for part, ms in frame_result.timings_ms.items():
+                if part.startswith("yolo_"):
+                    yolo_parts.setdefault(part, []).append(ms)
             t_det = frame_result.timings_ms["perception"]
             t_hpe = frame_result.timings_ms["head_observation"]
             t_temp = frame_result.timings_ms["temporal"]
@@ -289,7 +313,10 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
             # Stage 9: Video Writer Output & Display Window
             t0 = time.perf_counter()
-            out_writer.write(annotated_frame)
+            for _ in range(max(1, frame_idx - last_written_idx) if auto_rate else 1):
+                out_writer.write(annotated_frame)  # skipped frames show the last analysed one
+            last_written_idx = frame_idx
+            last_annotated = annotated_frame
             t_write = (time.perf_counter() - t0) * 1000.0
             t_write_list.append(t_write)
 
@@ -327,7 +354,11 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
                 )
 
     finally:
+        reader.stop()
         cap.release()
+        if auto_rate and last_annotated is not None:  # frames after the last analysed one
+            for _ in range(last_read_idx - last_written_idx):
+                out_writer.write(last_annotated)
         out_writer.release()
         if config.show_window:
             cv2.destroyAllWindows()
@@ -350,7 +381,15 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     total_wall_time = time.time() - start_wall_time
     overall_fps = processed_count / max(0.001, total_wall_time)
-    realtime_factor = (duration_sec / max(0.001, total_wall_time))
+    # The video actually analysed (--max-frames may stop early), not the file's whole length
+    last_frame = min(frame_idx, config.max_frames) if config.max_frames else frame_idx
+    analysed_sec = last_frame / fps if fps > 0 else 0.0
+    realtime_factor = (analysed_sec / max(0.001, total_wall_time))
+    steady_realtime_factor = steady_fps = None
+    if steady_first and steady_last and steady_last[0] - steady_first[0] > 0.5:
+        steady_wall = steady_last[0] - steady_first[0]
+        steady_realtime_factor = ((steady_last[1] - steady_first[1]) / 1000.0) / steady_wall
+        steady_fps = (processed_count - 1) / steady_wall
 
     # 5. Strict Canonical Ground Truth Benchmark Comparison (Actor-Centric)
     benchmark_summary: Optional[Dict[str, Any]] = None
@@ -436,9 +475,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
     hpe_telemetry = head_provider_inst.get_telemetry()
     hpe_telemetry["target_hz"] = config.hpe_hz
     hpe_telemetry["scheduled_cycles"] = pipeline.scheduled_hpe_cycles
-    hpe_telemetry["effective_hpe_hz"] = round(hpe_telemetry["estimate_batch_calls"] / max(0.01, duration_sec), 2)
+    hpe_telemetry["effective_hpe_hz"] = round(hpe_telemetry["estimate_batch_calls"] / max(0.01, analysed_sec), 2)
     occ_seats_count = max(1, sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED))
-    hpe_telemetry["effective_hpe_hz_per_seat"] = round((hpe_telemetry["valid_head_crops"] / occ_seats_count) / max(0.01, duration_sec), 2)
+    hpe_telemetry["effective_hpe_hz_per_seat"] = round((hpe_telemetry["valid_head_crops"] / occ_seats_count) / max(0.01, analysed_sec), 2)
 
     # 7. Export All Standardized Demo Artifacts
     scene_meta = {
@@ -446,7 +485,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "room_code": config.room_code,
         "camera_id": config.camera_id,
         "video_file": str(config.video_path),
-        "duration_sec": duration_sec,
+        "duration_sec": analysed_sec,
         "fps": fps,
         "total_seats": len(seat_mgr.seats),
         "occupied_seats": sum(1 for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED),
@@ -457,7 +496,12 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "wall_time_sec": total_wall_time,
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,
+        "steady_realtime_factor": steady_realtime_factor,
+        "steady_analysed_fps": steady_fps,
         "head_pose_runtime": hpe_telemetry,
+        "yolo_breakdown_ms": {k[5:]: round(float(np.mean(v)), 2) for k, v in yolo_parts.items() if v},
+        "stride": "auto" if auto_rate else config.stride,
+        "skipped_frames": pacer.skipped,
         "lat_perception_avg_ms": float(np.mean(t_det_list)) if t_det_list else 0.0,
         "lat_6drepnet_avg_ms": float(np.mean(t_hpe_list)) if t_hpe_list else 0.0,
         "lat_temporal_avg_ms": float(np.mean(t_temp_list)) if t_temp_list else 0.0,
@@ -480,6 +524,9 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
 
     print("\n" + "=" * 80)
     print(f" DEMO RUN COMPLETE: {config.name.upper()} in {total_wall_time:.1f}s ({overall_fps:.1f} FPS, {realtime_factor:.2f}x Realtime)")
+    if steady_realtime_factor is not None:
+        print(f" Steady state:    {steady_fps:.1f} analysed frames/s, {steady_realtime_factor:.2f}x realtime"
+              " (without model loading and the final evidence flush)")
     print(f" Output Video:    {result_video_path}")
     print(f" Canonical EPs:   {exported_files['episodes']} ({len(all_episodes)} episodes)")
     print(f" Review Events:   {exported_files['events']} ({len(all_events)} events)")
@@ -492,7 +539,7 @@ def run_demo_pipeline(config: DemoVideoConfig) -> Dict[str, Any]:
         "video_path": str(config.video_path),
         "result_video": str(result_video_path),
         "total_frames": processed_count,
-        "duration_sec": duration_sec,
+        "duration_sec": analysed_sec,
         "wall_time_sec": total_wall_time,
         "overall_fps": overall_fps,
         "realtime_factor": realtime_factor,

@@ -357,7 +357,7 @@
 .queue-row {
     position: relative;
     display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) auto;
+    grid-template-columns: 54px minmax(0, 1fr) auto;
     align-items: center;
     gap: var(--vigil-space-2);
     width: 100%;
@@ -395,9 +395,12 @@
     background: var(--vigil-surface);
     font-family: var(--vigil-font-mono);
     line-height: 1.1;
+    min-width: 0;
+    overflow: hidden;
 }
-.queue-seat small { max-width: 44px; overflow: hidden; color: var(--vigil-text-dim); font-size: 0.5625rem; text-overflow: ellipsis; white-space: nowrap; }
-.queue-seat strong { color: var(--vigil-info); font-size: var(--vigil-font-size-xs); font-weight: var(--vigil-font-bold); }
+.queue-seat small { max-width: 50px; overflow: hidden; color: var(--vigil-text-dim); font-size: 0.5625rem; text-overflow: ellipsis; white-space: nowrap; }
+.queue-seat strong { max-width: 50px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--vigil-info); font-size: var(--vigil-font-size-xs); font-weight: var(--vigil-font-bold); }
+.queue-seat.is-one strong { font-size: 0.625rem; }
 .queue-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .queue-title { overflow: hidden; color: var(--vigil-text); font-size: var(--vigil-font-size-xs); font-weight: var(--vigil-font-medium); text-overflow: ellipsis; white-space: nowrap; }
 .queue-meta { overflow: hidden; color: var(--vigil-text-muted); font-family: var(--vigil-font-mono); font-size: var(--vigil-font-size-2xs); text-overflow: ellipsis; white-space: nowrap; }

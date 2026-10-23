@@ -114,6 +114,20 @@
 .evidence-frame.is-missing video { visibility: hidden; }
 .focus-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .evidence-frame video ~ .focus-svg { bottom: 38px; height: calc(100% - 38px); } /* keep clear of the player controls */
+.debug-info {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    max-width: calc(100% - 12px);
+    padding: 3px 7px;
+    border-radius: var(--vigil-radius-xs);
+    background: rgba(0, 0, 0, 0.72);
+    color: #e5e7eb;
+    font-family: var(--vigil-font-mono);
+    font-size: 0.6875rem;
+    line-height: 1.35;
+    pointer-events: none;
+}
 .evidence-status {
     position: absolute;
     inset: auto var(--vigil-space-2) var(--vigil-space-2);

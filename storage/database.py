@@ -87,6 +87,10 @@ def init_db(custom_engine=None) -> None:
                     conn.execute(text("ALTER TABLE detection_events ADD COLUMN observation_quality FLOAT DEFAULT 1.0"))
                 if "incident_metadata_json" not in event_cols:
                     conn.execute(text("ALTER TABLE detection_events ADD COLUMN incident_metadata_json TEXT"))
+                if "source_product" not in event_cols:
+                    conn.execute(text("ALTER TABLE detection_events ADD COLUMN source_product VARCHAR(30) DEFAULT 'VIGIL_CLASSROOM'"))
+                if "subject_ref" not in event_cols:
+                    conn.execute(text("ALTER TABLE detection_events ADD COLUMN subject_ref VARCHAR(100)"))
                 conn.commit()
 
                 duplicate_event_ids = conn.execute(
@@ -116,10 +120,49 @@ def init_db(custom_engine=None) -> None:
                     ("closed_at", "DATETIME"),
                     ("closed_by", "VARCHAR(100)"),
                     ("close_note", "TEXT"),
+                    # VIGIL One sessions synced from the desktop app
+                    ("product", "VARCHAR(20) DEFAULT 'CLASSROOM'"),
+                    ("subject_ref", "VARCHAR(100)"),
+                    ("subject_name", "VARCHAR(255)"),
+                    ("device_id", "VARCHAR(36)"),
+                    ("client_session_id", "VARCHAR(64)"),
+                    ("simulation", "BOOLEAN DEFAULT 0"),
+                    ("last_heartbeat_at", "DATETIME"),
+                    ("live_status_json", "TEXT"),
+                    ("candidate_id", "VARCHAR(36)"),
+                    ("video_status", "VARCHAR(20)"),
+                    ("video_path", "VARCHAR(500)"),
+                    ("video_sha256", "VARCHAR(64)"),
+                    ("video_duration_s", "FLOAT"),
+                    ("video_gaps_json", "TEXT"),
+                    ("video_error", "TEXT"),
+                    ("analysis_mode", "VARCHAR(10)"),
+                    ("analysis_state_json", "TEXT"),
                 ):
                     if name not in session_cols:
                         conn.execute(text(f"ALTER TABLE exam_sessions ADD COLUMN {name} {ddl}"))
+                conn.execute(text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_exam_sessions_client_session_id "
+                    "ON exam_sessions(client_session_id)"
+                ))
                 conn.commit()
+
+            # Online exams (VIGIL One): join code and policy on exams, candidate tokens on devices
+            for table, columns in (
+                ("exams", (("join_code", "VARCHAR(12)"), ("join_open", "BOOLEAN DEFAULT 0"), ("one_policy_json", "TEXT"))),
+                ("client_devices", (("kind", "VARCHAR(20) DEFAULT 'PAIRED'"), ("candidate_id", "VARCHAR(36)"), ("expires_at", "DATETIME"))),
+                ("session_video_segments", (("analysis_status", "VARCHAR(20)"), ("analysis_error", "TEXT"),
+                                            ("analyzed_at", "DATETIME"), ("frames_analyzed", "INTEGER DEFAULT 0"),
+                                            ("speech_json", "TEXT"))),
+            ):
+                if table in tables:
+                    existing = {row[1] for row in conn.execute(text(f"PRAGMA table_info({table})")).fetchall()}
+                    for name, ddl in columns:
+                        if name not in existing:
+                            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+            if "exams" in tables:
+                conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS uq_exams_join_code ON exams(join_code)"))
+            conn.commit()
 
             if "evidence_files" in tables:
                 duplicate_evidence = conn.execute(

@@ -12,7 +12,7 @@ const PAGE_SIZE = 50;
 const REVIEWER_KEY = 'vigil.reviewer';
 
 const state = {
-    filters: { status: 'PENDING', room: '', pattern: '', severity: '', source: 'ALL', sort: 'newest', session_id: '' },
+    filters: { status: 'PENDING', room: '', pattern: '', severity: '', source: 'ALL', product: 'ALL', sort: 'newest', session_id: '' },
     items: [],
     total: 0,
     offset: 0,
@@ -51,8 +51,34 @@ function seatShort(ref) {
     return digits ? `S${digits[1].padStart(2, '0')}` : (ref ? String(ref).slice(0, 6) : '—');
 }
 
+function isOne(item) {
+    return item && item.source_product === 'VIGIL_ONE';
+}
+
+// Where the signal comes from: seat in a Classroom room, or the candidate of a VIGIL One computer
+function placeLabel(item) {
+    return isOne(item) ? 'ONE' : roomShort(item.room_code);
+}
+
+function subjectLabel(item) {
+    return isOne(item) ? String(item.subject_ref || '—') : seatShort(item.subject_ref);
+}
+
+function signalTitle(item) {
+    return isOne(item) && item.label ? item.label : prettyName(item.primary_signal);
+}
+
+// "CLASSROOM-03" -> "P03", "ROOM-101" -> "101": the queue tile is 3 characters wide
 function roomShort(code) {
-    return String(code || '').replace(/^ROOM-/, '');
+    const raw = String(code || '').replace(/^ROOM-/, '');
+    const m = raw.match(/^CLASSROOM-?(\d+)$/i);
+    return m ? `P${m[1].padStart(2, '0')}` : raw;
+}
+
+// A candidate code is too long for the tile: keep its last 6 characters (the full code is in the tooltip)
+function subjectShort(item) {
+    const full = subjectLabel(item);
+    return isOne(item) && full.length > 7 ? `…${full.slice(-6)}` : full;
 }
 
 function seconds(ms) {
@@ -90,6 +116,8 @@ function compactTiming(item) {
 // -----------------------------------------------------------------------------
 
 function readFiltersFromUrl() {
+    // The sidebar's product switcher (Classroom / One / both); a ?product= link wins
+    if (window.VIGIL_PRODUCT) state.filters.product = window.VIGIL_PRODUCT.get();
     const params = new URLSearchParams(window.location.search);
     for (const key of Object.keys(state.filters)) {
         if (params.has(key)) state.filters[key] = params.get(key);
@@ -117,13 +145,16 @@ function syncFilterControls() {
     $('filterPattern').value = state.filters.pattern;
     $('filterSeverity').value = state.filters.severity;
     $('filterSource').value = state.filters.source;
+    $('filterProduct').value = state.filters.product;
     $('sortOrder').value = state.filters.sort;
     const heading = { ALL: 'All incidents', PENDING: 'Pending', CONFIRMED: 'Confirmed', REJECTED: 'Rejected', INCONCLUSIVE: 'Unsure' };
     $('listHeading').textContent = heading[state.filters.status] || 'Incidents';
 }
 
 function setFilter(key, value) {
+    if (key === 'product' && state.filters.product === value) return;
     state.filters[key] = value;
+    if (key === 'product' && window.VIGIL_PRODUCT) window.VIGIL_PRODUCT.set(value);
     writeFiltersToUrl();
     syncFilterControls();
     loadQueue(true);
@@ -147,6 +178,7 @@ async function loadQueue(reset) {
     const params = new URLSearchParams({
         status: state.filters.status,
         source: state.filters.source,
+        product: state.filters.product,
         sort: state.filters.sort,
         limit: String(PAGE_SIZE),
         offset: String(state.offset),
@@ -227,16 +259,18 @@ function renderList() {
         const seat = document.createElement('span');
         seat.className = 'queue-seat';
         const room = document.createElement('small');
-        room.textContent = roomShort(item.room_code) || (manual ? 'MARK' : '');
+        room.textContent = placeLabel(item) || (manual ? 'MARK' : '');
         const seatLabel = document.createElement('strong');
-        seatLabel.textContent = seatShort(item.subject_ref);
+        seatLabel.textContent = subjectShort(item);
+        seat.title = `${placeLabel(item) ? item.room_code || placeLabel(item) : ''} ${subjectLabel(item)}`.trim();
+        if (isOne(item)) seat.classList.add('is-one');
         seat.append(room, seatLabel);
 
         const main = document.createElement('span');
         main.className = 'queue-main';
         const title = document.createElement('span');
         title.className = 'queue-title';
-        title.textContent = manual ? (item.note || 'Proctor bookmark') : prettyName(item.primary_signal);
+        title.textContent = manual ? (item.note || 'Proctor bookmark') : signalTitle(item);
         const meta = document.createElement('span');
         meta.className = 'queue-meta';
         meta.textContent = [compactTiming(item), manual ? 'proctor' : `x${item.occurrence_count || 1}`].filter(Boolean).join(' · ');
@@ -294,18 +328,23 @@ function renderDetail(item) {
     video.load();
     $('detailEmpty').classList.toggle('hidden', Boolean(item));
     $('detailBody').classList.toggle('hidden', !item);
-    if (!item) return;
+    if (!item) {
+        ReviewDebug.stop();
+        return;
+    }
 
     const manual = item.source_type === 'MANUAL_BOOKMARK';
-    $('dSeat').textContent = `${roomShort(item.room_code)} ${seatShort(item.subject_ref)}`.trim();
-    $('dTitle').textContent = manual ? 'Proctor bookmark' : prettyName(item.primary_signal);
+    $('dSeat').textContent = `${placeLabel(item)} ${subjectLabel(item)}`.trim();
+    $('dTitle').textContent = manual ? (isOne(item) ? 'Đánh dấu thủ công (VIGIL One)' : 'Proctor bookmark') : signalTitle(item);
     $('dSeverity').textContent = manual ? 'PROCTOR' : (item.severity || 'MEDIUM');
     $('dSeverity').dataset.severity = manual ? 'MANUAL' : (item.severity || 'MEDIUM');
     $('dStatus').textContent = item.review_status || 'PENDING';
     $('dStatus').dataset.status = item.review_status || 'PENDING';
     const score = Number(item.review_priority_score);
     $('dScore').textContent = manual || !Number.isFinite(score) ? '' : `${Math.round(score)}/100`;
-    $('dContext').textContent = [item.room_name, item.subject_ref].filter(Boolean).join(' · ');
+    $('dContext').textContent = isOne(item)
+        ? ['VIGIL One', `Thí sinh ${item.subject_ref || '—'}`, item.reason].filter(Boolean).join(' · ')
+        : [item.room_name, item.subject_ref].filter(Boolean).join(' · ');
     $('dTiming').textContent = timingText(item);
     $('dSession').textContent = [item.session_name, item.session_status].filter(Boolean).join(' · ') || item.session_id || '--';
     const cues = manual ? [item.note].filter(Boolean) : (item.supporting_cues || []);
@@ -323,12 +362,20 @@ function renderDetail(item) {
         video.src = videoUrl;
         video.load();
     } else {
-        setVideoStatus(item.evidence_error || (manual ? 'Bookmarks keep a frame, not a clip.' : 'No clip for this incident.'));
+        setVideoStatus(item.evidence_error || (manual ? 'Bookmarks keep a frame, not a clip.' : (isOne(item) ? 'No clip for this signal yet; the whole exam video has it.' : 'No clip for this incident.')));
+    }
+    // VIGIL One records the whole exam: open it at this signal's moment
+    const sessionVideo = isOne(item) && item.session_id;
+    $('dSessionVideo').classList.toggle('hidden', !sessionVideo);
+    if (sessionVideo) {
+        const at = item.first_seen_ms ?? item.source_timestamp_ms;
+        $('dSessionVideo').href = `/one-video?session=${encodeURIComponent(item.session_id)}${at != null ? `&t=${Math.round(at)}` : ''}`;
     }
     $('dSnapshot').src = snapshotUrl || '';
     $('dSnapshotLink').href = snapshotUrl || '#';
     $('dSnapshotLink').classList.toggle('hidden', !snapshotUrl);
     renderFocus(item);
+    renderDebug(item);
 
     $('dIntegrity').textContent = item.sha256 ? 'Checking…' : 'No digest stored';
     if (item.sha256 && !manual) checkIntegrity(item);
@@ -346,6 +393,26 @@ function renderDetail(item) {
     $('closedReportLink').href = `/reports?session=${encodeURIComponent(item.session_id || '')}`;
     $('decisionForm').classList.toggle('is-locked', locked);
     $('decisionForm').querySelectorAll('button, select, textarea, input').forEach((el) => { el.disabled = locked || (el.id === 'btnSubmit' && !state.decision); });
+}
+
+// Debug mode (the global switch, also on this page): per-frame boxes / gaze over the clip
+function renderDebug(item) {
+    const on = Boolean(window.vigilDebug && window.vigilDebug.isOn());
+    $('chkDebug').checked = on;
+    if (!on || !item) {
+        ReviewDebug.stop();
+        return;
+    }
+    ReviewDebug.load(item, {
+        video: $('dVideo'),
+        svg: $('dVideoDebug'),
+        info: $('dDebugInfo'),
+        fetchJson: async (url) => {
+            const res = await apiFetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        },
+    });
 }
 
 function renderFocus(item) {
@@ -467,9 +534,14 @@ document.addEventListener('DOMContentLoaded', () => {
     $('filterPattern').addEventListener('change', (e) => setFilter('pattern', e.target.value));
     $('filterSeverity').addEventListener('change', (e) => setFilter('severity', e.target.value));
     $('filterSource').addEventListener('change', (e) => setFilter('source', e.target.value));
+    $('filterProduct').addEventListener('change', (e) => setFilter('product', e.target.value));
+    document.addEventListener('vigil:product', (e) => setFilter('product', e.detail.product));
     $('sortOrder').addEventListener('change', (e) => setFilter('sort', e.target.value));
     $('btnMore').addEventListener('click', () => { state.offset = state.items.length; loadQueue(false); });
     $('chkFocus').addEventListener('change', () => { const item = currentItem(); if (item) renderFocus(item); });
+    $('chkDebug').addEventListener('change', (e) => { if (window.vigilDebug) window.vigilDebug.set(e.target.checked); });
+    document.addEventListener('vigil-debug', () => renderDebug(currentItem()));
+    window.addEventListener('resize', () => ReviewDebug.redraw());
 
     document.querySelectorAll('.decision-btn').forEach((btn) => {
         btn.addEventListener('click', () => chooseDecision(btn.dataset.decision));

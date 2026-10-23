@@ -72,3 +72,28 @@ FONTS = {
     "tiny": ("Segoe UI Semibold", 8),
     "mono": ("Cascadia Mono", 9),
 }
+
+
+BRAND_FONT_FILE = __import__("pathlib").Path(__file__).resolve().parent / "assets" / "dmc5.ttf"
+BRAND_FONT_FAMILY = "Dmc5 Font By Kalina Ann"
+_brand_font_loaded: bool | None = None
+
+
+def brand_font(size: int) -> tuple:
+    """The DMC5 font for the product wordmark ("vigil one"): lowercase a-z only, so never for text.
+
+    Loaded privately for this process on Windows (not installed system-wide); falls back to Segoe UI.
+    """
+    global _brand_font_loaded
+    if _brand_font_loaded is None:
+        _brand_font_loaded = False
+        try:
+            import ctypes
+            import sys
+
+            if sys.platform == "win32" and BRAND_FONT_FILE.is_file():
+                FR_PRIVATE = 0x10
+                _brand_font_loaded = ctypes.windll.gdi32.AddFontResourceExW(str(BRAND_FONT_FILE), FR_PRIVATE, 0) > 0
+        except (AttributeError, OSError):
+            _brand_font_loaded = False
+    return (BRAND_FONT_FAMILY, size) if _brand_font_loaded else ("Segoe UI Semibold", max(10, size - 6))

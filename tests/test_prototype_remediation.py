@@ -469,7 +469,7 @@ def test_live_worker_crosses_first_incident_and_persists_evidence(tmp_path: Path
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(runtime_module, "get_demo_config", lambda _preset: config)
-    monkeypatch.setattr(runtime_module, "PoseClassroomDetector", FakeDetector)
+    monkeypatch.setattr(runtime_module, "pose_detector_for", lambda *args, **kwargs: FakeDetector())
     monkeypatch.setattr(runtime_module, "SeatManager", FakeSeatManager)
     monkeypatch.setattr(runtime_module, "create_head_pose_provider", lambda _name: FakeProvider())
     monkeypatch.setattr(runtime_module, "ObservationExtractor", FakeObservationExtractor)
@@ -747,3 +747,21 @@ def test_configured_demo_token_protects_api(monkeypatch):
         )
     assert denied.status_code == 401
     assert allowed.status_code == 200
+
+
+def test_demo_token_from_the_address_is_remembered_for_every_page(monkeypatch):
+    monkeypatch.setenv("VIGIL_DEMO_TOKEN", "competition-secret")
+    with TestClient(app) as client:
+        assert client.get("/api/v1/demo/status").status_code == 401
+        wrong = client.get("/online?token=guess")
+        assert "vigil_demo_token" not in wrong.cookies
+        page = client.get("/online?token=competition-secret")
+        assert page.status_code == 200 and client.cookies.get("vigil_demo_token") == "competition-secret"
+        assert client.get("/api/v1/demo/status").status_code == 200  # the cookie now carries the token
+
+
+def test_demo_token_is_not_needed_on_the_hub_computer(monkeypatch):
+    from api.main import _is_loopback
+
+    assert _is_loopback("127.0.0.1") and _is_loopback("::1") and _is_loopback("localhost")
+    assert not _is_loopback("192.168.1.20") and not _is_loopback("testclient") and not _is_loopback(None)

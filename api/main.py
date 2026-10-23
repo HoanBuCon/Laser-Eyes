@@ -10,15 +10,18 @@ Implements SRS v1.0 specifications:
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 import os
 import secrets
+from typing import Optional
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
+from starlette.concurrency import run_in_threadpool
 from urllib.parse import quote
 from fastapi.staticfiles import StaticFiles
 
@@ -34,6 +37,7 @@ from api.routes import (
     demo,
     events,
     inference,
+    one,
     proctor,
     rooms,
     seats,
@@ -79,10 +83,42 @@ async def lifespan(app: FastAPI):
 
     runtime.register_event_callback(publish_event)
     runtime.register_status_callback(publish_status)
+
+    async def watch_one_connections():
+        """Online exams: flag candidates whose VIGIL One went silent (every 10 s)."""
+        from storage.online_exam_service import check_connections
+
+        def check():
+            session = SessionLocal()
+            try:
+                return check_connections(session)
+            finally:
+                session.close()
+
+        while True:
+            await asyncio.sleep(10)
+            try:
+                if await asyncio.to_thread(check):
+                    realtime_manager.broadcast_threadsafe({"type": "ONE_EVENTS", "reason": "connection_lost"})
+            except Exception as exc:  # never let the watchdog take the server down
+                logger.warning("VIGIL One connection watchdog: %s", exc)
+
+    watchdog = asyncio.create_task(watch_one_connections())
+
+    # VIGIL One sessions in analysis_mode SERVER are analysed here, next to Classroom
+    from storage import one_analysis
+
+    one_analysis.start_service(
+        SessionLocal,
+        on_events=lambda session_id, count: realtime_manager.broadcast_threadsafe(
+            {"type": "ONE_EVENTS", "session_id": session_id, "created": count, "source": "server_analysis"}),
+    )
     logger.info("VIGIL AI Enterprise Proctoring Server is ready!")
     try:
         yield
     finally:
+        watchdog.cancel()
+        one_analysis.stop_service()
         runtime.unregister_event_callback(publish_event)
         runtime.unregister_status_callback(publish_status)
         realtime_manager.clear_event_loop(loop)
@@ -114,15 +150,38 @@ def _cors_origins() -> list[str]:
     return ["http://127.0.0.1:8000", "http://localhost:8000"]
 
 
+_DEVICE_PATHS = ("/api/v1/one/client/", "/api/one/client/")
+DEMO_TOKEN_COOKIE = "vigil_demo_token"
+
+
+def _is_loopback(host: Optional[str]) -> bool:
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host or "").is_loopback
+    except ValueError:
+        return False
+
+
 @app.middleware("http")
 async def protect_network_demo(request: Request, call_next):
     """Require the opt-in demo token for API calls when one is configured."""
     token = os.getenv("VIGIL_DEMO_TOKEN")
-    if token and request.url.path.startswith(("/api/", "/demo/")):
-        supplied = request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+    # The token keeps other computers out; a browser on the Hub computer itself needs none
+    if not token or _is_loopback(request.client.host if request.client else None):
+        return await call_next(request)
+    # VIGIL One desktops authenticate with their own device token instead
+    if request.url.path.startswith(("/api/", "/demo/")) and not request.url.path.startswith(_DEVICE_PATHS):
+        supplied = (request.headers.get("X-Vigil-Demo-Token") or request.query_params.get("token")
+                    or request.cookies.get(DEMO_TOKEN_COOKIE))
         if not supplied or not secrets.compare_digest(supplied, token):
             return JSONResponse(status_code=401, content={"detail": "Valid demo token required"})
-    return await call_next(request)
+    response = await call_next(request)
+    # Opening any page once with ?token=... remembers it, so every page, image and live stream works
+    supplied = request.query_params.get("token")
+    if supplied and secrets.compare_digest(supplied, token) and request.cookies.get(DEMO_TOKEN_COOKIE) != supplied:
+        response.set_cookie(DEMO_TOKEN_COOKIE, supplied, httponly=True, samesite="strict")
+    return response
 
 
 @app.middleware("http")
@@ -136,7 +195,7 @@ async def revalidate_dashboard_files(request: Request, call_next):
     return response
 
 
-_OPEN_PATHS = ("/login", "/static/", "/api/v1/auth/", "/health", "/ready", "/api/v1/health", "/api/v1/ready", "/favicon.ico")
+_OPEN_PATHS = ("/api/v1/one/client/", "/api/one/client/", "/login", "/static/", "/api/v1/auth/", "/health", "/ready", "/api/v1/health", "/api/v1/ready", "/favicon.ico")
 
 
 @app.middleware("http")
@@ -189,13 +248,29 @@ for prefix in ["/api/v1", "/api"]:
     app.include_router(auth_routes.router, prefix=prefix)
     app.include_router(exams.router, prefix=prefix)
     app.include_router(reports.router, prefix=prefix)
+    app.include_router(one.router, prefix=prefix)
+
+
+try:
+    from vigil_build import fingerprint as _fingerprint
+
+    _BUILD = _fingerprint()  # the code this Hub started with
+except Exception:  # pragma: no cover - a packaged Hub without the source tree
+    _BUILD = "unknown"
+
+
+def _database_name() -> str:
+    from storage.database import DATABASE_URL as url
+
+    return Path(url.split("///", 1)[-1]).name if url.startswith("sqlite") else url.split("@")[-1].split("?")[0]
 
 
 @app.get("/health", tags=["Health"])
 @app.get("/api/v1/health", tags=["Health"])
 def health_check():
-    """Service liveness probe."""
-    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0"}
+    """Service liveness probe; ``build`` and ``database`` let vigil.py spot a Hub left over from older code."""
+    return {"status": "ok", "service": "VIGIL AI Proctoring Server", "version": "2.6.0", "build": _BUILD,
+            "database": _database_name(), "features": ["one-live-stream", "one-server-analysis"]}
 
 
 @app.get("/ready", tags=["Health"])
@@ -205,14 +280,30 @@ def readiness_check():
     return {"status": "ready", "database": "connected"}
 
 
+def _signed_in(websocket: WebSocket) -> bool:
+    provider = websocket.app.dependency_overrides.get(get_db, get_db)
+    gen = provider()
+    db = next(gen)
+    try:
+        return user_for_token(db, websocket.cookies.get(COOKIE_NAME)) is not None
+    finally:
+        gen.close()
+
+
 @app.websocket("/ws/events")
 @app.websocket("/ws/demo")
 async def websocket_events_endpoint(websocket: WebSocket):
     """WebSocket stream for real-time proctoring event notifications & live demo telemetry."""
     token = os.getenv("VIGIL_DEMO_TOKEN")
-    supplied = websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
-    if token and (not supplied or not secrets.compare_digest(supplied, token)):
+    supplied = (websocket.headers.get("X-Vigil-Demo-Token") or websocket.query_params.get("token")
+                or websocket.cookies.get(DEMO_TOKEN_COOKIE))
+    local = _is_loopback(websocket.client.host if websocket.client else None)
+    if token and not local and (not supplied or not secrets.compare_digest(supplied, token)):
         await websocket.close(code=1008, reason="Valid demo token required")
+        return
+    if auth_mode() == "required" and not await run_in_threadpool(_signed_in, websocket):
+        # The same rule as every page and API: live incidents are not for anonymous viewers
+        await websocket.close(code=1008, reason="Sign in to continue")
         return
     await realtime_manager.connect(websocket)
     try:
@@ -285,6 +376,9 @@ if dashboard_dir.exists():
         ("/reports", "reports.html"),
         ("/reports/print", "report-print.html"),
         ("/users", "users.html"),
+        ("/online", "online.html"),
+        ("/one-video", "one_video.html"),
+        ("/one-monitor", "one_monitor.html"),
     ):
         app.add_api_route(route, _page(page), methods=["GET"], tags=["Dashboard"], include_in_schema=False)
 

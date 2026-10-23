@@ -62,7 +62,14 @@ def close_interrupted_sessions(db: Session) -> int:
     Called once at start-up, before any analysis can run, so every open
     session found then belongs to a process that no longer exists.
     """
-    sessions = db.query(ExamSession).filter(ExamSession.status.in_(OPEN_STATES)).all()
+    # VIGIL One sessions are run by the candidate's computer, not by this
+    # process: they stay open across a server restart and resume syncing.
+    sessions = (
+        db.query(ExamSession)
+        .filter(ExamSession.status.in_(OPEN_STATES))
+        .filter((ExamSession.product.is_(None)) | (ExamSession.product != "ONE"))
+        .all()
+    )
     for session in sessions:
         session.status = "INTERRUPTED"
         # The real end time is unknown; the start time keeps durations honest

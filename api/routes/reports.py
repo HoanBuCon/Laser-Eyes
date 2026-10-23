@@ -45,6 +45,17 @@ def _session(db: Session, session_id: str) -> ExamSession:
 
 # --- Playback ----------------------------------------------------------------------
 
+def _video_size(path: Path) -> Optional[list]:
+    import cv2
+
+    cap = cv2.VideoCapture(str(path))
+    try:
+        w, h = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH) or 0), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    finally:
+        cap.release()
+    return [w, h] if w and h else None
+
+
 @router.get("/exam-sessions/{session_id}/playback")
 def session_playback(session_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Everything the playback page draws: video sources, incidents and the seat timeline."""
@@ -84,14 +95,22 @@ def session_playback(session_id: str, db: Session = Depends(get_db)) -> Dict[str
         if "x" in res:
             frame_size = [int(v) for v in res.split("x")]
     source_ok = bool(preset and Path(DEMO_PRESETS[preset]["video_path"]).is_file())
+    source_url = f"/api/v1/demo/presets/{preset}/source" if source_ok else None
+    if session.product == "ONE":
+        # VIGIL One: the whole-exam video the Hub joined from the candidate's segments
+        video_file = Path(session.video_path or "")
+        if session.video_status in ("READY", "PARTIAL") and video_file.is_file():
+            source_url = f"/api/v1/one/sessions/{session.id}/video/file"
+            frame_size = frame_size or _video_size(video_file)
     rendered = artifacts / "result.mp4" if artifacts else None
     room = db.get(ExamRoom, session.room_id)
     return {
         "session": {"id": session.id, "name": session.exam_name, "status": session.status,
-                    "room_code": room.room_code if room else None,
+                    "room_code": room.room_code if room else None, "product": session.product,
+                    "subject_ref": session.subject_ref,
                     "started_at": session.started_at.isoformat() if session.started_at else None},
         "video": {
-            "source_url": f"/api/v1/demo/presets/{preset}/source" if source_ok else None,
+            "source_url": source_url,
             "rendered_url": f"/api/v1/exam-sessions/{session.id}/playback/rendered" if rendered and rendered.is_file() else None,
         },
         "frame_size": frame_size,
@@ -149,11 +168,17 @@ def approve_session_report(session_id: str, payload: ApproveIn, db: Session = De
     report = build_session_report(db, session, _serialize_ai_event)
     pending = report["incidents"]["by_review_status"].get("PENDING", 0)
     note = (payload.note or "").strip()
+    from storage.one_analysis import analysis_backlog
+
+    backlog = analysis_backlog(db, session)  # VIGIL One: the Hub may still be analysing the video
+    if backlog and not note:
+        raise HTTPException(status_code=409, detail="The Hub has not finished analysing this candidate ("
+                            + "; ".join(backlog) + "). Wait, or write why the report is approved anyway.")
     if pending and not note:
         raise HTTPException(status_code=409, detail=f"{pending} incidents are still pending. Review them or write why the session is closed anyway.")
     now = datetime.datetime.utcnow()
     report["approval"] = {"approved_by": actor_name(user), "approved_at": now.isoformat(), "note": note,
-                          "pending_at_approval": pending}
+                          "pending_at_approval": pending, "analysis_incomplete": backlog}
     previous = latest_version(db, session.id)
     sha = canonical_sha256(report)
     record = SessionReportVersion(session_id=session.id, version=(previous.version + 1) if previous else 1,
@@ -221,9 +246,19 @@ def session_incidents_csv(session_id: str, db: Session = Depends(get_db)) -> Res
             item["review_status"], item["reviewer_id"] or "", item["reason_code"] or "", item["review_note"] or "",
             item["reviewed_at"] or "", item["sha256"] or "",
         ])
-    name = f"session-{(session.exam_name or session.id)[:40]}".replace(" ", "_").replace("/", "-")
-    return Response(content="﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
-                    headers={"Content-Disposition": f'attachment; filename="{name}.csv"'})
+    return Response(content="\ufeff" + buf.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": attachment_header(f"session-{(session.exam_name or session.id)[:40]}", ".csv")})
+
+
+def attachment_header(name: str, suffix: str) -> str:
+    """Content-Disposition for any name (Vietnamese included): an ASCII fallback plus RFC 5987 UTF-8."""
+    import unicodedata
+    from urllib.parse import quote
+
+    clean = "".join(c if c.isalnum() or c in "-_." else "_" for c in name).strip("_") or "export"
+    ascii_name = unicodedata.normalize("NFKD", clean).replace("đ", "d").replace("Đ", "D")
+    ascii_name = ascii_name.encode("ascii", "ignore").decode() or "export"
+    return f'attachment; filename="{ascii_name}{suffix}"; filename*=UTF-8\'\'{quote(clean + suffix)}'
 
 
 @router.get("/reports/incidents/{incident_id}/record")

@@ -16,10 +16,11 @@ router = APIRouter(prefix="/statistics", tags=["Statistics & Analytics"])
 def get_summary_statistics(
     site_id: Optional[str] = Query(None, description="Optional filter by site"),
     room_id: Optional[str] = Query(None, description="Optional filter by room"),
+    product: str = Query("ALL", pattern="^(ALL|CLASSROOM|ONE)$", description="VIGIL Classroom, VIGIL One or both"),
     repo: StatisticsRepository = Depends(get_stats_repo),
 ):
     """Retrieve macro violation counts, class distribution, and room activity metrics."""
-    return repo.get_overall_summary(site_id=site_id, room_id=room_id)
+    return repo.get_overall_summary(site_id=site_id, room_id=room_id, product=None if product == "ALL" else product)
 
 
 @router.get("/rankings", response_model=List[RoomRankingItem])

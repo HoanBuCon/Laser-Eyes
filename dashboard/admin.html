@@ -11,12 +11,13 @@
     <link rel="stylesheet" href="/static/css/vigil-shell.css">
     <link rel="stylesheet" href="/static/css/admin.css">
     <script src="/static/js/vigil-theme.js"></script>
+    <script src="/static/js/vigil-product.js"></script>
 </head>
 <body class="vigil-classroom admin-page">
 
     <aside class="vigil-sidebar" aria-label="Classroom workspace navigation">
         <a href="/" class="vigil-brand" aria-label="VIGIL Classroom home">
-            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="55" height="32">
+            <img class="vigil-brand-logo" src="/static/assets/brand/logo-mark.png" alt="" width="36" height="36">
             <span class="vigil-brand-copy"><strong>VIGIL AI</strong><small>BURY THE LIGHT</small></span>
         </a>
         <div class="vigil-nav-label">MONITOR</div>
@@ -24,18 +25,19 @@
             <a href="/" class="vigil-nav-item"><span>01</span><strong>Operations</strong></a>
             <a href="/demo" class="vigil-nav-item"><span>02</span><strong>Live monitor</strong></a>
             <a href="/wall" class="vigil-nav-item"><span>03</span><strong>Video wall</strong></a>
+            <a href="/online" class="vigil-nav-item"><span>04</span><strong>Online exams</strong></a>
         </nav>
         <div class="vigil-nav-label">REVIEW</div>
         <nav class="vigil-nav">
-            <a href="/review" class="vigil-nav-item"><span>04</span><strong>Review queue</strong></a>
-            <a href="/playback" class="vigil-nav-item"><span>05</span><strong>Playback</strong></a>
-            <a href="/reports" class="vigil-nav-item"><span>06</span><strong>Reports</strong></a>
+            <a href="/review" class="vigil-nav-item"><span>05</span><strong>Review queue</strong></a>
+            <a href="/playback" class="vigil-nav-item"><span>06</span><strong>Playback</strong></a>
+            <a href="/reports" class="vigil-nav-item"><span>07</span><strong>Reports</strong></a>
         </nav>
         <div class="vigil-nav-label">SETUP</div>
         <nav class="vigil-nav">
-            <a href="/sessions" class="vigil-nav-item"><span>07</span><strong>Exams & sessions</strong></a>
-            <a href="/calibration" class="vigil-nav-item"><span>08</span><strong>Seat calibration</strong></a>
-            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>09</span><strong>System</strong></a>
+            <a href="/sessions" class="vigil-nav-item"><span>08</span><strong>Exams & sessions</strong></a>
+            <a href="/calibration" class="vigil-nav-item"><span>09</span><strong>Seat calibration</strong></a>
+            <a href="/admin" class="vigil-nav-item is-active" aria-current="page"><span>10</span><strong>System</strong></a>
             <button type="button" class="vigil-nav-item vigil-theme-toggle" data-theme-toggle><span data-theme-icon>☀</span><strong data-theme-label>Light mode</strong></button>
         </nav>
         <div class="vigil-user" data-user-slot></div>
@@ -47,7 +49,7 @@
 
     <header class="vg-topbar">
         <div class="vg-topbar-title">
-            <span class="vg-eyebrow">09 · System</span>
+            <span class="vg-eyebrow">10 · System</span>
             <h1 class="vg-title">System maintenance</h1>
             <span class="vg-subtitle">Clean up demo and test data. Database actions take a backup first and are written to the audit log.</span>
         </div>
@@ -112,6 +114,23 @@
             </section>
         </div>
 
+        <section class="vg-panel" aria-label="VIGIL One computers">
+            <div class="vg-panel-head"><h2>VIGIL One computers</h2><span class="vg-label">candidates' webcams</span></div>
+            <div class="one-pair">
+                <p>Pair a candidate computer: create a code, then in VIGIL One open <strong>Cài đặt › Kết nối VIGIL Hub</strong>,
+                    enter this server's address and the code. A code works once, for 10 minutes. Needs a chief or admin sign-in.</p>
+                <div class="one-pair-row">
+                    <button type="button" id="pairCodeBtn" class="vigil-btn vigil-btn--sm vigil-btn--primary">Create pairing code</button>
+                    <code id="pairCode" class="one-pair-code" aria-live="polite"></code>
+                    <span id="pairHint" class="vg-label"></span>
+                </div>
+            </div>
+            <table class="vg-table">
+                <thead><tr><th>Computer</th><th>Paired</th><th>Last seen</th><th>Status</th><th></th></tr></thead>
+                <tbody id="oneDevices"><tr><td class="vg-empty" colspan="5">Loading…</td></tr></tbody>
+            </table>
+        </section>
+
         <section class="vg-panel">
             <div class="vg-panel-head"><h2>Activity</h2><span class="vg-label">this page</span></div>
             <div id="activityLog" class="admin-log"><div class="vg-empty">No actions yet.</div></div>
@@ -134,6 +153,12 @@
         </form>
     </dialog>
 
+    <style>
+        .one-pair { padding: 12px 16px; }
+        .one-pair p { margin: 0 0 10px; font-size: 13px; opacity: .8; }
+        .one-pair-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+        .one-pair-code { font-family: var(--vigil-font-mono); font-size: 28px; letter-spacing: .3em; }
+    </style>
     <script src="/static/js/admin.js"></script>
     <script src="/static/js/vigil-auth.js"></script>
 </body>

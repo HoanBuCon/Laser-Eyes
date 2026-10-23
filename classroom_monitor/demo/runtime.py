@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import shutil
 import threading
 import time
@@ -51,13 +50,14 @@ from classroom_monitor.demo.seat_timeline import SeatTimelineRecorder
 from classroom_monitor.demo.paths import demo_runs_root, purge_replay_package, replay_package_dir
 from classroom_monitor.demo.renderer import DemoHUDOverlayRenderer
 from classroom_monitor.demo.seating import build_scene_seating
-from classroom_monitor.detector import PoseClassroomDetector
+from classroom_monitor.detector import pose_detector_for
 from classroom_monitor.head_pose_provider import (
     HeadOrientationEstimate,
     create_head_pose_provider,
 )
 from classroom_monitor.models import ClassroomEvent, Detection, EventStatus, SeverityLevel
 from classroom_monitor.observation_extractor import ObservationExtractor, RawObservation
+from classroom_monitor.video_io import AsyncVideoWriter, FrameReader, RealtimePacer, StageTimer
 from classroom_monitor.pipeline import SRSv2Pipeline
 from classroom_monitor.scene_context import CapabilityStatus, DeskGeometry, SceneProfile, SeatContext, SeatGraph
 from classroom_monitor.seat_manager import SeatDefinition, SeatManager, SeatState
@@ -66,6 +66,7 @@ from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType,
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from proctor_support.contracts import SourceProduct
 from proctor_support.frame_store import CapturedFrame, FrameCaptureStore
+from storage.analysis_trace import CLASSROOM_TRACE_FILE, TraceWriter, classroom_record
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, DetectionEvent, EvidenceFile, ExamRoom, ExamSession, ExamSite, SeatROI
 from storage.session_lifecycle import finish_session
@@ -111,9 +112,15 @@ class DemoStatus:
     capability_health: Dict[str, str] = field(default_factory=dict)
     persistence_health: str = "UNKNOWN"
     last_error: Optional[str] = None
+    stage_ms: Dict[str, float] = field(default_factory=dict)  # rolling average per stage of the loop
+    stride: Optional[int] = None                               # every n-th frame; None = as many as the machine can
+    skipped_frames: int = 0                                    # frames not analysed to stay live (auto mode)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            "stage_ms": dict(self.stage_ms),
+            "stride": self.stride,
+            "skipped_frames": self.skipped_frames,
             "state": self.state,
             "run_id": self.run_id,
             "preset": self.preset,
@@ -326,7 +333,7 @@ class DemoRuntime:
         debug_overlay: bool = False,
         show_window: bool = False,
         max_frames: Optional[int] = None,
-        stride: int = 1,
+        stride: Optional[int] = None,
         allow_mock: bool = False,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -354,7 +361,7 @@ class DemoRuntime:
         debug_overlay: bool = False,
         show_window: bool = False,
         max_frames: Optional[int] = None,
-        stride: int = 1,
+        stride: Optional[int] = None,
         allow_mock: bool = False,
         session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -611,6 +618,7 @@ class DemoRuntime:
             "peak_risk_score": event_dict["peak_risk_score"],
             "supporting_cues": event.metadata.get("supporting_cues") or [],
             "focus": event.metadata.get("focus"),
+            "clip_start_ms": event.metadata.get("clip_start_ms"),
         }, default=float)
 
         # Persist to SQLite
@@ -716,7 +724,7 @@ class DemoRuntime:
         debug_overlay: bool,
         show_window: bool,
         max_frames: Optional[int],
-        stride: int,
+        stride: Optional[int],
         allow_mock: bool,
     ) -> None:
         """Executes full live SRS v2 inference pipeline."""
@@ -726,7 +734,6 @@ class DemoRuntime:
         config.show_window = show_window
         if max_frames is not None:
             config.max_frames = max_frames
-        config.stride = stride
 
         # Output isolation directory
         out_p = demo_runs_root() / run_id
@@ -748,7 +755,13 @@ class DemoRuntime:
         if config.max_frames and config.max_frames < total_frames:
             total_frames = config.max_frames
 
+        # No fixed rate: analyse as many frames as this machine can while staying live (frames
+        # already late are skipped, see RealtimePacer).  An explicit stride is used as given.
+        auto_rate = not stride
+        config.stride = 1 if auto_rate else int(stride)
         with self._lock:
+            self.status.stride = None if auto_rate else config.stride
+            self.status.skipped_frames = 0
             self.status.total_frames = total_frames
             self.status.source_fps = fps
             self.status.video_duration_ms = (total_frames / fps) * 1000.0 if fps > 0 else 0.0
@@ -779,7 +792,7 @@ class DemoRuntime:
 
         # Initialize AI Models & Engines
         try:
-            detector = PoseClassroomDetector(confidence_threshold=config.pose_conf, allow_mock=allow_mock)
+            detector = pose_detector_for(config, allow_mock=allow_mock)
             detector.ensure_available()
         except Exception as exc:
             logger.error("LIVE start refused: %s", exc)
@@ -811,6 +824,7 @@ class DemoRuntime:
         pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph, **runtime_cfg["patterns"])
         risk_tracker = SeatRiskTracker(room_id=config.room_code, camera_id=config.camera_id, **runtime_cfg["risk"])
         timeline = SeatTimelineRecorder()
+        trace = TraceWriter(out_p / CLASSROOM_TRACE_FILE)  # person boxes per frame, for the Review debug overlay
         pipeline = SRSv2Pipeline(
             config=config,
             runtime_config=runtime_cfg,
@@ -852,7 +866,14 @@ class DemoRuntime:
         # Video writer for result.mp4
         result_video_path = out_p / "result.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-        out_writer = cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h))
+        # Encoded on its own thread: the loop only queues the annotated frame
+        # Auto rate: the last annotated frame fills in for skipped ones, so result.mp4 keeps the
+        # camera's timing; a fixed stride writes one frame per analysed frame at fps / stride.
+        out_writer = AsyncVideoWriter(cv2.VideoWriter(str(result_video_path), fourcc, fps / config.stride, (orig_w, orig_h)))
+        pacer = RealtimePacer(fps)
+        last_written_idx = 0
+        last_read_idx = 0
+        last_annotated = None
 
         all_episodes: List[TemporalEpisode] = []
         all_events: List[ClassroomEvent] = []
@@ -882,22 +903,38 @@ class DemoRuntime:
         rolling_fps_deque = deque(maxlen=30)
         last_frame_time = time.time()
         source_ts_ms = 0.0
+        reader = FrameReader(cap)  # decodes the next frames while the GPU works on this one
+        stages = StageTimer()
 
         try:
             while not self._stop_event.is_set():
                 if self._pause_event.is_set():
+                    pacer.pause()
                     time.sleep(0.1)
                     continue
+                pacer.resume()
 
-                ret, frame = cap.read()
+                t_stage = time.perf_counter()
+                ret, frame = reader.read()
                 if not ret:
                     break
+                stages.add("decode_wait", t_stage)
 
                 frame_idx += 1
                 if config.max_frames and frame_idx > config.max_frames:
                     break
+                last_read_idx = frame_idx
+                # Same clock as the CLI runner: the first frame is t=0.
+                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
+                # Every frame goes into the evidence buffer, analysed or not: clips keep the
+                # camera's frame rate (they used to play fast when frames were skipped)
+                t_stage = time.perf_counter()
+                evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
+                stages.add("evidence_buffer", t_stage)
 
                 if config.stride > 1 and (frame_idx % config.stride) != 0:
+                    continue
+                if auto_rate and not pacer.should_analyse(source_ts_ms):
                     continue
 
                 processed_count += 1
@@ -906,17 +943,22 @@ class DemoRuntime:
                 last_frame_time = now
                 rolling_fps_deque.append(1.0 / dt)
                 curr_fps = float(np.mean(rolling_fps_deque))
-                # Same clock as the CLI runner: the first frame is t=0.
-                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
 
-                evidence_buffer.add_frame(frame, frame_idx=frame_idx, timestamp_ms=source_ts_ms)
                 frame_result = pipeline.process_frame(frame, frame_idx, source_ts_ms)
+                pacer.analysed_frame(source_ts_ms)
+                realtime = pacer.realtime_factor() or (curr_fps * config.stride / fps if fps > 0 else 1.0)
+                for stage_name, stage_ms in frame_result.timings_ms.items():
+                    stages.put(stage_name, stage_ms)
+                t_stage = time.perf_counter()
                 detections = frame_result.detections
                 unmapped_dets = frame_result.roaming_detections
                 active_episodes_frame = frame_result.active_episodes
                 patterns_frame = frame_result.patterns
                 occupied_seats = [occ for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED]
                 all_patterns.extend(patterns_frame)
+                traced = list(detections or [])
+                traced += [d for d in (unmapped_dets or []) if all(d is not o for o in traced)]
+                trace.write(classroom_record(source_ts_ms, traced, seat_mgr.occupancies))
 
                 for event in frame_result.incidents:
                     all_events.append(event)
@@ -930,6 +972,9 @@ class DemoRuntime:
                             timestamp_ms=source_ts_ms,
                         )
                         event.evidence_video_path = str(clip_job.output_path)
+                        # Source time of the clip's first frame: the debug overlay lines the trace up with it
+                        event.metadata["clip_start_ms"] = (
+                            clip_job.pre_frames[0].timestamp_ms if clip_job.pre_frames else source_ts_ms)
                         evidence_jobs[event.event_id] = clip_job
                         snapshot_path = evidence_dir / f"{event.event_id}_snapshot.jpg"
                         snapshot_frame = event.evidence_frame if event.evidence_frame is not None else frame
@@ -952,6 +997,7 @@ class DemoRuntime:
                         publish_evidence(events_by_id[event_id], job)
 
                 timeline.observe(source_ts_ms, {code: prof.risk_score for code, prof in risk_tracker.profiles.items()})
+                stages.add("incidents_db", t_stage)
 
                 # 5. Render Output Frame
                 active_seats_state = {}
@@ -966,7 +1012,7 @@ class DemoRuntime:
                 metrics_telemetry = {
                     "source_fps": fps,
                     "processing_fps": curr_fps,
-                    "realtime_factor": curr_fps / fps if fps > 0 else 1.0,
+                    "realtime_factor": realtime,
                     "total_frames": total_frames,
                     "active_episodes_count": len(active_episodes_frame),
                     "active_patterns_count": len(patterns_frame),
@@ -976,6 +1022,7 @@ class DemoRuntime:
 
                 renderer.behavior_labels = self.behavior_labels
                 renderer.debug_overlay = self.debug_overlay
+                t_stage = time.perf_counter()
                 annotated_frame = renderer.render_frame(
                     frame=frame,
                     frame_idx=frame_idx,
@@ -1006,9 +1053,17 @@ class DemoRuntime:
                         cv2.LINE_AA,
                     )
 
-                out_writer.write(annotated_frame)
+                stages.add("render", t_stage)
+                t_stage = time.perf_counter()
+                for _ in range(max(1, frame_idx - last_written_idx) if auto_rate else 1):
+                    out_writer.write(annotated_frame)
+                last_written_idx = frame_idx
+                last_annotated = annotated_frame
+                stages.add("video_writer_wait", t_stage)
+                t_stage = time.perf_counter()
                 _, jpeg_buf = cv2.imencode(".jpg", annotated_frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
                 jpeg_bytes = jpeg_buf.tobytes()
+                stages.add("stream_jpeg", t_stage)
 
                 with self._lock:
                     self.latest_frame = annotated_frame
@@ -1017,12 +1072,14 @@ class DemoRuntime:
                     self.status.frame_index = frame_idx
                     self.status.source_timestamp_ms = source_ts_ms
                     self.status.processing_fps = curr_fps
-                    self.status.realtime_factor = curr_fps / fps if fps > 0 else 1.0
+                    self.status.realtime_factor = realtime
+                    self.status.skipped_frames = pacer.skipped
                     self.status.occupied_seats = len(occupied_seats)
                     self.status.suspicious_seats = sum(
                         1 for p in risk_tracker.profiles.values() if p.current_state in (RiskState.SUSPICIOUS.value, RiskState.FLAGGED_FOR_REVIEW.value)
                     )
                     self.status.active_review_incidents = metrics_telemetry["active_review_incidents"]
+                    self.status.stage_ms = stages.averages()
 
                 for cb in self._callback_snapshot("frame"):
                     try:
@@ -1050,6 +1107,10 @@ class DemoRuntime:
                 job = evidence_jobs.get(completed_event.event_id)
                 if job is not None:
                     publish_evidence(completed_event, job)
+            reader.stop()
+            if auto_rate and last_annotated is not None:  # frames after the last analysed one
+                for _ in range(last_read_idx - last_written_idx):
+                    out_writer.write(last_annotated)
             out_writer.release()
             cap.release()
             if show_window:
@@ -1087,6 +1148,7 @@ class DemoRuntime:
                 scene_metadata=scene_meta,
                 runtime_stats=runtime_stats,
             )
+            trace.close()
             try:
                 timeline.write(out_p)
             except OSError as exc:

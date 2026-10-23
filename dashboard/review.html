@@ -142,10 +142,13 @@
                                 <span>Evidence clip</span>
                                 <a id="dSessionVideo" class="hidden" href="#">Whole exam video</a>
                                 <label class="focus-toggle"><input type="checkbox" id="chkFocus" checked> Highlight suspect</label>
+                                <label class="focus-toggle" title="What the analysis saw on each frame: person boxes (Classroom), face and gaze (VIGIL One)"><input type="checkbox" id="chkDebug"> Debug</label>
                             </div>
                             <div class="evidence-frame">
                                 <video id="dVideo" controls preload="metadata"></video>
                                 <svg id="dVideoFocus" class="focus-svg hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                                <svg id="dVideoDebug" class="focus-svg debug-svg hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                                <div id="dDebugInfo" class="debug-info hidden"></div>
                                 <div id="dVideoStatus" class="evidence-status hidden"></div>
                             </div>
                         </div>
@@ -212,6 +215,7 @@
     </footer>
 
     <script src="/static/js/focus-overlay.js"></script>
+    <script src="/static/js/review-debug.js"></script>
     <script src="/static/js/review.js"></script>
     <script src="/static/js/vigil-auth.js"></script>
 </body>

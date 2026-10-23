@@ -80,6 +80,31 @@ function seek(seconds) {
     }
 }
 
+/** The moment of the exam (ms) shown at a position of the joined video: the inverse of locate(). */
+function examMsAt(seconds) {
+    const rows = state.info ? state.info.segments : [];
+    const row = rows.find((r) => seconds < r.offset_s + r.duration_s) || rows[rows.length - 1];
+    return row ? row.start_ms + Math.max(0, seconds - row.offset_s) * 1000 : seconds * 1000;
+}
+
+// --- debug overlay: face, gaze and objects the analysis saw (the global debug switch) -------------
+
+function renderDebug() {
+    const on = Boolean(window.vigilDebug && window.vigilDebug.isOn()) && Boolean(state.info && state.info.segment_count);
+    $('ovDebug').checked = on;
+    if (!on) {
+        ReviewDebug.stop();
+        return;
+    }
+    ReviewDebug.attach({
+        video: $('ovVideo'),
+        svg: $('ovDebugSvg'),
+        info: $('ovDebugInfo'),
+        timeMs: () => examMsAt(position()),
+        loadWindow: (from, to) => api(`/api/v1/one/sessions/${encodeURIComponent(sessionId)}/trace?from_ms=${Math.round(from)}&to_ms=${Math.round(to)}`),
+    });
+}
+
 function seekToExamMs(ms) {
     const at = locate(ms);
     if (at === null) return;
@@ -259,5 +284,9 @@ $('ovMerge').addEventListener('click', async () => {
     }
 });
 
+$('ovDebug').addEventListener('change', (e) => { if (window.vigilDebug) window.vigilDebug.set(e.target.checked); });
+document.addEventListener('vigil-debug', renderDebug);
+window.addEventListener('resize', () => ReviewDebug.redraw());
+
 bindVideo();
-load();
+load().then(renderDebug);

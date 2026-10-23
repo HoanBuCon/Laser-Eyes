@@ -64,9 +64,13 @@
 
     <main class="vg-page">
         <section class="vg-panel ov-player-panel">
-            <div class="vg-panel-head"><h2 id="ovTitle">Candidate</h2><span class="vg-label" id="ovStatus">—</span></div>
+            <div class="vg-panel-head"><h2 id="ovTitle">Candidate</h2>
+                <label class="ov-debug-toggle" title="What the analysis saw on each frame: face, gaze, objects"><input type="checkbox" id="ovDebug"> Debug</label>
+                <span class="vg-label" id="ovStatus">—</span></div>
             <div class="ov-stage">
                 <video id="ovVideo" controls playsinline preload="metadata"></video>
+                <svg id="ovDebugSvg" class="ov-debug-svg hidden" preserveAspectRatio="xMidYMid meet" aria-hidden="true"></svg>
+                <div id="ovDebugInfo" class="ov-debug-info hidden"></div>
                 <div id="ovEmpty" class="ov-empty" hidden></div>
             </div>
             <div class="ov-timeline" id="ovTimeline" aria-label="Signals on the session timeline">
@@ -82,6 +86,7 @@
         </section>
     </main>
 
+    <script src="/static/js/review-debug.js"></script>
     <script src="/static/js/one-video.js"></script>
     <script src="/static/js/vigil-auth.js"></script>
 </body>

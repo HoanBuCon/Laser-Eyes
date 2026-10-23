@@ -21,3 +21,10 @@
 .ov-signal-time { font-family: var(--vigil-font-mono); }
 .vg-label[data-tone="good"] { color: var(--vigil-good); }
 .vg-label[data-tone="warning"] { color: var(--vigil-warning); }
+
+/* Debug overlay (face, gaze, objects from the analysis trace) */
+.ov-debug-toggle { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; margin-right: 12px; color: var(--vigil-text-muted); font-size: var(--vigil-font-size-xs); cursor: pointer; }
+.ov-debug-svg { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.ov-stage .hidden { display: none; }
+.ov-debug-info { position: absolute; top: 8px; left: 8px; max-width: calc(100% - 16px); padding: 3px 8px; border-radius: var(--vigil-radius-xs);
+    background: rgba(0, 0, 0, 0.72); color: #e5e7eb; font-family: var(--vigil-font-mono); font-size: 0.875rem; pointer-events: none; }

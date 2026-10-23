@@ -66,6 +66,7 @@ from classroom_monitor.temporal_episode_engine import EpisodeState, EpisodeType,
 from classroom_monitor.video_buffer import EvidenceVideoBuffer
 from proctor_support.contracts import SourceProduct
 from proctor_support.frame_store import CapturedFrame, FrameCaptureStore
+from storage.analysis_trace import CLASSROOM_TRACE_FILE, TraceWriter, classroom_record
 from storage.database import SessionLocal, init_db
 from storage.db_models import Camera, DetectionEvent, EvidenceFile, ExamRoom, ExamSession, ExamSite, SeatROI
 from storage.session_lifecycle import finish_session
@@ -617,6 +618,7 @@ class DemoRuntime:
             "peak_risk_score": event_dict["peak_risk_score"],
             "supporting_cues": event.metadata.get("supporting_cues") or [],
             "focus": event.metadata.get("focus"),
+            "clip_start_ms": event.metadata.get("clip_start_ms"),
         }, default=float)
 
         # Persist to SQLite
@@ -822,6 +824,7 @@ class DemoRuntime:
         pattern_engine = BehaviorPatternEngine(seat_graph=seat_graph, **runtime_cfg["patterns"])
         risk_tracker = SeatRiskTracker(room_id=config.room_code, camera_id=config.camera_id, **runtime_cfg["risk"])
         timeline = SeatTimelineRecorder()
+        trace = TraceWriter(out_p / CLASSROOM_TRACE_FILE)  # person boxes per frame, for the Review debug overlay
         pipeline = SRSv2Pipeline(
             config=config,
             runtime_config=runtime_cfg,
@@ -953,6 +956,9 @@ class DemoRuntime:
                 patterns_frame = frame_result.patterns
                 occupied_seats = [occ for occ in seat_mgr.occupancies.values() if occ.state == SeatState.OCCUPIED]
                 all_patterns.extend(patterns_frame)
+                traced = list(detections or [])
+                traced += [d for d in (unmapped_dets or []) if all(d is not o for o in traced)]
+                trace.write(classroom_record(source_ts_ms, traced, seat_mgr.occupancies))
 
                 for event in frame_result.incidents:
                     all_events.append(event)
@@ -966,6 +972,9 @@ class DemoRuntime:
                             timestamp_ms=source_ts_ms,
                         )
                         event.evidence_video_path = str(clip_job.output_path)
+                        # Source time of the clip's first frame: the debug overlay lines the trace up with it
+                        event.metadata["clip_start_ms"] = (
+                            clip_job.pre_frames[0].timestamp_ms if clip_job.pre_frames else source_ts_ms)
                         evidence_jobs[event.event_id] = clip_job
                         snapshot_path = evidence_dir / f"{event.event_id}_snapshot.jpg"
                         snapshot_frame = event.evidence_frame if event.evidence_frame is not None else frame
@@ -1139,6 +1148,7 @@ class DemoRuntime:
                 scene_metadata=scene_meta,
                 runtime_stats=runtime_stats,
             )
+            trace.close()
             try:
                 timeline.write(out_p)
             except OSError as exc:

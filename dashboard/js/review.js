@@ -68,8 +68,17 @@ function signalTitle(item) {
     return isOne(item) && item.label ? item.label : prettyName(item.primary_signal);
 }
 
+// "CLASSROOM-03" -> "P03", "ROOM-101" -> "101": the queue tile is 3 characters wide
 function roomShort(code) {
-    return String(code || '').replace(/^ROOM-/, '');
+    const raw = String(code || '').replace(/^ROOM-/, '');
+    const m = raw.match(/^CLASSROOM-?(\d+)$/i);
+    return m ? `P${m[1].padStart(2, '0')}` : raw;
+}
+
+// A candidate code is too long for the tile: keep its last 6 characters (the full code is in the tooltip)
+function subjectShort(item) {
+    const full = subjectLabel(item);
+    return isOne(item) && full.length > 7 ? `…${full.slice(-6)}` : full;
 }
 
 function seconds(ms) {
@@ -252,7 +261,8 @@ function renderList() {
         const room = document.createElement('small');
         room.textContent = placeLabel(item) || (manual ? 'MARK' : '');
         const seatLabel = document.createElement('strong');
-        seatLabel.textContent = subjectLabel(item);
+        seatLabel.textContent = subjectShort(item);
+        seat.title = `${placeLabel(item) ? item.room_code || placeLabel(item) : ''} ${subjectLabel(item)}`.trim();
         if (isOne(item)) seat.classList.add('is-one');
         seat.append(room, seatLabel);
 
@@ -318,7 +328,10 @@ function renderDetail(item) {
     video.load();
     $('detailEmpty').classList.toggle('hidden', Boolean(item));
     $('detailBody').classList.toggle('hidden', !item);
-    if (!item) return;
+    if (!item) {
+        ReviewDebug.stop();
+        return;
+    }
 
     const manual = item.source_type === 'MANUAL_BOOKMARK';
     $('dSeat').textContent = `${placeLabel(item)} ${subjectLabel(item)}`.trim();
@@ -362,6 +375,7 @@ function renderDetail(item) {
     $('dSnapshotLink').href = snapshotUrl || '#';
     $('dSnapshotLink').classList.toggle('hidden', !snapshotUrl);
     renderFocus(item);
+    renderDebug(item);
 
     $('dIntegrity').textContent = item.sha256 ? 'Checking…' : 'No digest stored';
     if (item.sha256 && !manual) checkIntegrity(item);
@@ -379,6 +393,26 @@ function renderDetail(item) {
     $('closedReportLink').href = `/reports?session=${encodeURIComponent(item.session_id || '')}`;
     $('decisionForm').classList.toggle('is-locked', locked);
     $('decisionForm').querySelectorAll('button, select, textarea, input').forEach((el) => { el.disabled = locked || (el.id === 'btnSubmit' && !state.decision); });
+}
+
+// Debug mode (the global switch, also on this page): per-frame boxes / gaze over the clip
+function renderDebug(item) {
+    const on = Boolean(window.vigilDebug && window.vigilDebug.isOn());
+    $('chkDebug').checked = on;
+    if (!on || !item) {
+        ReviewDebug.stop();
+        return;
+    }
+    ReviewDebug.load(item, {
+        video: $('dVideo'),
+        svg: $('dVideoDebug'),
+        info: $('dDebugInfo'),
+        fetchJson: async (url) => {
+            const res = await apiFetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.json();
+        },
+    });
 }
 
 function renderFocus(item) {
@@ -505,6 +539,9 @@ document.addEventListener('DOMContentLoaded', () => {
     $('sortOrder').addEventListener('change', (e) => setFilter('sort', e.target.value));
     $('btnMore').addEventListener('click', () => { state.offset = state.items.length; loadQueue(false); });
     $('chkFocus').addEventListener('change', () => { const item = currentItem(); if (item) renderFocus(item); });
+    $('chkDebug').addEventListener('change', (e) => { if (window.vigilDebug) window.vigilDebug.set(e.target.checked); });
+    document.addEventListener('vigil-debug', () => renderDebug(currentItem()));
+    window.addEventListener('resize', () => ReviewDebug.redraw());
 
     document.querySelectorAll('.decision-btn').forEach((btn) => {
         btn.addEventListener('click', () => chooseDecision(btn.dataset.decision));

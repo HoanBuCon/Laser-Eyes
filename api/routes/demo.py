@@ -418,6 +418,76 @@ def _contained_persisted_evidence(path_value: Optional[str], extensions: set[str
     return candidate
 
 
+CLIP_PRE_ROLL_MS = 5000.0  # both products start an evidence clip ~5 s before the signal
+TRACE_WINDOW_MS = 14000.0
+
+
+@router.get("/events/{event_id}/trace")
+def get_event_trace(event_id: str, db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """What the analysis saw on each frame of the incident's clip (Review debug overlay).
+
+    ``t`` of every record is in clip time (ms from the clip's first frame).  ``kind`` is
+    ``boxes`` (Classroom person boxes with their seat) or ``gaze`` (VIGIL One face and gaze).
+    """
+    from storage import analysis_trace
+    from storage.db_models import ExamSession
+    from storage.exam_workflow import session_artifact_dir
+
+    event = db.query(DetectionEvent).filter(DetectionEvent.event_id == event_id).first()
+    if event is None:
+        raise HTTPException(status_code=404, detail="Review incident not found")
+    try:
+        meta = json.loads(event.incident_metadata_json or "{}")
+    except (TypeError, ValueError):
+        meta = {}
+    focus = meta.get("focus") or {}
+    one = event.source_product == "VIGIL_ONE"
+    if one:
+        from storage.one_analysis import trace_path
+
+        paths = [trace_path(event.session_id)]
+    else:
+        paths = []
+        evidence = event.evidence
+        clip = (evidence.video_path or evidence.file_path) if evidence else None
+        if clip:
+            paths += [Path(clip).parent.parent / analysis_trace.CLASSROOM_TRACE_FILE,
+                      Path(clip).parent / analysis_trace.CLASSROOM_TRACE_FILE]
+        session = db.get(ExamSession, event.session_id)
+        artifacts = session_artifact_dir(db, session) if session is not None else None
+        if artifacts is not None:
+            paths.append(Path(artifacts) / analysis_trace.CLASSROOM_TRACE_FILE)
+    path = next((p for p in paths if p.is_file()), None)
+    clip_start = meta.get("clip_start_ms")
+    if clip_start is None:
+        # Incidents from before clip_start_ms was stored: the clip was cut around the moment the
+        # signal was raised -- VIGIL One raises it when the behaviour has lasted (last_seen_ms),
+        # Classroom when the incident is flagged (first_seen_ms)
+        seen = meta.get("last_seen_ms" if one else "first_seen_ms")
+        clip_start = max(0.0, float(seen) - CLIP_PRE_ROLL_MS) if seen is not None else None
+    records: List[Dict[str, Any]] = []
+    if path is not None and clip_start is not None:
+        start = float(clip_start)
+        for record in analysis_trace.read_window(path, start - 200.0, start + TRACE_WINDOW_MS):
+            record["t"] = round(record["t"] - start, 1)
+            records.append(record)
+    frame_size = focus.get("frame_size")
+    if frame_size is None and one and records:
+        frame_size = [records[0].get("w"), records[0].get("h")]
+    return {
+        "event_id": event_id,
+        "kind": "gaze" if one else "boxes",
+        "available": bool(records),
+        "reason": None if records else ("no trace for this incident (recorded before tracing, or not analysed live)"
+                                        if path is None or clip_start is None else "no frames in the clip window"),
+        "clip_start_ms": clip_start,
+        "frame_size": frame_size,
+        "subject": event.subject_ref,
+        "focus": focus or None,
+        "records": records,
+    }
+
+
 @router.get("/events/{event_id}/evidence/snapshot")
 def get_event_evidence_snapshot(event_id: str, db: Session = Depends(get_db)):
     """Serve the exact snapshot linked to a durable incident."""

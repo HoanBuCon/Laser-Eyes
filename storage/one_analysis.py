@@ -49,6 +49,7 @@ from sqlalchemy.orm import Session
 from exam_monitor.audio import AudioSpeechState, speech_is_confirmed
 from exam_monitor.events import EventDetector
 from exam_monitor.models import AnalysisResult, EventType
+from storage import analysis_trace
 from storage import one_service as one
 from storage.db_models import DetectionEvent, EvidenceFile, Exam, ExamSession, SessionVideoSegment
 
@@ -405,6 +406,7 @@ class OneAnalysisService:
             speech = json.loads(seg.speech_json) if seg.speech_json else None
             audio = speech is not None and bool(policy.get("microphone", True))
             created = analysed = index = 0
+            traced: list[dict] = []
             while True:
                 ok, frame = cap.read()
                 if not ok or frame is None:
@@ -424,6 +426,7 @@ class OneAnalysisService:
                 else:
                     analyzer, detector = self._backfill(state, policy, t_ms)
                 result = analyzer.analyze(frame, t_ms / 1000.0)
+                traced.append(analysis_trace.one_record(t_ms, result, (frame.shape[1], frame.shape[0])))
                 if audio:
                     result = _with_voice(result, any(start <= t_ms <= end for start, end in speech))
                 for event in detector.update(result, session.id, now=t_ms / 1000.0):
@@ -433,6 +436,7 @@ class OneAnalysisService:
                 analysed += 1
         finally:
             cap.release()
+            analysis_trace.append(trace_path(session.id), traced)
         seg.frames_analyzed = analysed
         state.frames += analysed
         self._update_live(db, session, state)
@@ -481,6 +485,8 @@ class OneAnalysisService:
             state.main_until_ms = frame.t_ms
             state.cover(frame.t_ms)
             result = state.analyzer.analyze(image, frame.t_ms / 1000.0)
+            analysis_trace.append(trace_path(session_id),
+                                  [analysis_trace.one_record(frame.t_ms, result, (image.shape[1], image.shape[0]))])
             if frame.voice is not None and policy.get("microphone", True):
                 result = _with_voice(result, bool(frame.voice))
             created = 0
@@ -563,8 +569,16 @@ class OneAnalysisService:
         ok, jpeg = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
         if ok and row is not None:
             one.store_snapshot(db, row, jpeg.tobytes())
-        state.pending_clips.append({"event_id": event_id, "from_ms": max(0.0, t_ms - CLIP_BEFORE_MS),
-                                    "to_ms": t_ms + CLIP_AFTER_MS})
+        clip_from = max(0.0, t_ms - CLIP_BEFORE_MS)
+        state.pending_clips.append({"event_id": event_id, "from_ms": clip_from, "to_ms": t_ms + CLIP_AFTER_MS})
+        if row is not None:  # where the clip starts in session time: the debug overlay lines the trace up with it
+            try:
+                meta = json.loads(row.incident_metadata_json or "{}")
+            except (TypeError, ValueError):
+                meta = {}
+            meta["clip_start_ms"] = round(clip_from, 1)
+            row.incident_metadata_json = json.dumps(meta, ensure_ascii=False)
+            db.commit()
         return 1
 
     def _update_live(self, db: Session, session: ExamSession, state: _SessionState) -> None:
@@ -670,6 +684,11 @@ class OneAnalysisService:
             return "error"
         one.store_clip(db, row, data)
         return "ready"
+
+
+def trace_path(session_id: str) -> Path:
+    """Per-frame face / gaze trace of a session (the Review page's debug overlay)."""
+    return one.one_evidence_root() / session_id / analysis_trace.ONE_TRACE_FILE
 
 
 def _covers(segs: list, from_ms: float, to_ms: float, slack_ms: float = 1500.0) -> bool:

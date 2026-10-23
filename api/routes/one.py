@@ -151,6 +151,21 @@ def _queue_merge(request: Request, background: BackgroundTasks, session_id: str)
     background.add_task(one_video.merge_in_background, session_id, provider)
 
 
+@router.get("/sessions/{session_id}/trace")
+def get_session_trace(session_id: str, from_ms: float = 0.0, to_ms: float = 60000.0,
+                      db: Session = Depends(get_db)) -> dict[str, Any]:
+    """What the analysis saw (face, gaze, objects) on each frame between two moments of the exam:
+    the debug overlay of the whole-exam video.  At most two minutes per request."""
+    from storage import analysis_trace
+
+    _one_session(db, session_id)
+    to_ms = min(float(to_ms), float(from_ms) + 120000.0)
+    records = analysis_trace.read_window(one_analysis.trace_path(session_id), float(from_ms), to_ms)
+    first = records[0] if records else {}
+    return {"session_id": session_id, "from_ms": from_ms, "to_ms": to_ms,
+            "frame_size": [first["w"], first["h"]] if first.get("w") else None, "records": records}
+
+
 @router.get("/sessions/{session_id}/video")
 def get_session_video(session_id: str, db: Session = Depends(get_db)) -> dict[str, Any]:
     return one_video.info(db, _one_session(db, session_id))

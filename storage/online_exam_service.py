@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import secrets
 import string
 import threading
@@ -33,6 +34,8 @@ from storage.session_lifecycle import _summarise
 JOIN_CODE_LENGTH = 7
 TOKEN_HOURS = 12
 OFFLINE_AFTER_SECONDS = 30
+# A candidate silent this long has left the exam: the Hub closes the session (env VIGIL_ONE_ABANDON_MINUTES)
+ABANDON_AFTER_SECONDS = 15 * 60
 CLOCK_SKEW_SECONDS = 120
 BOOST_SECONDS = 60
 
@@ -63,6 +66,7 @@ INTEGRITY_SIGNALS = {
     "ONE_LEFT_EARLY": ("HIGH", "Thoát phần mềm trước khi nộp bài"),
     "ONE_DEVICE_CHANGED": ("MEDIUM", "Vào thi lại từ máy khác"),
     "ONE_CLOCK_SKEW": ("LOW", "Đồng hồ máy thí sinh lệch so với máy chủ"),
+    "ONE_ABANDONED": ("HIGH", "Bỏ dở bài thi (mất kết nối kéo dài)"),
 }
 
 
@@ -414,6 +418,47 @@ def check_connections(db: Session, now: Optional[datetime.datetime] = None) -> i
                             open_ended=True)
             opened += 1
     return opened
+
+
+def abandon_after_seconds() -> float:
+    try:
+        minutes = float(os.getenv("VIGIL_ONE_ABANDON_MINUTES", ""))
+    except ValueError:
+        minutes = 0.0
+    return minutes * 60.0 if minutes > 0 else float(ABANDON_AFTER_SECONDS)
+
+
+def close_abandoned(db: Session, now: Optional[datetime.datetime] = None) -> list[str]:
+    """Close the sessions whose VIGIL One has been silent past the abandon limit.
+
+    A session left RUNNING (or INTERRUPTED by a Hub restart) by a computer that never came
+    back used to stay "LOST" for ever: its video was never joined and nobody closed it.
+    Returns the ids of the sessions closed (their video still has to be joined)."""
+    now = now or _now()
+    limit = now - datetime.timedelta(seconds=abandon_after_seconds())
+    rows = (
+        db.query(ExamSession)
+        .filter(ExamSession.product == "ONE", ExamSession.status.in_(("RUNNING", "STOPPING", "INTERRUPTED")))
+        .all()
+    )
+    closed = []
+    for session in rows:
+        last = session.last_heartbeat_at or session.started_at
+        if last is None or last >= limit:
+            continue
+        silent_min = (now - last).total_seconds() / 60.0
+        offline = _open_offline(db, session)
+        if offline is not None:
+            offline.end_timestamp = now
+            offline.duration_seconds = (now - offline.start_timestamp).total_seconds() + OFFLINE_AFTER_SECONDS
+        raise_integrity(db, session, "ONE_ABANDONED",
+                        f"Máy thí sinh im lặng {silent_min:.0f} phút (từ {last:%H:%M:%S} UTC): "
+                        "VIGIL Hub tự đóng phiên thi. Thí sinh chưa bấm Nộp bài.")
+        one.stop_session(db, session, {"ended_at": last.isoformat()})
+        session.ended_at = last
+        db.commit()
+        closed.append(session.id)
+    return closed
 
 
 def connection_back(db: Session, session: ExamSession) -> None:

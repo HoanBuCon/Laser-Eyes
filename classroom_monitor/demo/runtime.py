@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import shutil
 import threading
 import time
@@ -42,9 +43,12 @@ from classroom_monitor.demo.config import (
     DEFAULT_PRESET,
     DEMO_PRESETS,
     DemoVideoConfig,
+    get_room_config,
+    room_key,
     get_demo_config,
     resolve_video_path,
 )
+from classroom_monitor.camera_source import LiveFrameReader, redact
 from classroom_monitor.demo.exporter import export_demo_artifacts
 from classroom_monitor.demo.seat_timeline import SeatTimelineRecorder
 from classroom_monitor.demo.paths import demo_runs_root, purge_replay_package, replay_package_dir
@@ -72,6 +76,16 @@ from storage.db_models import Camera, DetectionEvent, EvidenceFile, ExamRoom, Ex
 from storage.session_lifecycle import finish_session
 
 logger = logging.getLogger("VigilDemoRuntime")
+
+def _run_config(preset_or_room: str) -> DemoVideoConfig:
+    """A demo preset or video (get_demo_config), else a room from the database (its camera)."""
+    try:
+        return get_demo_config(preset_or_room)
+    except FileNotFoundError:
+        return get_room_config(preset_or_room)
+
+
+CAMERA_CONNECT_TIMEOUT_S = 15.0  # a room camera that sends nothing for this long refuses the start
 
 
 class DemoMode(str, Enum):
@@ -115,12 +129,18 @@ class DemoStatus:
     stage_ms: Dict[str, float] = field(default_factory=dict)  # rolling average per stage of the loop
     stride: Optional[int] = None                               # every n-th frame; None = as many as the machine can
     skipped_frames: int = 0                                    # frames not analysed to stay live (auto mode)
+    room_code: str = ""                                        # the room this runtime analyses
+    source_kind: str = "FILE"                                  # FILE (a video) or CAMERA (stream / device)
+    source_status: str = ""                                    # camera: CONNECTING, LIVE, RECONNECTING, STOPPED
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "stage_ms": dict(self.stage_ms),
             "stride": self.stride,
             "skipped_frames": self.skipped_frames,
+            "room_code": self.room_code,
+            "source_kind": self.source_kind,
+            "source_status": self.source_status,
             "state": self.state,
             "run_id": self.run_id,
             "preset": self.preset,
@@ -146,18 +166,81 @@ class DemoStatus:
         }
 
 
-class DemoRuntime:
-    """Singleton-capable, thread-safe execution runtime for VIGIL AI SRS v2 Demo."""
+def max_live_rooms() -> int:
+    """Rooms analysed at the same time on this Hub (VIGIL_MAX_LIVE_ROOMS, default 3).
 
-    _instance: Optional[DemoRuntime] = None
+    Each LIVE room holds its own YOLO model on the GPU and shares the head-pose model; an RTX 4060
+    keeps about 3 rooms of 1080p video live. Raise it on a bigger GPU."""
+    try:
+        return max(1, int(os.getenv("VIGIL_MAX_LIVE_ROOMS", "3")))
+    except ValueError:
+        return 3
+
+
+class DemoRuntime:
+    """Thread-safe Classroom analysis of one room; one runtime per room, several rooms at once.
+
+    ``get_instance(room)`` gives the runtime of a room (a demo preset or a room code), created on
+    first use. ``get_instance()`` without a room gives the most recently started runtime, as every
+    caller expected when there was a single one. Callbacks registered with ``register_global_*``
+    apply to every room.
+    """
+
+    _instance: Optional[DemoRuntime] = None          # the most recently started (or the first) runtime
+    _rooms: Dict[str, "DemoRuntime"] = {}            # room key -> runtime
+    _registry_lock = threading.Lock()
+    _global_callbacks: Dict[str, List[Callable[..., None]]] = {"frame": [], "event": [], "status": []}
 
     @classmethod
-    def get_instance(cls) -> DemoRuntime:
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
+    def get_instance(cls, room: Optional[str] = None) -> DemoRuntime:
+        with cls._registry_lock:
+            if not room:
+                if cls._instance is None:
+                    cls._instance = cls()
+                return cls._instance
+            key = room_key(room)
+            runtime = cls._rooms.get(key)
+            if runtime is None:
+                default = cls._instance
+                # A single-room Hub keeps a single runtime: an idle runtime of no room is taken over
+                if default is not None and not default.room and not default.is_active() \
+                        and default not in cls._rooms.values():
+                    runtime = default
+                else:
+                    runtime = cls()
+                    if cls._instance is None:
+                        cls._instance = runtime
+                runtime.room = key
+                cls._rooms[key] = runtime
+            return runtime
+
+    @classmethod
+    def all_rooms(cls) -> Dict[str, "DemoRuntime"]:
+        with cls._registry_lock:
+            return dict(cls._rooms)
+
+    @classmethod
+    def active_rooms(cls) -> List[str]:
+        return [key for key, runtime in cls.all_rooms().items() if runtime.is_active()]
+
+    @classmethod
+    def register_global_callback(cls, kind: str, cb: Callable[..., None]) -> None:
+        with cls._registry_lock:
+            if cb not in cls._global_callbacks[kind]:
+                cls._global_callbacks[kind].append(cb)
+
+    @classmethod
+    def unregister_global_callback(cls, kind: str, cb: Callable[..., None]) -> None:
+        with cls._registry_lock:
+            if cb in cls._global_callbacks[kind]:
+                cls._global_callbacks[kind].remove(cb)
+
+    def is_active(self) -> bool:
+        return self.status.state in (DemoState.RUNNING.value, DemoState.PAUSED.value) or bool(
+            self._thread and self._thread.is_alive())
 
     def __init__(self):
+        self.room = ""  # room key once a room uses this runtime
         self._lock = threading.Lock()
         self._lifecycle_lock = threading.Lock()
         self._callback_lock = threading.Lock()
@@ -214,7 +297,10 @@ class DemoRuntime:
 
     def _callback_snapshot(self, kind: str) -> List[Callable[..., None]]:
         with self._callback_lock:
-            return list(getattr(self, f"_{kind}_callbacks"))
+            own = list(getattr(self, f"_{kind}_callbacks"))
+        with DemoRuntime._registry_lock:
+            shared = [cb for cb in DemoRuntime._global_callbacks[kind] if cb not in own]
+        return own + shared
 
     def get_status(self) -> Dict[str, Any]:
         with self._lock:
@@ -309,7 +395,7 @@ class DemoRuntime:
             source_timestamp_ms = self.status.source_timestamp_ms
             source_kind = "RECORDED_REPLAY" if self.status.mode == DemoMode.REPLAY.value else "VIDEO"
             try:
-                source_ref = str(resolve_video_path(get_demo_config(self.status.preset).video_path))
+                source_ref = redact(_run_config(self.status.preset).capture_source)
             except Exception:
                 source_ref = self.status.preset
         return self.frame_capture_store.capture(
@@ -342,6 +428,13 @@ class DemoRuntime:
         ``session_id`` runs the analysis for a scheduled exam session instead
         of creating an ad-hoc demo session.
         """
+        others = [key for key in DemoRuntime.active_rooms() if key != room_key(preset) and DemoRuntime._rooms.get(key) is not self]
+        if len(others) >= max_live_rooms():
+            raise RuntimeError(
+                f"{len(others)} rooms are already being analysed ({', '.join(sorted(others))}); this Hub runs at most "
+                f"{max_live_rooms()} at once (VIGIL_MAX_LIVE_ROOMS). Stop one first.")
+        with DemoRuntime._registry_lock:
+            DemoRuntime._instance = self
         with self._lifecycle_lock:
             return self._start_locked(
                 preset=preset,
@@ -388,9 +481,15 @@ class DemoRuntime:
             mode_enum = DemoMode.REPLAY if str(mode).upper() == "REPLAY" else DemoMode.LIVE
             run_id = f"DEMO-{int(time.time())}-{preset.lower()}"
 
+            try:
+                run_config = _run_config(preset)
+            except LookupError as exc:
+                raise RuntimeError(str(exc)) from exc
             self.status.state = DemoState.RUNNING.value
             self.status.run_id = run_id
             self.status.preset = preset.lower()
+            self.status.room_code = run_config.room_code
+            self.status.source_kind = "CAMERA" if run_config.is_live else "FILE"
             self.status.mode = mode_enum.value
             self.debug_overlay = bool(debug_overlay)
             self.status.debug_overlay = self.debug_overlay
@@ -502,7 +601,7 @@ class DemoRuntime:
         scheduled = db.get(ExamSession, session_id) if session_id else None
         session_id = scheduled.id if scheduled is not None else str(uuid.uuid4())
         try:
-            demo_cfg = get_demo_config(preset)
+            demo_cfg = _run_config(preset)
             room_code = demo_cfg.room_code
 
             # Ensure room exists
@@ -528,7 +627,7 @@ class DemoRuntime:
                 camera = Camera(
                     room_id=room.id,
                     name=demo_cfg.camera_id,
-                    source_uri=str(demo_cfg.video_path),
+                    source_uri=Path(demo_cfg.video_path).as_posix(),
                     status="online",
                 )
                 db.add(camera)
@@ -546,8 +645,11 @@ class DemoRuntime:
                     id=session_id,
                     room_id=room.id,
                     camera_id=camera.id,
-                    exam_name=f"VIGIL AI {mode} Demo ({preset.upper()}) - {run_id}",
-                    subject_code=f"ICTU-2026-{preset.upper()}",
+                    # An analysis started from the Live monitor without a scheduled session:
+                    # named by what it is, the room and when (run_id stays in its own column)
+                    exam_name=(f"{'Phát lại phân tích' if mode == DemoMode.REPLAY.value else 'Phân tích trực tiếp'}"
+                               f" · {room.name or room.room_code} · {datetime.now():%d/%m/%Y %H:%M}"),
+                    subject_code=room.room_code,
                     status="RUNNING",
                     run_id=run_id,
                     source_preset=preset.lower(),
@@ -729,7 +831,7 @@ class DemoRuntime:
     ) -> None:
         """Executes full live SRS v2 inference pipeline."""
         logger.info("Starting SRS v2 LIVE analysis worker for preset '%s' (run_id: %s)...", preset, run_id)
-        config = get_demo_config(preset)
+        config = _run_config(preset)
         config.debug_overlay = debug_overlay
         config.show_window = show_window
         if max_frames is not None:
@@ -741,19 +843,44 @@ class DemoRuntime:
         evidence_dir = out_p / "evidence"
         evidence_dir.mkdir(parents=True, exist_ok=True)
 
-        cap = cv2.VideoCapture(str(config.video_path))
-        if not cap.isOpened():
+        # A room camera (stream or device) is read live until the run is stopped; a video file
+        # is read to its end. Both give the loop frames with their moment (source_ts_ms).
+        live_reader: Optional[LiveFrameReader] = None
+        if config.is_live:
+            cap = None
+            live_reader = LiveFrameReader(config.capture_source)
             with self._lock:
-                self.status.state = DemoState.ERROR.value
-                self.status.last_error = f"Cannot open video: {config.video_path}"
-            return
+                self.status.source_status = live_reader.status
+            if not live_reader.wait_first_frame(CAMERA_CONNECT_TIMEOUT_S):
+                live_reader.stop()
+                with self._lock:
+                    self.status.state = DemoState.ERROR.value
+                    self.status.last_error = (f"Cannot connect to the camera of {config.room_code} "
+                                              f"({redact(config.capture_source)}) within {CAMERA_CONNECT_TIMEOUT_S:.0f} s")
+                return
+            orig_w, orig_h = live_reader.width, live_reader.height
+            fps = live_reader.fps or 25.0
+            total_frames = 0  # no end: until the proctor stops
+        else:
+            cap = cv2.VideoCapture(str(config.video_path))
+            if not cap.isOpened():
+                with self._lock:
+                    self.status.state = DemoState.ERROR.value
+                    self.status.last_error = f"Cannot open video: {config.video_path}"
+                return
 
-        orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        if config.max_frames and config.max_frames < total_frames:
-            total_frames = config.max_frames
+            orig_w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            orig_h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            if config.max_frames and config.max_frames < total_frames:
+                total_frames = config.max_frames
+
+        def release_source() -> None:
+            if live_reader is not None:
+                live_reader.stop()
+            if cap is not None:
+                cap.release()
 
         # No fixed rate: analyse as many frames as this machine can while staying live (frames
         # already late are skipped, see RealtimePacer).  An explicit stride is used as given.
@@ -771,7 +898,7 @@ class DemoRuntime:
             seating = build_scene_seating(config)
         except Exception as exc:
             logger.error("LIVE start refused: %s", exc)
-            cap.release()
+            release_source()
             with self._lock:
                 self.status.state = DemoState.ERROR.value
                 self.status.last_error = f"Seat calibration error: {exc}"
@@ -796,7 +923,7 @@ class DemoRuntime:
             detector.ensure_available()
         except Exception as exc:
             logger.error("LIVE start refused: %s", exc)
-            cap.release()
+            release_source()
             with self._lock:
                 self.status.state = DemoState.ERROR.value
                 self.status.inference_mode = CapabilityMode.ERROR.value
@@ -903,7 +1030,9 @@ class DemoRuntime:
         rolling_fps_deque = deque(maxlen=30)
         last_frame_time = time.time()
         source_ts_ms = 0.0
-        reader = FrameReader(cap)  # decodes the next frames while the GPU works on this one
+        # decodes the next frames while the GPU works on this one (a camera has its own reader)
+        reader = FrameReader(cap) if cap is not None else None
+        live_t0: Optional[float] = None
         stages = StageTimer()
 
         try:
@@ -915,17 +1044,29 @@ class DemoRuntime:
                 pacer.resume()
 
                 t_stage = time.perf_counter()
-                ret, frame = reader.read()
-                if not ret:
-                    break
+                if live_reader is not None:
+                    ret, frame, captured_at = live_reader.read(timeout=0.5)
+                    with self._lock:
+                        self.status.source_status = live_reader.status
+                    if not ret:
+                        continue  # reconnecting, or no frame yet: wait for the camera (or a stop)
+                else:
+                    ret, frame = reader.read()
+                    if not ret:
+                        break
                 stages.add("decode_wait", t_stage)
 
                 frame_idx += 1
                 if config.max_frames and frame_idx > config.max_frames:
                     break
                 last_read_idx = frame_idx
-                # Same clock as the CLI runner: the first frame is t=0.
-                source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
+                if live_reader is not None:
+                    # A camera: the moment the frame was captured (its advertised rate is not reliable)
+                    live_t0 = captured_at if live_t0 is None else live_t0
+                    source_ts_ms = (captured_at - live_t0) * 1000.0
+                else:
+                    # Same clock as the CLI runner: the first frame is t=0.
+                    source_ts_ms = ((frame_idx - 1) / fps) * 1000.0
                 # Every frame goes into the evidence buffer, analysed or not: clips keep the
                 # camera's frame rate (they used to play fast when frames were skipped)
                 t_stage = time.perf_counter()
@@ -1107,12 +1248,13 @@ class DemoRuntime:
                 job = evidence_jobs.get(completed_event.event_id)
                 if job is not None:
                     publish_evidence(completed_event, job)
-            reader.stop()
+            if reader is not None:
+                reader.stop()
             if auto_rate and last_annotated is not None:  # frames after the last analysed one
                 for _ in range(last_read_idx - last_written_idx):
                     out_writer.write(last_annotated)
             out_writer.release()
-            cap.release()
+            release_source()
             if show_window:
                 cv2.destroyAllWindows()
 
@@ -1121,7 +1263,7 @@ class DemoRuntime:
                 "scene_id": config.name,
                 "room_code": config.room_code,
                 "camera_id": config.camera_id,
-                "video_file": str(config.video_path),
+                "video_file": redact(config.capture_source),
                 "duration_sec": source_ts_ms / 1000.0,
                 "fps": fps,
                 "total_seats": len(seat_mgr.seats),
@@ -1157,7 +1299,8 @@ class DemoRuntime:
             # Publish to the canonical replay package only for a complete,
             # uninterrupted run; a stopped or frame-limited run must never
             # replace the package REPLAY mode plays back.
-            run_complete = not self._stop_event.is_set() and not config.max_frames
+            # A camera room has no replay package: its runs are the exam itself
+            run_complete = not self._stop_event.is_set() and not config.max_frames and not config.is_live
             if run_complete:
                 replay_dst = replay_package_dir(preset)
                 replay_dst.mkdir(parents=True, exist_ok=True)

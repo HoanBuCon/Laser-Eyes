@@ -25,11 +25,11 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.auth import actor_name, current_user
+from api.auth import actor_name, current_user, writes_need
 from api.realtime import realtime_manager
 from classroom_monitor.demo.paths import demo_final_root, demo_runs_root, replay_package_dir
-from classroom_monitor.demo.config import DEFAULT_PRESET, DEMO_PRESETS, get_demo_config
-from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState
+from classroom_monitor.demo.config import DEFAULT_PRESET, DEMO_PRESETS, config_for, get_demo_config, is_live_source
+from classroom_monitor.demo.runtime import DemoMode, DemoRuntime, DemoState, max_live_rooms
 from classroom_monitor.demo.seating import CalibrationMismatchError, build_scene_seating
 from classroom_monitor.async_evidence_writer import compute_file_sha256
 from classroom_monitor.contracts import HashStatus
@@ -38,11 +38,13 @@ from storage.db_models import DetectionEvent
 from storage.review_service import ReviewCommand, ReviewTargetMissing, SessionClosed, submit_event_review
 
 logger = logging.getLogger("DemoRouter")
-router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"])
+router = APIRouter(prefix="/demo", tags=["Competition Demo Engine"], dependencies=[Depends(writes_need("PROCTOR"))])
 
 
 class DemoStartRequest(BaseModel):
     preset: str = Field(DEFAULT_PRESET, description="Demo preset name (see GET /api/v1/demo/presets)")
+    room: Optional[str] = Field(None, description="A room code from the database: its calibrated camera is "
+                                                  "analysed live (RTSP, device or file); overrides preset")
     mode: str = Field("LIVE", description="Execution mode: 'LIVE' or 'REPLAY'")
     debug_overlay: bool = Field(False, description="Render advanced developer overlay")
     behavior_labels: Optional[bool] = Field(None, description="Show display-only behaviour tags on the stream")
@@ -61,12 +63,42 @@ class HumanReviewRequest(BaseModel):
 
 
 def _calibration_state(preset: str) -> Dict[str, Any]:
-    """Seat ROIs saved on the calibration page for the preset's room."""
+    """Seat ROIs saved on the calibration page for the preset's (or room's) room."""
     try:
-        seating = build_scene_seating(get_demo_config(preset))
+        seating = build_scene_seating(config_for(preset))
         return {"calibrated": True, "seat_count": len(seating.seat_defs), "error": None}
-    except CalibrationMismatchError as exc:
+    except (CalibrationMismatchError, LookupError) as exc:
         return {"calibrated": False, "seat_count": 0, "error": str(exc)}
+
+
+@router.get("/rooms")
+def list_live_rooms(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """Rooms that can be analysed live (demo videos and rooms with a camera) and what each is doing."""
+    from storage.db_models import Camera, ExamRoom, SeatROI
+
+    runtimes = DemoRuntime.all_rooms()
+    rooms: List[Dict[str, Any]] = []
+    preset_rooms = {p["room_code"]: name for name, p in DEMO_PRESETS.items()}
+    for room in db.query(ExamRoom).order_by(ExamRoom.room_code).all():
+        if not room.room_code:
+            continue
+        cameras = [c for c in db.query(Camera).filter(Camera.room_id == room.id).all() if c.enabled is not False]
+        seats = db.query(SeatROI).filter(SeatROI.room_id == room.id, SeatROI.enabled == True).count()  # noqa: E712
+        preset = preset_rooms.get(room.room_code)
+        if not preset and not cameras:
+            continue
+        live = any(is_live_source(c.rtsp_url_protected or c.source_uri) for c in cameras)
+        runtime = runtimes.get(room.room_code.upper())
+        rooms.append({
+            "room_code": room.room_code,
+            "name": room.name,
+            "preset": preset,
+            "start_key": preset or room.room_code,
+            "source_kind": "CAMERA" if (live and not preset) else "FILE",
+            "seats": seats,
+            "status": runtime.get_status() if runtime is not None else None,
+        })
+    return {"max_live_rooms": max_live_rooms(), "active": DemoRuntime.active_rooms(), "rooms": rooms}
 
 
 @router.get("/presets")
@@ -167,9 +199,9 @@ class OverlayRequest(BaseModel):
 
 
 @router.post("/overlay")
-def set_overlay(payload: OverlayRequest) -> Dict[str, Any]:
+def set_overlay(payload: OverlayRequest, room: Optional[str] = None) -> Dict[str, Any]:
     """Toggle display-only overlays on the live stream while a run is in progress."""
-    return DemoRuntime.get_instance().set_overlay(
+    return DemoRuntime.get_instance(room).set_overlay(
         behavior_labels=payload.behavior_labels, debug_overlay=payload.debug_overlay
     )
 
@@ -177,12 +209,16 @@ def set_overlay(payload: OverlayRequest) -> Dict[str, Any]:
 @router.post("/start")
 def start_demo(payload: DemoStartRequest) -> Dict[str, Any]:
     """Start video analysis in LIVE AI ANALYSIS or RECORDED ANALYSIS REPLAY mode."""
-    preset_clean = payload.preset.lower().strip()
-    if preset_clean not in DEMO_PRESETS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unknown preset '{payload.preset}'. Available: {list(DEMO_PRESETS.keys())}",
-        )
+    preset_clean = (payload.room or payload.preset).strip()
+    if preset_clean.lower() in DEMO_PRESETS:
+        preset_clean = preset_clean.lower()
+    else:
+        try:
+            config_for(preset_clean)
+        except LookupError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=400, detail=f"Unknown preset or room '{preset_clean}': {exc}") from exc
 
     mode_clean = payload.mode.upper().strip()
     if mode_clean not in (DemoMode.LIVE.value, DemoMode.REPLAY.value):
@@ -196,7 +232,7 @@ def start_demo(payload: DemoStartRequest) -> Dict[str, Any]:
         if not calibration["calibrated"]:
             raise HTTPException(status_code=409, detail=calibration["error"])
 
-    runtime = DemoRuntime.get_instance()
+    runtime = DemoRuntime.get_instance(preset_clean)
     if payload.behavior_labels is not None:
         runtime.set_behavior_labels(payload.behavior_labels)
     try:
@@ -222,51 +258,51 @@ def start_demo(payload: DemoStartRequest) -> Dict[str, Any]:
 
 
 @router.post("/pause")
-def pause_demo() -> Dict[str, Any]:
-    """Pause current demo processing."""
-    runtime = DemoRuntime.get_instance()
+def pause_demo(room: Optional[str] = None) -> Dict[str, Any]:
+    """Pause current demo processing. ``room``: which room (default: the most recently started)."""
+    runtime = DemoRuntime.get_instance(room)
     res = runtime.pause()
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": res})
     return res
 
 
 @router.post("/resume")
-def resume_demo() -> Dict[str, Any]:
-    """Resume paused demo processing."""
-    runtime = DemoRuntime.get_instance()
+def resume_demo(room: Optional[str] = None) -> Dict[str, Any]:
+    """Resume paused demo processing. ``room``: which room (default: the most recently started)."""
+    runtime = DemoRuntime.get_instance(room)
     res = runtime.resume()
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": res})
     return res
 
 
 @router.post("/stop")
-def stop_demo() -> Dict[str, Any]:
-    """Stop active demo processing."""
-    runtime = DemoRuntime.get_instance()
+def stop_demo(room: Optional[str] = None) -> Dict[str, Any]:
+    """Stop active demo processing. ``room``: which room (default: the most recently started)."""
+    runtime = DemoRuntime.get_instance(room)
     res = runtime.stop()
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": res})
     return res
 
 
 @router.post("/reset")
-def reset_demo() -> Dict[str, Any]:
-    """Reset demo runtime state and clear active review queue."""
-    runtime = DemoRuntime.get_instance()
+def reset_demo(room: Optional[str] = None) -> Dict[str, Any]:
+    """Reset demo runtime state and clear active review queue. ``room``: which room (default: the most recently started)."""
+    runtime = DemoRuntime.get_instance(room)
     res = runtime.reset()
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": res})
     return res
 
 
 @router.get("/status")
-def get_demo_status() -> Dict[str, Any]:
-    """Retrieve realtime processing telemetry, speed, FPS, and incident metrics."""
-    return DemoRuntime.get_instance().get_status()
+def get_demo_status(room: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieve realtime processing telemetry, speed, FPS, and incident metrics (of ``room``)."""
+    return DemoRuntime.get_instance(room).get_status()
 
 
 @router.get("/events")
-def get_demo_events() -> List[Dict[str, Any]]:
-    """Retrieve all review incidents emitted during the current demo session."""
-    return DemoRuntime.get_instance().get_events()
+def get_demo_events(room: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Retrieve all review incidents emitted during the current run (of ``room``)."""
+    return DemoRuntime.get_instance(room).get_events()
 
 
 @router.get("/events/{event_id}")
@@ -376,9 +412,9 @@ def review_demo_event(
 # -----------------------------------------------------------------------------
 
 @router.get("/stream")
-async def mjpeg_stream_endpoint():
-    """High-performance multipart MJPEG stream from the SRS v2 renderer."""
-    runtime = DemoRuntime.get_instance()
+async def mjpeg_stream_endpoint(room: Optional[str] = None):
+    """High-performance multipart MJPEG stream from the SRS v2 renderer (of ``room``)."""
+    runtime = DemoRuntime.get_instance(room)
 
     async def frame_generator():
         try:

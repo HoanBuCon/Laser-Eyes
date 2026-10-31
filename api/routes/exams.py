@@ -81,11 +81,19 @@ def _audit(db: Session, actor: str, action: str, resource_type: str, resource_id
                     resource_id=resource_id, metadata_json=json.dumps(details, default=str)))
 
 
+def _live_runtimes() -> Dict[str, DemoRuntime]:
+    """Session id -> the runtime analysing it, for every room running now."""
+    out: Dict[str, DemoRuntime] = {}
+    for runtime in {DemoRuntime.get_instance(), *DemoRuntime.all_rooms().values()}:
+        status = runtime.get_status()
+        if status.get("state") in (DemoState.RUNNING.value, DemoState.PAUSED.value) and status.get("session_id"):
+            out[status["session_id"]] = runtime
+    return out
+
+
 def _live_session_id() -> Optional[str]:
-    status = DemoRuntime.get_instance().get_status()
-    if status.get("state") in (DemoState.RUNNING.value, DemoState.PAUSED.value):
-        return status.get("session_id")
-    return None
+    """One running session (kept for callers that show "the" live session)."""
+    return next(iter(_live_runtimes()), None)
 
 
 def serialize_session(db: Session, s: ExamSession, counts: Optional[Dict[str, int]] = None,
@@ -322,15 +330,16 @@ def start_session_analysis(session_id: str, payload: StartIn, db: Session = Depe
     if not check["ready"]:
         failed = [i["label"] for i in check["items"] if i["blocking"] and not i["ok"]]
         raise HTTPException(status_code=409, detail="Not ready: " + ", ".join(failed))
-    if _live_session_id():
-        raise HTTPException(status_code=409, detail="Another analysis is running. Stop it first.")
+    room_runtime = DemoRuntime.get_instance(check["preset"])
+    if room_runtime.is_active():
+        raise HTTPException(status_code=409, detail="This room is already being analysed. Stop it first.")
     mode = payload.mode.upper()
     if mode != "LIVE":
         raise HTTPException(status_code=400, detail="A session is analysed live; recorded replays are on the Live monitor page.")
     _audit(db, actor_name(me), "START_SESSION", "SESSION", session.id, {"mode": mode, "preset": check["preset"]})
     db.commit()
     try:
-        status = DemoRuntime.get_instance().start(preset=check["preset"], mode=mode, session_id=session.id)
+        status = room_runtime.start(preset=check["preset"], mode=mode, session_id=session.id)
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STARTED", "status": status})
@@ -340,9 +349,10 @@ def start_session_analysis(session_id: str, payload: StartIn, db: Session = Depe
 @router.post("/exam-sessions/{session_id}/stop")
 def stop_session_analysis(session_id: str, db: Session = Depends(get_db), user=Depends(manage),
                           me: Optional[User] = Depends(current_user)) -> Dict[str, Any]:
-    if _live_session_id() != session_id:
+    runtime = _live_runtimes().get(session_id)
+    if runtime is None:
         raise HTTPException(status_code=409, detail="This session is not running.")
-    status = DemoRuntime.get_instance().stop()
+    status = runtime.stop()
     _audit(db, actor_name(me), "STOP_SESSION", "SESSION", session_id, {})
     db.commit()
     realtime_manager.broadcast_threadsafe({"type": "DEMO_STATUS", "status": status})

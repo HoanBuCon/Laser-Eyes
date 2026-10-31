@@ -25,6 +25,22 @@ let activeEvidenceUrls = { overall: '', crop: '' };
 let evidenceZoom = 1.0;
 let ws = null;
 let pollTimer = null;
+// Rooms being analysed now (room code -> status), from GET /api/v1/demo/rooms
+let runningRooms = {};
+// The room whose picture, status and incidents are shown (set by selectPreset)
+let shownRoom = null;
+
+/** "?room=..." for the room shown on this page (several rooms can be analysed at once). */
+function roomQuery(prefix = '?') {
+    return activePreset ? `${prefix}room=${encodeURIComponent(activePreset)}` : '';
+}
+
+/** A message from another room's analysis (the WebSocket carries every room). */
+function fromOtherRoom(status) {
+    const info = presetInfo[activePreset];
+    return Boolean(status && status.room_code && info && info.room_code
+        && status.room_code.toUpperCase() !== info.room_code.toUpperCase());
+}
 let allIncidents = new Map(); // event_id -> event object
 let allBookmarks = new Map(); // bookmark_id -> manual bookmark object
 const demoToken = new URLSearchParams(window.location.search).get('token') || '';
@@ -65,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchEvents();
         fetchBookmarks();
     }, 1500);
+    setInterval(fetchPresets, 8000);  // which rooms are being analysed (the dots on the room buttons)
 });
 
 function clearVideoPlayer(player) {
@@ -139,9 +156,11 @@ function updateWsBadge(connected) {
 
 function handleWebSocketMessage(msg) {
     if (msg.type === 'DEMO_STATUS' || msg.type === 'DEMO_STARTED') {
+        if (fromOtherRoom(msg.status)) return;
         renderStatus(msg.status);
     } else if (msg.type === 'REVIEW_INCIDENT') {
         const ev = msg.event;
+        if (activeSessionId && ev.session_id && ev.session_id !== activeSessionId) return;  // another room
         allIncidents.set(ev.event_id, ev);
         renderReviewQueue();
     } else if (msg.type === 'REVIEW_DECISION') {
@@ -165,6 +184,7 @@ function handleWebSocketMessage(msg) {
 
 function selectPreset(preset) {
     activePreset = preset;
+    shownRoom = preset;
     document.querySelectorAll('#presetButtons [data-preset]').forEach((btn) => {
         btn.setAttribute('aria-pressed', String(btn.dataset.preset === preset));
     });
@@ -172,6 +192,13 @@ function selectPreset(preset) {
     if (roomSelect && preset) roomSelect.value = preset;
 
     renderPresetDetails();
+    if (preset && typeof fetchStatus === 'function') {
+        allIncidents.clear();
+        activeSessionId = null;
+        fetchStatus();
+        fetchEvents();
+        refreshStream();
+    }
 }
 
 function renderPresetDetails() {
@@ -261,25 +288,25 @@ async function startDemo() {
 }
 
 async function pauseDemo() {
-    const res = await apiFetch('/api/v1/demo/pause', { method: 'POST' });
+    const res = await apiFetch(`/api/v1/demo/pause${roomQuery()}`, { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function resumeDemo() {
-    const res = await apiFetch('/api/v1/demo/resume', { method: 'POST' });
+    const res = await apiFetch(`/api/v1/demo/resume${roomQuery()}`, { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function stopDemo() {
-    const res = await apiFetch('/api/v1/demo/stop', { method: 'POST' });
+    const res = await apiFetch(`/api/v1/demo/stop${roomQuery()}`, { method: 'POST' });
     const data = await res.json();
     renderStatus(data);
 }
 
 async function resetDemo() {
-    const res = await apiFetch('/api/v1/demo/reset', { method: 'POST' });
+    const res = await apiFetch(`/api/v1/demo/reset${roomQuery()}`, { method: 'POST' });
     const data = await res.json();
     allIncidents.clear();
     allBookmarks.clear();
@@ -293,7 +320,7 @@ function refreshStream() {
     const img = document.getElementById('videoStreamImg');
     const placeholder = document.getElementById('videoPlaceholder');
     if (img) {
-        img.src = authenticatedUrl('/api/v1/demo/stream?t=' + Date.now());
+        img.src = authenticatedUrl(`/api/v1/demo/stream?t=${Date.now()}${roomQuery('&')}`);
         if (placeholder) placeholder.style.display = 'none';
     }
 }
@@ -311,6 +338,17 @@ async function fetchPresets() {
     try {
         const res = await apiFetch('/api/v1/demo/presets');
         const presets = await res.json();
+        try {
+            const rooms = await (await apiFetch('/api/v1/demo/rooms')).json();
+            (rooms.rooms || []).filter((r) => !r.preset).forEach((r) => presets.push({
+                name: r.room_code, title: r.name || r.room_code, room_code: r.room_code,
+                camera_id: r.source_kind === 'CAMERA' ? 'camera' : 'video', calibrated: r.seats > 0,
+                seat_count: r.seats, calibration_error: r.seats ? null : 'Draw Seat ROIs on the calibration page',
+                camera: r.source_kind === 'CAMERA',
+            }));
+            runningRooms = Object.fromEntries((rooms.rooms || []).filter((r) => r.status && ['RUNNING', 'PAUSED']
+                .includes(r.status.state)).map((r) => [r.room_code.toUpperCase(), r.status]));
+        } catch (e) { /* older Hub: demo videos only */ }
         const container = document.getElementById('presetButtons');
         const roomSelect = document.getElementById('presetSelect');
         // A few rooms fit as buttons; more rooms become a list so the toolbar keeps one row
@@ -336,17 +374,28 @@ async function fetchPresets() {
             }
             const btn = container ? container.querySelector(`[data-preset="${p.name}"]`) : null;
             if (!btn) return;
-            btn.textContent = p.calibrated ? `${p.title} · ${p.seat_count}` : `${p.title} · no seats`;
-            btn.title = hint;
+            const running = runningRooms[(p.room_code || '').toUpperCase()];
+            btn.textContent = `${running ? '● ' : ''}${p.camera ? '📷 ' : ''}`
+                + (p.calibrated ? `${p.title} · ${p.seat_count}` : `${p.title} · no seats`);
+            btn.title = running ? `${hint} · being analysed` : hint;
         });
-        if (!activePreset || !presetInfo[activePreset]) activePreset = presets.length ? presets[0].name : null;
-        selectPreset(activePreset);
+        const chosen = activePreset && presetInfo[activePreset] ? activePreset : (presets.length ? presets[0].name : null);
+        if (chosen !== shownRoom) {
+            shownRoom = chosen;
+            selectPreset(chosen);  // first load (or the room disappeared): show it
+        } else {
+            document.querySelectorAll('#presetButtons [data-preset]').forEach((btn) => {
+                btn.setAttribute('aria-pressed', String(btn.dataset.preset === activePreset));
+            });
+            const roomSelect = document.getElementById('presetSelect');
+            if (roomSelect && activePreset) roomSelect.value = activePreset;
+        }
     } catch (e) {}
 }
 
 async function toggleOverlay(change) {
     try {
-        await apiFetch('/api/v1/demo/overlay', {
+        await apiFetch(`/api/v1/demo/overlay${roomQuery()}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(change),
@@ -372,7 +421,7 @@ function showDemoError(message) {
 
 async function fetchStatus() {
     try {
-        const res = await apiFetch('/api/v1/demo/status');
+        const res = await apiFetch(`/api/v1/demo/status${roomQuery()}`);
         const data = await res.json();
         renderStatus(data);
     } catch (e) {}
@@ -380,7 +429,7 @@ async function fetchStatus() {
 
 async function fetchEvents() {
     try {
-        const res = await apiFetch('/api/v1/demo/events');
+        const res = await apiFetch(`/api/v1/demo/events${roomQuery()}`);
         const events = await res.json();
         allIncidents.clear();
         events.forEach((ev) => allIncidents.set(ev.event_id, ev));

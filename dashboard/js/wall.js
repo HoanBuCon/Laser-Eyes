@@ -67,9 +67,16 @@ async function loadSources() {
         const res = await fetch('/api/v1/one/sessions?active_only=false');
         if (res.ok) oneRecorded = (await res.json()).filter((s) => s.video_url);
     } catch (e) { /* offline */ }
+    // Every room that can be analysed live (demo videos and rooms with a camera): one tile each
+    let liveRooms = [];
+    try {
+        const res = await fetch('/api/v1/demo/rooms');
+        if (res.ok) liveRooms = (await res.json()).rooms || [];
+    } catch (e) { /* offline */ }
     sourceOptions = [
         ...presets.map((p) => ({ id: `preset:${p.name}`, label: `${p.title} · replay`, preset: p.name })),
-        { id: 'live', label: 'Live analysis stream' },
+        { id: 'live', label: 'Live analysis stream (latest room)' },
+        ...liveRooms.map((r) => ({ id: `live:${r.start_key}`, label: `LIVE · ${r.name || r.room_code}`, room: r.start_key })),
         ...Array.from({ length: 9 }, (_, k) => ({ id: `one-slot:${k}`, label: `VIGIL One · candidate #${k + 1} (auto)` })),
         ...oneRecorded.map((s) => ({
             id: `one-rec:${s.session_id}`,
@@ -148,9 +155,11 @@ async function assignSource(tile, sourceId) {
         setStatus(tile, tile.replayLabel);
         return;
     }
-    if (sourceId === 'live') {
+    if (sourceId === 'live' || sourceId.startsWith('live:')) {
+        const room = sourceId.startsWith('live:') ? sourceId.slice(5) : '';
+        tile.liveRoom = room;
         tile.img.hidden = false;
-        tile.img.src = `/api/v1/demo/stream?tile=${tile.index}&t=${Date.now()}`;
+        tile.img.src = `/api/v1/demo/stream?tile=${tile.index}&t=${Date.now()}${room ? `&room=${encodeURIComponent(room)}` : ''}`;
         setStatus(tile, 'LIVE');
         return;
     }
@@ -303,17 +312,26 @@ function frameLoop() {
 // --- Live tile status -----------------------------------------------------------
 
 async function pollLive() {
-    const liveTiles = tiles.filter((t) => t.source === 'live');
+    const liveTiles = tiles.filter((t) => t.source === 'live' || String(t.source || '').startsWith('live:'));
     if (!liveTiles.length) return;
+    const byRoom = {};
     try {
-        const res = await fetch('/api/v1/demo/status', { cache: 'no-store' });
-        if (!res.ok) return;
-        const status = await res.json();
-        const running = status.state === 'RUNNING' || status.state === 'PAUSED';
+        // one request per room shown (each room has its own analysis)
+        await Promise.all([...new Set(liveTiles.map((t) => t.liveRoom || ''))].map(async (room) => {
+            const res = await fetch(`/api/v1/demo/status${room ? `?room=${encodeURIComponent(room)}` : ''}`, { cache: 'no-store' });
+            if (res.ok) byRoom[room] = await res.json();
+        }));
+    } catch (e) { return; /* server restarting */ }
+    try {
         liveTiles.forEach((tile) => {
+            const status = byRoom[tile.liveRoom || ''];
+            if (!status) return;
+            const running = status.state === 'RUNNING' || status.state === 'PAUSED';
             if (running) {
                 const flagged = status.active_review_incidents || 0;
-                setStatus(tile, `LIVE · ${String(status.preset || '').toUpperCase()}${flagged ? ` · ${flagged} FLAGGED` : ''}`, flagged ? 'danger' : 'good');
+                const reconnecting = status.source_status === 'RECONNECTING' ? ' · RECONNECTING' : '';
+                setStatus(tile, `LIVE · ${String(status.room_code || status.preset || '').toUpperCase()}${reconnecting}${flagged ? ` · ${flagged} FLAGGED` : ''}`,
+                    flagged || reconnecting ? 'danger' : 'good');
             } else {
                 setStatus(tile, 'NO ANALYSIS RUNNING');
             }

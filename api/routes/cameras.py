@@ -10,6 +10,7 @@ from typing import List, Optional
 import cv2
 import numpy as np
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
+from api.auth import writes_need
 from fastapi.responses import FileResponse
 
 from api.dependencies import get_camera_repo
@@ -17,7 +18,7 @@ from api.schemas import CameraCreate, CameraResponse, CameraUpdate
 from classroom_monitor.demo.config import DEMO_PRESETS
 from storage.repositories import CameraRepository
 
-router = APIRouter(tags=["Cameras"])
+router = APIRouter(tags=["Cameras"], dependencies=[Depends(writes_need("CHIEF"))])
 
 REF_FRAME_DIR = Path("data/reference_frames")
 REF_FRAME_DIR.mkdir(parents=True, exist_ok=True)

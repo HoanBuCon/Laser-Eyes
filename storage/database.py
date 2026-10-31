@@ -138,6 +138,7 @@ def init_db(custom_engine=None) -> None:
                     ("video_error", "TEXT"),
                     ("analysis_mode", "VARCHAR(10)"),
                     ("analysis_state_json", "TEXT"),
+                    ("media_purged_at", "DATETIME"),
                 ):
                     if name not in session_cols:
                         conn.execute(text(f"ALTER TABLE exam_sessions ADD COLUMN {name} {ddl}"))

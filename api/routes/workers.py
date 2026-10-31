@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from api.auth import writes_need
 from sqlalchemy.orm import Session
 
 from api.schemas import WorkerHeartbeatRequest, WorkerRegisterRequest, WorkerResponse
 from storage.database import get_db
 from storage.repositories import WorkerRepository
 
-router = APIRouter(tags=["Workers"])
+router = APIRouter(tags=["Workers"], dependencies=[Depends(writes_need("ADMIN"))])
 
 
 @router.post("/workers/register", response_model=WorkerResponse, status_code=status.HTTP_200_OK)

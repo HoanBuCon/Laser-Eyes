@@ -1,0 +1,61 @@
+name: CI
+
+# Tests, a lint for errors that break Python, and a syntax check of the dashboard JavaScript,
+# on every push to DEV / main and on every pull request. CPU only: GPU speed is measured by hand.
+on:
+  push:
+    branches: [DEV, main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-hpe.txt
+
+      - name: System libraries (OpenCV, audio, video joins)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libportaudio2 ffmpeg
+
+      - name: Python packages (CPU build of torch)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch==2.6.0 torchvision==0.21.0 --index-url https://download.pytorch.org/whl/cpu
+          grep -viE '^(torch|torchvision)==|^--extra-index-url' requirements.txt > /tmp/requirements-cpu.txt
+          pip install -r /tmp/requirements-cpu.txt -r requirements-hpe.txt
+          pip install ruff
+
+      - name: Lint (errors only)
+        # Syntax errors, undefined names and similar; the ~200 style findings are cleaned up separately
+        run: ruff check --select E9,F63,F7,F82 api storage classroom_monitor exam_monitor scripts tests server.py vigil.py
+
+      - name: Tests
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python -m pytest -q -p no:cacheprovider
+
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: JavaScript syntax
+        run: for f in dashboard/js/*.js; do node --check "$f" || exit 1; done

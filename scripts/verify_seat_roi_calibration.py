@@ -60,7 +60,9 @@ def run_calibration_verification():
             capacity=30,
         )
 
-    cam = cam_repo.get_by_id("cam-calib-01")
+    # By room and name: the camera's id is a generated UUID (looking up a fixed id made a new
+    # camera on every run)
+    cam = next((c for c in cam_repo.list_by_room(room.id) if c.name == "Camera Trần Góc 45 Độ"), None)
     if not cam:
         cam = cam_repo.create(
             room_id=room.id,

@@ -91,6 +91,12 @@ def ensure_calibration_sources(db) -> None:
         camera.enabled = True
         camera.status = "online" if os.path.isfile(spec["source_uri"]) else "error"
     db.commit()
+    # Cameras duplicated by older tools (same room, same name) become one; paths use "/"
+    from storage.maintenance import merge_duplicate_cameras
+
+    result = merge_duplicate_cameras(db)
+    if result["merged"] or result["normalised"]:
+        logger.info("Cameras: merged %d duplicate(s), normalised %d path(s)", result["merged"], result["normalised"])
 
 
 def seed_initial_demo_data() -> None:
@@ -280,6 +286,16 @@ def main() -> None:
     os.environ["VIGIL_BIND_HOST"] = args.host
     if args.demo_token:
         os.environ["VIGIL_DEMO_TOKEN"] = args.demo_token
+    # Reachable from other computers: proctors sign in (candidate exams, evidence and videos are
+    # personal data). An explicit VIGIL_AUTH_MODE still wins, with a warning when it is "optional".
+    if args.host not in loopback_hosts:
+        chosen = os.getenv("VIGIL_AUTH_MODE", "").strip().lower()
+        if not chosen:
+            os.environ["VIGIL_AUTH_MODE"] = "required"
+            logger.info("Network binding: sign-in required (VIGIL_AUTH_MODE=required)")
+        elif chosen != "required":
+            logger.warning("Network binding with VIGIL_AUTH_MODE=%s: pages and evidence open to anyone holding the "
+                           "demo token", chosen)
 
     # 1. Initialize DB Schema
     logger.info("Initializing schema tables...")
@@ -299,6 +315,8 @@ def main() -> None:
     print(f"  * Operations       : http://localhost:{args.port}/")
     if args.demo_token:
         print("  * Network access   : protected by X-Vigil-Demo-Token")
+    if os.getenv("VIGIL_AUTH_MODE", "").lower() == "required":
+        print(f"  * Sign-in          : required (first account: http://localhost:{args.port}/login)")
     print("  * Stop the server  : Ctrl+C in this window")
     print("=" * 70 + "\n")
 

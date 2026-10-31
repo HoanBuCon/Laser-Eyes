@@ -44,6 +44,18 @@ class DemoVideoConfig:
     seats_preset: Optional[List[Dict[str, Any]]] = None
     # Default camera placement when the calibration does not declare one.
     camera_view: str = "facing_subjects"
+    # A room's camera from the database: RTSP/HTTP URL, device index ("0") or file path.
+    # A live source (not a file) is read until the run is stopped, reconnecting when it drops.
+    source: Optional[str] = None
+
+    @property
+    def is_live(self) -> bool:
+        return is_live_source(self.source)
+
+    @property
+    def capture_source(self) -> str:
+        """What to open: the camera source, else the video file."""
+        return self.source if self.source else str(self.video_path)
 
     def __post_init__(self) -> None:
         if isinstance(self.video_path, str):
@@ -102,6 +114,69 @@ def resolve_video_path(video_arg: Union[str, Path], video_dir: str = "demo_video
     raise FileNotFoundError(
         f"Video feed not found for '{video_arg}'. Searched local path, demo_video/, video/, and data/."
     )
+
+
+def is_live_source(source: Optional[str]) -> bool:
+    """A camera (stream URL or device index), as opposed to a video file."""
+    if not source:
+        return False
+    text = str(source).strip()
+    return text.isdigit() or "://" in text
+
+
+def room_key(preset_or_room: str) -> str:
+    """One name per room for the runtimes: a demo preset maps to its room code."""
+    clean = (preset_or_room or "").strip()
+    preset = DEMO_PRESETS.get(clean.lower())
+    return (preset["room_code"] if preset else clean).upper()
+
+
+def get_room_config(room_code: str, **kwargs: Any) -> DemoVideoConfig:
+    """Run settings for a room configured in the database: its calibrated camera is the source.
+
+    The camera is the room's enabled camera holding the most Seat ROIs (else the first enabled
+    one). Raises LookupError when the room or a usable camera is missing.
+    """
+    from storage.database import SessionLocal
+    from storage.db_models import Camera, ExamRoom, SeatROI
+
+    db = SessionLocal()
+    try:
+        room = db.query(ExamRoom).filter(ExamRoom.room_code == room_code.upper()).first()             or db.query(ExamRoom).filter(ExamRoom.room_code == room_code).first()
+        if room is None:
+            raise LookupError(f"Room {room_code} does not exist.")
+        cameras = [c for c in db.query(Camera).filter(Camera.room_id == room.id).all() if c.enabled is not False]
+        if not cameras:
+            raise LookupError(f"Room {room.room_code} has no camera. Add one with its RTSP address or device index.")
+        seats = {c.id: db.query(SeatROI).filter(SeatROI.camera_id == c.id, SeatROI.enabled == True).count()  # noqa: E712
+                 for c in cameras}
+        camera = max(cameras, key=lambda c: (seats.get(c.id, 0), c.name or ""))
+        source = (camera.rtsp_url_protected or camera.source_uri or "").strip()
+        if not source:
+            raise LookupError(f"Camera {camera.name} of room {room.room_code} has no source address.")
+        live = is_live_source(source)
+        values: Dict[str, Any] = {
+            "name": room.room_code.lower(),
+            "video_path": Path(f"live-{room.room_code.lower()}") if live else resolve_video_path(source),
+            "source": source if live else None,
+            "room_code": room.room_code,
+            "camera_id": camera.name or camera.id,
+            "output_dir": Path(f"data/demo_final/{room.room_code.lower()}"),
+        }
+    finally:
+        db.close()
+    for k, v in kwargs.items():
+        if v is not None:
+            values[k] = v
+    run_fields = {f.name for f in fields(DemoVideoConfig)}
+    return DemoVideoConfig(**{k: v for k, v in values.items() if k in run_fields})
+
+
+def config_for(preset_or_room: str, **kwargs: Any) -> DemoVideoConfig:
+    """A demo preset (its video) or a room from the database (its camera)."""
+    if (preset_or_room or "").lower().strip() in DEMO_PRESETS:
+        return get_demo_config(preset_or_room, **kwargs)
+    return get_room_config(preset_or_room, **kwargs)
 
 
 def get_demo_config(name_or_path: str, **kwargs: Any) -> DemoVideoConfig:

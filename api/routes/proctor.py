@@ -13,7 +13,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from api.dependencies import get_db
-from api.auth import actor_name, current_user
+from api.auth import actor_name, current_user, writes_need
 from storage.review_service import SessionClosed
 from api.realtime import realtime_manager
 from classroom_monitor.demo.runtime import DemoRuntime
@@ -33,7 +33,7 @@ from storage.proctor_service import (
     verify_bookmark_integrity,
 )
 
-router = APIRouter(prefix="/proctor", tags=["Human Proctor Support"])
+router = APIRouter(prefix="/proctor", tags=["Human Proctor Support"], dependencies=[Depends(writes_need("PROCTOR"))])
 
 
 class BookmarkCreateRequest(BaseModel):
@@ -53,10 +53,18 @@ class BookmarkReviewRequest(BaseModel):
     note: str = Field("", max_length=4000)
 
 
+def _runtime_with_capture(capture_id: str) -> DemoRuntime:
+    """The room runtime that holds this capture token (several rooms can run at once)."""
+    for runtime in {DemoRuntime.get_instance(), *DemoRuntime.all_rooms().values()}:
+        if runtime.get_captured_frame(capture_id) is not None:
+            return runtime
+    return DemoRuntime.get_instance()
+
+
 @router.post("/captures")
-def capture_current_frame() -> dict[str, Any]:
+def capture_current_frame(room: Optional[str] = None) -> dict[str, Any]:
     try:
-        captured = DemoRuntime.get_instance().capture_latest_frame()
+        captured = DemoRuntime.get_instance(room).capture_latest_frame()
     except RuntimeError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     result = captured.metadata()
@@ -66,7 +74,7 @@ def capture_current_frame() -> dict[str, Any]:
 
 @router.get("/captures/{capture_id}/snapshot")
 def get_capture_snapshot(capture_id: str) -> Response:
-    captured = DemoRuntime.get_instance().get_captured_frame(capture_id)
+    captured = _runtime_with_capture(capture_id).get_captured_frame(capture_id)
     if captured is None:
         raise HTTPException(status_code=404, detail="Capture token is missing or expired")
     return Response(content=captured.jpeg_bytes, media_type="image/jpeg")
@@ -77,7 +85,7 @@ def save_bookmark(
     payload: BookmarkCreateRequest,
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    runtime = DemoRuntime.get_instance()
+    runtime = _runtime_with_capture(payload.capture_id)
     existing = get_bookmark_by_request_id(db, payload.request_id)
     if existing is not None:
         result = serialize_bookmark(existing, include_reviews=True)
@@ -234,11 +242,13 @@ def _serialize_ai_event(event: DetectionEvent) -> dict[str, Any]:
         "duration_seconds": event.duration_seconds,
         "occurrence_count": int(meta.get("occurrence_count") or 1),
         "evidence_status": evidence.status if evidence else "NOT_AVAILABLE",
+        # Media deleted by retention (storage.retention): no links; evidence_error says why
         "snapshot_url": f"/api/v1/demo/events/{event.event_id}/evidence/snapshot"
-        if evidence and evidence.snapshot_path
+        if evidence and evidence.snapshot_path and evidence.status != "PURGED"
         else None,
         "video_url": f"/api/v1/demo/events/{event.event_id}/evidence/video"
-        if evidence and str(evidence.video_path or evidence.file_path or "").lower().endswith(".mp4")
+        if evidence and evidence.status != "PURGED"
+        and str(evidence.video_path or evidence.file_path or "").lower().endswith(".mp4")
         else None,
         "sha256": evidence.video_sha256 if evidence else None,
         "file_size_bytes": evidence.file_size_bytes if evidence else 0,

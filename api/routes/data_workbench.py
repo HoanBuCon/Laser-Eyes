@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from api.auth import writes_need
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -53,7 +54,7 @@ from storage.repositories import (
 
 logger = logging.getLogger("DataWorkbenchRouter")
 
-router = APIRouter(prefix="/data", tags=["Human Data Operations Workbench"])
+router = APIRouter(prefix="/data", tags=["Human Data Operations Workbench"], dependencies=[Depends(writes_need("ADMIN"))])
 
 
 # ==============================================================================

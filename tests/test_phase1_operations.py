@@ -229,3 +229,27 @@ def test_decisions_are_recorded_under_the_reviewers_name_not_a_placeholder():
         source = Path(script).read_text(encoding="utf-8")
         assert "'Lead_Proctor'" not in source, script
         assert "vigil.reviewer" in source, script
+
+
+def test_duplicate_cameras_are_merged_into_the_one_with_seats(db):
+    from storage.maintenance import merge_duplicate_cameras
+
+    room = _room(db, "ROOM-DUP", with_seat=False)
+    other_room = _room(db, "ROOM-OTHER", with_seat=False)
+    copies = [Camera(room_id=room.id, name="Cam A", source_uri=r"demo_video\a.mp4") for _ in range(4)]
+    same_name_elsewhere = Camera(room_id=other_room.id, name="Cam A", source_uri="rtsp://10.0.0.5/live")
+    db.add_all(copies + [same_name_elsewhere])
+    db.flush()
+    keep = copies[2]
+    db.add(SeatROI(room_id=room.id, camera_id=keep.id, seat_code="S01", polygon_json="[[0,0],[10,0],[10,10]]"))
+    session = ExamSession(room_id=room.id, camera_id=copies[0].id, exam_name="x")
+    db.add(session)
+    db.commit()
+
+    assert merge_duplicate_cameras(db) == {"merged": 3, "normalised": 1}
+    db.expire_all()
+    left = db.query(Camera).filter(Camera.room_id == room.id).all()
+    assert [c.id for c in left] == [keep.id] and left[0].source_uri == "demo_video/a.mp4"
+    assert db.get(ExamSession, session.id).camera_id == keep.id  # moved, not lost
+    assert db.query(Camera).filter(Camera.room_id == other_room.id).one().source_uri == "rtsp://10.0.0.5/live"
+    assert merge_duplicate_cameras(db) == {"merged": 0, "normalised": 0}  # idempotent
